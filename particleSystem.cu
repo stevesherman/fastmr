@@ -374,11 +374,11 @@ struct isOut
 	isOut(float bmax) : bmax(bmax) {}	
 	
 	__host__ __device__ bool operator()(const float4 &p){
-		if(p.x*p.x >= bmax*bmax )
+		if(p.x*p.x > bmax*bmax )
 			return true;
 		if(p.y*p.y > bmax*bmax)//>= due to pinning BCs
 			return true;
-		if(p.z*p.z >= bmax*bmax )
+		if(p.z*p.z > bmax*bmax )
 			return true;
 		return false;
 	}

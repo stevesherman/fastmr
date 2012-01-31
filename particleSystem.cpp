@@ -274,288 +274,153 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 		m_randSet--;
 
 	} else {
-		if(false)
-		{
-			
-			/*
-			   Main loop:
-				sort
-				moments
-				forceIntegrate
-				render/pass out
-			*/
-
-			// calculate grid hash
-			
-					calcHash(m_dGridParticleHash, m_dGridParticleIndex,	m_dPos,	m_numParticles);
-			// sort particles based on hash
-			//printf("ok\n");
-			sortParticles(m_dGridParticleHash, m_dGridParticleIndex, m_numParticles);
-			cudaDeviceSynchronize();
-			//printf("plz\n");
-			//TODO: find a better way to compute moment
-			// reorder particle arrays into sorted order and
-			// find start and end of each cell - also sets the fixed moment
-			reorderDataAndFindCellStart(
-				m_dCellStart, m_dCellEnd,
-				m_dSortedPos, m_dMomentsB, // moments B is sorted
-				m_dGridParticleHash, m_dGridParticleIndex,
-				m_dPos, m_dMomentsA, //input
-				m_numParticles,	m_numGridCells);
-			//swap so MomentsA is always the newest one	
-			float* temp = m_dMomentsA;
-			m_dMomentsA = m_dMomentsB;
-			m_dMomentsB = temp;
-			
-			//do the iterative solve of moments
-			for(int ii = 0; ii<m_params.mutDipIter; ii++)
-			{
-				calcMoments(
-					m_dSortedPos,
-					m_dMomentsA,//in
-					m_dMomentsB,//out
-					m_dGridParticleIndex,
-					m_dCellStart, m_dCellEnd,
-					m_numParticles,	m_numGridCells);
-				//swap the pointers
-				temp = m_dMomentsA;
-				m_dMomentsA = m_dMomentsB;
-				m_dMomentsB = temp;
-				//Moments A is always the newest one	
-			}
+		newParams hnparams;
+		hnparams.N = m_numParticles;
+		hnparams.gridSize = m_params.gridSize;
+		hnparams.numGridCells = m_numGridCells;
+		hnparams.cellSize = m_params.cellSize;
+		//printf("cs: %g %g %g ocs: %g %g %g\n", hnparams.cellSize.x, hnparams.cellSize.y, hnparams.cellSize.z, m_params.cellSize.x, m_params.cellSize.y, m_params.cellSize.z);
+		hnparams.worldOrigin = m_params.worldOrigin;
+		hnparams.L = m_params.worldSize;
+		hnparams.Linv = 1/hnparams.L;
+		hnparams.max_ndr_sq = 8.0f*m_params.particleRadius[0]*8.0f*m_params.particleRadius[0];
+		hnparams.max_fdr_sq = 8.0f*m_params.particleRadius[0]*8.0f*m_params.particleRadius[0];
+		hnparams.num_c_neigh = 125;
+		hnparams.spring = 25;
+		hnparams.uf = m_params.uf;
+		hnparams.shear = m_params.shear;
+		hnparams.viscosity = m_params.viscosity;
+		hnparams.max_neigh = m_maxNeigh;
+		setNParameters(&hnparams);
 		
-		/*	
-			//trapezoid integration
-			calcForces(m_dSortedPos,//for calculations
-					m_dSortedPos, //for integration
-					m_dMidPos,//out
-					m_dForces1,//out
-					m_dMomentsA, deltaTime,	m_dCellStart,m_dCellEnd,m_numParticles);
-
-			calcForces(m_dMidPos, m_dMidPos,m_dPos,	m_dForces2,	m_dMomentsA,deltaTime,
-					m_dCellStart, m_dCellEnd, m_numParticles);
+		
+		//isOutofBounds((float4*) m_dPos, m_params.worldOrigin.x, m_numParticles);
+		comp_phash(m_dPos, m_dGridParticleHash, m_dGridParticleIndex, m_dCellHash, m_numParticles, m_numGridCells);
+		// sort particles based on hash
+		//cudaDeviceSynchronize();
+		sortParticles(m_dGridParticleHash, m_dGridParticleIndex, m_numParticles);
+		//cudaDeviceSynchronize();
+		// reorder particle arrays into sorted order and
+		// find start and end of each cell - also sets the fixed moment
+		find_cellStart(m_dCellStart, m_dCellEnd, m_dGridParticleHash, m_numParticles, m_numGridCells);
+		cutilCheckMsg("Cstart");
+		reorder(m_dGridParticleIndex, m_dSortedPos, m_dMomentsB, m_dPos, m_dMomentsA, m_numParticles);	
+		cutilCheckMsg("Reorder");
+		float* temp = m_dMomentsB;
+		m_dMomentsB = m_dMomentsA;
+		m_dMomentsA = temp;
 			
-			integrate(m_dSortedPos,//in
-				m_dPos,//overwite FinalPos
-				m_dForces1,
-				m_dForces2,
-				deltaTime,
-				m_numParticles);
-		*/	
-			bool solve = true;
-			double Cd, maxf, maxFdx;
-			Cd = 6*CUDART_PI_F*m_params.viscosity*m_params.particleRadius[0];
-			while(solve) {
-				//use max dx to control integration test
-				maxFdx = maxdxpct*Cd*m_params.particleRadius[0]/deltaTime; //force to cause a dx
-				//see the wikipedia article on RK4 for this to make sense	
-				calcForces(m_dSortedPos,//yn					//y_in
-						m_dSortedPos, 	//yn					//yn
-						m_dMidPos, 		//yn + 1/2*k1			//out: yn + dt*kn
-						m_dForces1,		//k1					//f(y_in)
-						m_dMomentsA, 							//moments at yn (being held constant)
-						deltaTime/2, 							//for yn + dt*kn
-						m_dCellStart, m_dCellEnd, m_numParticles);
+		//printf("test N: %d %d\n", hnparams.N, m_numParticles);
+		uint maxn = buildNList(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, m_dCellStart, m_dCellEnd, m_dCellAdj, m_numParticles);
+		cutilCheckMsg("nlist");
+		
+		//printf("maxn: %d\n", maxn);
+		/*cudaMemcpy(m_hNumNeigh, m_dNumNeigh, sizeof(uint)*m_numParticles, cudaMemcpyDeviceToHost);
+		cudaMemcpy(m_hForces, m_dForces1, 4*sizeof(float)*m_numParticles, cudaMemcpyDeviceToHost);
+		float max_neigh = 0;
+		for(uint i = 0; i < m_numParticles; i++){
+			max_neigh = m_hForces[4*i+3] > max_neigh ? m_hForces[4*i+3] : max_neigh;
+			if( m_hNumNeigh[i] != (uint) m_hForces[4*i+3] && m_randSet == 0)
+				printf("particle %d has a neighbor discrepancy: %d v %f\n", i,  m_hNumNeigh[i], m_hForces[4*i+3]);
+		}
+		printf("host max neigh = %f\n", max_neigh);*/
+		/*cudaMemcpy(m_hNeighList, m_dNeighList, sizeof(uint)*m_numParticles*m_maxNeigh, cudaMemcpyDeviceToHost);	
+		for(uint i = 0; i < hnparams.N; i++){
+			for(uint j = 0; j < m_hNumNeigh[i]; j++){
+				uint neigh = m_hNeighList[j*hnparams.N + i];
+				if(neigh > hnparams.N){
+					printf("Particle %d neighbor num: %d has val: %d which exceeds N: %d\n", i,j,neigh,hnparams.N);
+				}
+				if(neigh == i){
+					printf("Particle %d is listed as neighbors with itself(!)\n Has neighbors:\t", i);
+					for(uint k=0; k<m_hNumNeigh[i]; k++){
+					   printf("%d\t", m_hNeighList[k*hnparams.N + i+1]);
+					}
+				}
+			}
+			
+		}*/
+		//start debugging the new kern code
+		if(maxn > m_maxNeigh){
+			printf("maxn is too large (!) %u of %u\n", maxn, m_maxNeigh);
+			assert(maxn <= m_maxNeigh);
+		}
+		bool solve = true;
+		double Cd, maxf, maxFdx;
+		Cd = 6*CUDART_PI_F*m_params.viscosity*m_params.particleRadius[0];
 
-				calcForces(m_dMidPos,	//yn + 1/2 k1 
+		while(solve) {
+			maxFdx = maxdxpct*Cd*m_params.particleRadius[0]/deltaTime; //force to cause a dx
+
+			magForces(	m_dSortedPos,	//yin: yn 
 						m_dSortedPos,	//yn
-						m_dMidPos,		//sets to yn + 1/2*k2
+						m_dMidPos,   	//yn + 1/2*k1
+						m_dForces1,   	//k1
+						m_dMomentsA, m_dNeighList, m_dNumNeigh, m_numParticles, deltaTime/2);
+			cutilCheckMsg("magForces");
+		/*	
+			cudaMemcpy(m_hForces, m_dForces1, 4*sizeof(float)*m_numParticles, cudaMemcpyDeviceToHost);
+			cudaMemcpy(m_hMoments,m_dForces3, 4*sizeof(float)*m_numParticles, cudaMemcpyDeviceToHost);
+			uint fdiscrep = 0;
+			for(uint i = 0; i < m_numParticles; i++){
+				float3 fold = make_float3(m_hForces[4*i], m_hForces[4*i+1], m_hForces[4*i+2]);
+				float3 fnew = make_float3(m_hMoments[4*i], m_hMoments[4*i+1], m_hMoments[4*i+2]);
+				//printf("fold: %g %g %g %.1f\t fnew: %g %g %g %.1f\n", fold.x, fold.y, fold.z, m_hForces[4*i+3], fnew.x, fnew.y, fnew.z, m_hMoments[4*i+3]);
+				if( length(fnew-fold)/length(fold) > 1e-4f){
+					printf("fold: %g %g %g %.1f\t fnew: %g %g %g %.1f\n", fold.x, fold.y, fold.z, m_hForces[4*i+3], fnew.x, fnew.y, fnew.z, m_hMoments[4*i+3]);
+					printf("Error of %g discrepancy in particle %u\n", length(fnew-fold)/length(fold),i);
+					fdiscrep++;
+				}
+			}
+			printf("fdiscrep = %d\n", fdiscrep);
+		*/
+			magForces(	m_dMidPos, 		//yin: yn + 1/2*k1
+						m_dSortedPos, 	//yn
+						m_dPos, 		//yn + 1/2*k2
 						m_dForces2,		//k2
-						m_dMomentsA, deltaTime/2, m_dCellStart, m_dCellEnd, m_numParticles);
-				
-				calcForces(m_dMidPos, 	//yn + 1/2 k2 
+						m_dMomentsA, m_dNeighList, m_dNumNeigh, m_numParticles, deltaTime/2);
+			magForces(	m_dPos, 		//yin: yn + 1/2*k2
 						m_dSortedPos, 	//yn
-						m_dMidPos,    	//sets to yn + k3
-						m_dForces3, 	//k3
-						m_dMomentsA, deltaTime, m_dCellStart, m_dCellEnd, m_numParticles);
-				
-				calcForces(m_dMidPos, 	//yn + k3 
+						m_dMidPos, 		//yn + k3
+						m_dForces3,		//k3
+						m_dMomentsA, m_dNeighList, m_dNumNeigh, m_numParticles, deltaTime);
+			magForces(	m_dMidPos, 		//yin: yn + k3
 						m_dSortedPos, 	//yn
-						m_dMidPos,    	// doesn't matter
+						m_dPos, 		// doesn't matter
 						m_dForces4,		//k4
-						m_dMomentsA, deltaTime, m_dCellStart, m_dCellEnd, m_numParticles);
-
-				RK4integrate(m_dSortedPos,//yn 
+						m_dMomentsA, m_dNeighList, m_dNumNeigh, m_numParticles, deltaTime/2);
+			
+			RK4integrate(m_dSortedPos,//yn 
 						m_dPos, //yn+1
 						m_dForces1, //1/6*(k1 + 2*k2 + 2*k3 + k4) 
 						m_dForces2, m_dForces3, m_dForces4, deltaTime, m_numParticles);
+	
+			solve = false;	
 		
-				solve = false;	
+					
+			//need some sort of controller for error
 			
-						
-				//need some sort of controller for error
-				
-				//find max force
-				//printf("callmax\n");
-				maxf = maxforce( (float4*) m_dForces1, m_numParticles);
-				//printf("force excess ratio %.3g\n", maxf/maxFdx);	
-			
-				if(maxf > maxFdx){
-					solve = true;
-				} else { //if not excess force, check for out of bounds
-					//printf("ok\n");
-					solve = isOutofBounds((float4*)m_dPos, -m_params.worldOrigin.x, m_numParticles);
-					//printf("plz\n");
-				}
-				if(solve){
-					deltaTime *=.5f;
-					assert(deltaTime != 0);
-					printf("reducing timestep %.3g\n", deltaTime);
-					//getBadP();	
-				}
-			}
-		} else {
-			newParams hnparams;
-			hnparams.N = m_numParticles;
-			hnparams.gridSize = m_params.gridSize;
-			hnparams.numGridCells = m_numGridCells;
-			hnparams.cellSize = m_params.cellSize;
-			//printf("cs: %g %g %g ocs: %g %g %g\n", hnparams.cellSize.x, hnparams.cellSize.y, hnparams.cellSize.z, m_params.cellSize.x, m_params.cellSize.y, m_params.cellSize.z);
-			hnparams.worldOrigin = m_params.worldOrigin;
-			hnparams.L = m_params.worldSize;
-			hnparams.Linv = 1/hnparams.L;
-			hnparams.max_ndr_sq = 8.0f*m_params.particleRadius[0]*8.0f*m_params.particleRadius[0];
-			hnparams.max_fdr_sq = 8.0f*m_params.particleRadius[0]*8.0f*m_params.particleRadius[0];
-			hnparams.num_c_neigh = 125;
-			hnparams.spring = 25;
-			hnparams.uf = m_params.uf;
-			hnparams.shear = m_params.shear;
-			hnparams.viscosity = m_params.viscosity;
-			hnparams.max_neigh = m_maxNeigh;
-			setNParameters(&hnparams);
-			
-			
-			//isOutofBounds((float4*) m_dPos, m_params.worldOrigin.x, m_numParticles);
-			comp_phash(m_dPos, m_dGridParticleHash, m_dGridParticleIndex, m_dCellHash, m_numParticles, m_numGridCells);
-			// sort particles based on hash
-			//cudaDeviceSynchronize();
-			sortParticles(m_dGridParticleHash, m_dGridParticleIndex, m_numParticles);
-			//cudaDeviceSynchronize();
-			// reorder particle arrays into sorted order and
-			// find start and end of each cell - also sets the fixed moment
-			find_cellStart(m_dCellStart, m_dCellEnd, m_dGridParticleHash, m_numParticles, m_numGridCells);
-			cutilCheckMsg("Cstart");
-			reorder(m_dGridParticleIndex, m_dSortedPos, m_dMomentsB, m_dPos, m_dMomentsA, m_numParticles);	
-			cutilCheckMsg("Reorder");
-			float* temp = m_dMomentsB;
-			m_dMomentsB = m_dMomentsA;
-			m_dMomentsA = temp;
-				
-			//printf("test N: %d %d\n", hnparams.N, m_numParticles);
-			uint maxn = buildNList(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, m_dCellStart, m_dCellEnd, m_dCellAdj, m_numParticles);
-			cutilCheckMsg("nlist");
-			
-			//printf("maxn: %d\n", maxn);
-			/*cudaMemcpy(m_hNumNeigh, m_dNumNeigh, sizeof(uint)*m_numParticles, cudaMemcpyDeviceToHost);
-			cudaMemcpy(m_hForces, m_dForces1, 4*sizeof(float)*m_numParticles, cudaMemcpyDeviceToHost);
-			float max_neigh = 0;
-			for(uint i = 0; i < m_numParticles; i++){
-				max_neigh = m_hForces[4*i+3] > max_neigh ? m_hForces[4*i+3] : max_neigh;
-				if( m_hNumNeigh[i] != (uint) m_hForces[4*i+3] && m_randSet == 0)
-					printf("particle %d has a neighbor discrepancy: %d v %f\n", i,  m_hNumNeigh[i], m_hForces[4*i+3]);
-			}
-			printf("host max neigh = %f\n", max_neigh);*/
-			/*cudaMemcpy(m_hNeighList, m_dNeighList, sizeof(uint)*m_numParticles*m_maxNeigh, cudaMemcpyDeviceToHost);	
-			for(uint i = 0; i < hnparams.N; i++){
-				for(uint j = 0; j < m_hNumNeigh[i]; j++){
-					uint neigh = m_hNeighList[j*hnparams.N + i];
-					if(neigh > hnparams.N){
-						printf("Particle %d neighbor num: %d has val: %d which exceeds N: %d\n", i,j,neigh,hnparams.N);
-					}
-					if(neigh == i){
-						printf("Particle %d is listed as neighbors with itself(!)\n Has neighbors:\t", i);
-						for(uint k=0; k<m_hNumNeigh[i]; k++){
-						   printf("%d\t", m_hNeighList[k*hnparams.N + i+1]);
-						}
-					}
-				}
-				
-			}*/
-			//start debugging the new kern code
-			if(maxn > m_maxNeigh){
-				printf("maxn is too large (!) %u of %u\n", maxn, m_maxNeigh);
-				assert(maxn <= m_maxNeigh);
-			}
-			bool solve = true;
-			double Cd, maxf, maxFdx;
-			Cd = 6*CUDART_PI_F*m_params.viscosity*m_params.particleRadius[0];
-
-			while(solve) {
-				maxFdx = maxdxpct*Cd*m_params.particleRadius[0]/deltaTime; //force to cause a dx
-
-				magForces(	m_dSortedPos,	//yin: yn 
-							m_dSortedPos,	//yn
-							m_dMidPos,   	//yn + 1/2*k1
-							m_dForces1,   	//k1
-							m_dMomentsA, m_dNeighList, m_dNumNeigh, m_numParticles, deltaTime/2);
-				cutilCheckMsg("magForces");
-			/*	
-				cudaMemcpy(m_hForces, m_dForces1, 4*sizeof(float)*m_numParticles, cudaMemcpyDeviceToHost);
-				cudaMemcpy(m_hMoments,m_dForces3, 4*sizeof(float)*m_numParticles, cudaMemcpyDeviceToHost);
-				uint fdiscrep = 0;
-				for(uint i = 0; i < m_numParticles; i++){
-					float3 fold = make_float3(m_hForces[4*i], m_hForces[4*i+1], m_hForces[4*i+2]);
-					float3 fnew = make_float3(m_hMoments[4*i], m_hMoments[4*i+1], m_hMoments[4*i+2]);
-					//printf("fold: %g %g %g %.1f\t fnew: %g %g %g %.1f\n", fold.x, fold.y, fold.z, m_hForces[4*i+3], fnew.x, fnew.y, fnew.z, m_hMoments[4*i+3]);
-					if( length(fnew-fold)/length(fold) > 1e-4f){
-						printf("fold: %g %g %g %.1f\t fnew: %g %g %g %.1f\n", fold.x, fold.y, fold.z, m_hForces[4*i+3], fnew.x, fnew.y, fnew.z, m_hMoments[4*i+3]);
-						printf("Error of %g discrepancy in particle %u\n", length(fnew-fold)/length(fold),i);
-						fdiscrep++;
-					}
-				}
-				printf("fdiscrep = %d\n", fdiscrep);
-			*/
-				magForces(	m_dMidPos, 		//yin: yn + 1/2*k1
-							m_dSortedPos, 	//yn
-							m_dPos, 		//yn + 1/2*k2
-							m_dForces2,		//k2
-							m_dMomentsA, m_dNeighList, m_dNumNeigh, m_numParticles, deltaTime/2);
-				magForces(	m_dPos, 		//yin: yn + 1/2*k2
-							m_dSortedPos, 	//yn
-							m_dMidPos, 		//yn + k3
-							m_dForces3,		//k3
-							m_dMomentsA, m_dNeighList, m_dNumNeigh, m_numParticles, deltaTime);
-				magForces(	m_dMidPos, 		//yin: yn + k3
-							m_dSortedPos, 	//yn
-							m_dPos, 		// doesn't matter
-							m_dForces4,		//k4
-							m_dMomentsA, m_dNeighList, m_dNumNeigh, m_numParticles, deltaTime/2);
-				
-				RK4integrate(m_dSortedPos,//yn 
-							m_dPos, //yn+1
-							m_dForces1, //1/6*(k1 + 2*k2 + 2*k3 + k4) 
-							m_dForces2, m_dForces3, m_dForces4, deltaTime, m_numParticles);
+			//find max force
+			//printf("callmax\n");
+			maxf = maxforce( (float4*) m_dForces1, m_numParticles);
+			//printf("force excess ratio %.3g\n", maxf/maxFdx);	
 		
-				solve = false;	
-			
-						
-				//need some sort of controller for error
-				
-				//find max force
-				//printf("callmax\n");
-				maxf = maxforce( (float4*) m_dForces1, m_numParticles);
-				//printf("force excess ratio %.3g\n", maxf/maxFdx);	
-			
-				if(maxf > maxFdx){
-					solve = true;
-				} else { //if not excess force, check for out of bounds
-					//printf("ok\n");
-					solve = isOutofBounds((float4*)m_dPos, -m_params.worldOrigin.x, m_numParticles);
-					//printf("plz\n");
-				}
-				if(solve){
-					deltaTime *=.5f;
-					assert(deltaTime != 0);
-					printf("reducing timestep %.3g\n", deltaTime);
-					//getBadP();	
-				}
+			if(maxf > maxFdx){
+				solve = true;
+			} else { //if not excess force, check for out of bounds
+				//printf("ok\n");
+				solve = isOutofBounds((float4*)m_dPos, -m_params.worldOrigin.x, m_numParticles);
+				//printf("plz\n");
+			}
+			if(solve){
+				deltaTime *=.5f;
+				assert(deltaTime != 0);
+				printf("reducing timestep %.3g\n", deltaTime);
+				//getBadP();	
 			}
 		}
 	}
-	
-	
-
-
+		
 	return deltaTime;
 }
 

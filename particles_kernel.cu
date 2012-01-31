@@ -475,10 +475,17 @@ __global__ void integrateRK4(const float4* oldPos,
 	pos += fcomp*deltaTime/Cd;
 
 	//periodic boundary conditions
-   	pos.x -= params.worldSize.x*floor((pos.x - params.worldOrigin.x)/params.worldSize.x);
-	pos.y -= params.worldSize.y*floor((pos.y - params.worldOrigin.x)/params.worldSize.x);
-	if (pos.z > -1.0f*params.worldOrigin.z ) { pos.z += 2.0f*params.worldOrigin.z;}
-    if (pos.z < params.worldOrigin.z ) { pos.z -= 2.0f*params.worldOrigin.z; }
+   	//pos.x -= params.worldSize.x*floor((pos.x - params.worldOrigin.x)/params.worldSize.x);
+	//pos.z -= params.worldSize.z*floor((pos.z - params.worldOrigin.z)/params.worldSize.z);
+	
+	if (pos.x > -1.0f*params.worldOrigin.x ) { pos.x -= params.worldSize.x;}
+    if (pos.x < params.worldOrigin.x ) { pos.x += params.worldSize.x;}
+	if (pos.z > -1.0f*params.worldOrigin.z ) { pos.z -= params.worldSize.z;}
+	if (pos.z < params.worldOrigin.z ) { pos.z += params.worldSize.z; }
+
+	
+	if (pos.y > -1.0f*params.worldOrigin.y ) { pos.y = -1.0f*params.worldOrigin.z;}
+    if (pos.y < params.worldOrigin.y ) { pos.y = 1.0f*params.worldOrigin.z; }
 
 	newPos[index] = make_float4(pos, radius);
 	
