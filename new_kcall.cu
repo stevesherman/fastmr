@@ -20,13 +20,28 @@ uint iDivUp2(uint a, uint b)
 	return (a%b==0) ? (a/b) : (a/b + 1);
 }
 
-void comp_phash(float* dpos, uint* d_pHash, uint* d_pIndex, uint* d_CellHash, uint numParticles)
+void comp_phash(float* dpos, uint* d_pHash, uint* d_pIndex, uint* d_CellHash, uint numParticles, uint numGridCells)
 {
-	uint numThreads = 128;
+	uint numThreads = 256;
 	uint numBlocks = iDivUp2(numParticles, numThreads);
+/*	
+	uint maxkey = 0;
+	thrust::device_ptr<uint> dev_ptr(d_pHash);
+	thrust::maximum<uint> mx;
+	maxkey = thrust::reduce(dev_ptr, dev_ptr+numParticles, 0, mx);
+	printf("omaxkey: %u\n", maxkey);		
+
+	thrust::device_ptr<uint> hashes(d_CellHash);
+	maxkey = thrust::reduce(hashes, hashes+numGridCells, 0, mx);
+	printf("max hash: %u\n", maxkey);
+*/
 
 	comp_phashK<<<numBlocks, numThreads>>> ( (float4*) dpos, d_pHash, d_pIndex, d_CellHash);
-
+	//cudaDeviceSynchronize();
+	cutilCheckMsg("in phash computation");	
+	/*
+	maxkey = thrust::reduce(dev_ptr, dev_ptr+numParticles, 0, mx);
+	printf("nmaxkey: %u\n", maxkey);*/
 }
 
 
@@ -36,7 +51,7 @@ void setNParameters(newParams *hostParams){
 
 void find_cellStart(uint* cellStart, uint* cellEnd, uint* phash, uint numParticles, uint numCells)
 {
-	uint numThreads = 64;
+	uint numThreads = 128;
 	uint numBlocks = iDivUp2(numParticles, numThreads);
 	uint sMemSize = sizeof(uint)*(numThreads+1);
 
@@ -64,7 +79,8 @@ uint buildNList(uint* nlist, uint* num_neigh, float* dpos, uint* phash,
 
 	buildNListK<<<numBlocks, numThreads>>>(nlist, num_neigh, (float4*) dpos, 
 			phash, cellStart, cellEnd, cellAdj);
-
+	cutilCheckMsg("preSync");
+	cudaDeviceSynchronize();
 
 	cutilCheckMsg("inNList");
 	//find the maximum value using thrust - alternatively atomicMax as in HOOMD

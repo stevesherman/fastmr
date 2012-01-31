@@ -20,10 +20,14 @@ __device__ uint3 calcGPos(float3 p)
 	gpos.x = floor((p.x - nparams.worldOrigin.x)/nparams.cellSize.x);
 	gpos.y = floor((p.y - nparams.worldOrigin.y)/nparams.cellSize.y);
 	gpos.z = floor((p.z - nparams.worldOrigin.z)/nparams.cellSize.z);
+	gpos.x = (nparams.gridSize.x + gpos.x) % nparams.gridSize.x;
+	gpos.y = (nparams.gridSize.y + gpos.y) % nparams.gridSize.y;
+	gpos.z = (nparams.gridSize.z + gpos.z) % nparams.gridSize.z;
+	
 	return gpos;
 }
 
-__global__ void comp_phashK(float4* d_pos, uint* d_pHash, uint* d_pIndex, uint* d_CellHash)
+__global__ void comp_phashK(const float4* d_pos, uint* d_pHash, uint* d_pIndex, const uint* d_CellHash)
 {
 	int idx = blockDim.x*blockIdx.x + threadIdx.x;
 
@@ -37,7 +41,7 @@ __global__ void comp_phashK(float4* d_pos, uint* d_pHash, uint* d_pIndex, uint* 
 		gpos.z*nparams.gridSize.y*nparams.gridSize.x;
 	
 	d_pIndex[idx] = idx;
-	d_pHash[idx] = d_CellHash[cell_id];
+	d_pHash[idx] = cell_id;
 }
 
 
@@ -57,7 +61,9 @@ __global__ void findCellStartK(uint* cellStart,		//o: cell starts
 		if(index > 0 && threadIdx.x == 0)
 			sharedHash[0] = phash[index-1];
 	}
+	
 	__syncthreads();
+	
 	if(index < nparams.N)
 	{
 		//once load complete, compare to hash before and if !=, then write starts/ends

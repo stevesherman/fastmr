@@ -286,7 +286,8 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 			*/
 
 			// calculate grid hash
-			calcHash(m_dGridParticleHash, m_dGridParticleIndex,	m_dPos,	m_numParticles);
+			
+					calcHash(m_dGridParticleHash, m_dGridParticleIndex,	m_dPos,	m_numParticles);
 			// sort particles based on hash
 			//printf("ok\n");
 			sortParticles(m_dGridParticleHash, m_dGridParticleIndex, m_numParticles);
@@ -409,6 +410,7 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 			hnparams.gridSize = m_params.gridSize;
 			hnparams.numGridCells = m_numGridCells;
 			hnparams.cellSize = m_params.cellSize;
+			//printf("cs: %g %g %g ocs: %g %g %g\n", hnparams.cellSize.x, hnparams.cellSize.y, hnparams.cellSize.z, m_params.cellSize.x, m_params.cellSize.y, m_params.cellSize.z);
 			hnparams.worldOrigin = m_params.worldOrigin;
 			hnparams.L = m_params.worldSize;
 			hnparams.Linv = 1/hnparams.L;
@@ -422,7 +424,9 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 			hnparams.max_neigh = m_maxNeigh;
 			setNParameters(&hnparams);
 			
-			comp_phash(m_dPos, m_dGridParticleHash, m_dGridParticleIndex, m_dCellHash, m_numParticles);
+			
+			//isOutofBounds((float4*) m_dPos, m_params.worldOrigin.x, m_numParticles);
+			comp_phash(m_dPos, m_dGridParticleHash, m_dGridParticleIndex, m_dCellHash, m_numParticles, m_numGridCells);
 			// sort particles based on hash
 			//cudaDeviceSynchronize();
 			sortParticles(m_dGridParticleHash, m_dGridParticleIndex, m_numParticles);
@@ -854,6 +858,10 @@ ParticleSystem::reset(ParticleConfig config)
 			//	printf("idx: %d gl: %d %d %d\n", idx, i,j,k);
 			}
 		}
+	}
+	for(uint i=0; i < m_numGridCells; i++){
+		if(m_hCellHash[i] >= m_numGridCells)
+			printf("cell_adj entry %d has invaled entry %d\n", i, m_hCellHash[i]);
 	}
 	copyArrayToDevice(m_dCellAdj, m_hCellAdj,0, 125*m_numGridCells*sizeof(uint));
 	copyArrayToDevice(m_dCellHash, m_hCellHash, 0, m_numGridCells*sizeof(uint));

@@ -3,7 +3,7 @@ extern "C" {
 
 void setNParameters(newParams* hostParams);
 
-void comp_phash(float* dpos, uint* d_pHash, uint* d_pIndex, uint* d_cell_hash, uint numParticles);
+void comp_phash(float* dpos, uint* d_pHash, uint* d_pIndex, uint* d_cell_hash, uint numParticles, uint numGridCells);
 
 void find_cellStart(uint* cellStart, uint* cellEnd, uint* phash, uint numParticles,uint numCells);
 
