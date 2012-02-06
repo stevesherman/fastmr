@@ -112,18 +112,14 @@ __global__ void magForcesK( float4* dSortedPos,	//i: pos we use to calculate for
 	float radius1 = pos1.w;
 	float4 mom1 = dMom[idx];
 	float3 m1 = make_float3(mom1);
-	//float xi1 = mom1.w;
+	float xi1 = mom1.w;
 	
 	float3 force = make_float3(0,0,0);
 
 
 	for(uint i = 0; i < n_neigh; i++)
 	{
-		/*if(i*nparams.N + idx >= nparams.N*nparams.max_neigh)
-			radius1 *= 1.0001f;*/
 		uint neighbor = nlist[i*nparams.N + idx];
-		/*if(neighbor >= nparams.N)
-			xi1 *= 1.0001f;*/
 		
 		float4 pos2 = dSortedPos[neighbor];
 		float3 p2 = make_float3(pos2);
@@ -131,7 +127,7 @@ __global__ void magForcesK( float4* dSortedPos,	//i: pos we use to calculate for
 
 		float4 mom2 = dMom[neighbor];
 		float3 m2 = make_float3(mom2);
-		//float xi2 = mom2.w;
+		float xi2 = mom2.w;
 
 		float3 dr = p1 - p2;
 		dr.x = dr.x - nparams.L.x*rintf(dr.x*nparams.Linv.x);
@@ -148,6 +144,12 @@ __global__ void magForcesK( float4* dSortedPos,	//i: pos we use to calculate for
 			
 			force += 3.0f*nparams.uf/(4*PI*lsq*lsq) *( dm1m2*er + dm1er*m2
 					+ dm2er*m1 - 5.0f*dm1er*dm2er*er);
+			
+			m1 = (xi1 == 1.0f) ? nparams.mup*nparams.externalH : m1;
+			m2 = (xi2 == 1.0f) ? nparams.mup*nparams.externalH : m2;
+			dm1m2 = dot(m1,m2);
+
+			
 			float sepdist = radius1 + radius2;
 			force += 3.0f*nparams.uf*dm1m2/(2.0f*PI*pow(sepdist,4))*
 					exp(-nparams.spring*(sqrt(lsq)/sepdist - 1.0f))*er;
@@ -201,8 +203,8 @@ __global__ void buildNListK(	uint* nlist,	//	o:neighbor list
 					//float rad2 = pos2.w;
 					float3 dr = p1 - p2;
 
-					dr.x = dr.x - nparams.L.x*rintf(dr.x/nparams.L.x);
-					dr.z = dr.z - nparams.L.z*rintf(dr.z/nparams.L.z);
+					dr.x = dr.x - nparams.L.x*rintf(dr.x*nparams.Linv.x);
+					dr.z = dr.z - nparams.L.z*rintf(dr.z*nparams.Linv.z);
 
 					float lsq = dr.x*dr.x + dr.y*dr.y + dr.z*dr.z;
 

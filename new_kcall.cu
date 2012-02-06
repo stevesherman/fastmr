@@ -37,9 +37,9 @@ void comp_phash(float* dpos, uint* d_pHash, uint* d_pIndex, uint* d_CellHash, ui
 */
 
 	comp_phashK<<<numBlocks, numThreads>>> ( (float4*) dpos, d_pHash, d_pIndex, d_CellHash);
-	//cudaDeviceSynchronize();
+	cudaDeviceSynchronize();
 	cutilCheckMsg("in phash computation");	
-	/*
+/*	
 	maxkey = thrust::reduce(dev_ptr, dev_ptr+numParticles, 0, mx);
 	printf("nmaxkey: %u\n", maxkey);*/
 }
@@ -74,24 +74,38 @@ uint buildNList(uint* nlist, uint* num_neigh, float* dpos, uint* phash,
 	uint numThreads = 64;
 	//printf("N %d\n", numParticles);
 	uint numBlocks = iDivUp2(numParticles, numThreads);
-	
+	cudaFuncSetCacheConfig(buildNListK, cudaFuncCachePreferL1);	
 	//printf("nT: %d, nB: %d\n", numThreads, numBlocks);
 
 	buildNListK<<<numBlocks, numThreads>>>(nlist, num_neigh, (float4*) dpos, 
 			phash, cellStart, cellEnd, cellAdj);
 	cutilCheckMsg("preSync");
-	cudaDeviceSynchronize();
+	//cudaDeviceSynchronize();
 
 	cutilCheckMsg("inNList");
 	//find the maximum value using thrust - alternatively atomicMax as in HOOMD
 	//if exceeds, realloc and regen
-	
-	thrust::device_ptr<uint> dev_ptr(num_neigh);
-	uint max = 0;
+
 	thrust::maximum<uint> mx;
-	max=thrust::reduce(dev_ptr, dev_ptr+numParticles, 0, mx);
+	/*
+	//fprintf(stderr, "A\t");	
+	thrust::device_ptr<uint> thr_nlist(nlist);
+	uint maxn = 0;
+	maxn = thrust::reduce(thr_nlist, thr_nlist+max_neigh*numParticles, 0, mx);
+	if(maxn >= numParticles)
+		printf("nlist generation is FUCKED\n");
+	//fprintf(stderr, "B\t");	
+	*/
 	
-	return max;
+	thrust::device_ptr<uint> numneigh_ptr(num_neigh);
+	uint max = 0;
+	max=thrust::reduce(numneigh_ptr, numneigh_ptr+numParticles, 0, mx);
+	cudaDeviceSynchronize();
+	cutilCheckMsg("max nneigh thrust call");	
+
+	//fprintf(stderr, "C\t");	
+
+return max;
 }
 
 		
@@ -102,6 +116,8 @@ void magForces(	float* dSortedPos, float* dIntPos, float* newPos, float* dForce,
 	uint numThreads = 64;
 	uint numBlocks = iDivUp2(numParticles, numThreads);
 	//printf("numP: %d numThreads %d, numBlocks %d\n", numParticles, numThreads, numBlocks);	
+	cudaFuncSetCacheConfig(magForcesK, cudaFuncCachePreferL1);
+	
 	magForcesK<<<numBlocks,numThreads>>>( 	(float4*)dSortedPos, (float4*) dMom, (float4*) dIntPos, 
 											nlist, num_neigh, (float4*) dForce, (float4*) newPos, deltaTime);
 	cutilCheckMsg("hi");

@@ -505,8 +505,13 @@ __global__ void writeRender(const float4* pos, //never changes
 {
 	uint index = blockIdx.x*blockDim.x + threadIdx.x;
 	if(index >= numParticles) return;
+	
 	rendPos[index] = pos[index];
+	//float4 rpos = pos[index];
 	float xi = moments[index].w;
+	//rpos.w = (xi == 1.0f) ? 0.0 : rpos.w;
+	//rendPos[index] = rpos;
+	
 	/*if(xi > 2.0f)
 		rendColor[index] = make_float4(0.1f, 1.0f, 0.1f, 0.0f);
 	else

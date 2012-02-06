@@ -25,6 +25,9 @@ struct newParams {
 	float spring;
 	float uf;
 	float viscosity;
-	float shear;	
+	float shear;
+
+	float3 externalH;
+	float mup;	
 };
 #endif

@@ -106,11 +106,6 @@ ParticleSystem::_initialize(int numParticles)
 	memset(m_hForces, 0, m_numParticles*4*sizeof(float));
 	memset(m_hMoments, 0, m_numParticles*4*sizeof(float));
 
-
-	for(uint i = 0; i < m_numParticles; i++){
-		m_hMoments[i+1]= m_params.externalH.y*m_params.mup;
-	}
-	printf("Moments blanked\n");
    	m_hCellStart = new uint[m_numGridCells];
     memset(m_hCellStart, 0, m_numGridCells*sizeof(uint));
 
@@ -283,14 +278,16 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 		hnparams.worldOrigin = m_params.worldOrigin;
 		hnparams.L = m_params.worldSize;
 		hnparams.Linv = 1/hnparams.L;
-		hnparams.max_ndr_sq = 8.0f*m_params.particleRadius[0]*8.0f*m_params.particleRadius[0];
+		hnparams.max_ndr_sq = 8.1f*m_params.particleRadius[0]*8.1f*m_params.particleRadius[0];
 		hnparams.max_fdr_sq = 8.0f*m_params.particleRadius[0]*8.0f*m_params.particleRadius[0];
 		hnparams.num_c_neigh = 125;
-		hnparams.spring = 25;
+		hnparams.spring = m_params.spring;
 		hnparams.uf = m_params.uf;
 		hnparams.shear = m_params.shear;
 		hnparams.viscosity = m_params.viscosity;
 		hnparams.max_neigh = m_maxNeigh;
+		hnparams.externalH = m_params.externalH;
+		hnparams.mup = m_params.mup;
 		setNParameters(&hnparams);
 		
 		
@@ -298,7 +295,9 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 		comp_phash(m_dPos, m_dGridParticleHash, m_dGridParticleIndex, m_dCellHash, m_numParticles, m_numGridCells);
 		// sort particles based on hash
 		//cudaDeviceSynchronize();
+		//fprintf(stderr, "asd\t");
 		sortParticles(m_dGridParticleHash, m_dGridParticleIndex, m_numParticles);
+		//fprintf(stderr, "ASD\n");
 		//cudaDeviceSynchronize();
 		// reorder particle arrays into sorted order and
 		// find start and end of each cell - also sets the fixed moment
@@ -311,9 +310,21 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 		m_dMomentsA = temp;
 			
 		//printf("test N: %d %d\n", hnparams.N, m_numParticles);
-		uint maxn = buildNList(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, m_dCellStart, m_dCellEnd, m_dCellAdj, m_numParticles);
-		cutilCheckMsg("nlist");
-		
+		//fprintf(stderr, "qwe\t");	
+		uint maxn = buildNList(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
+				m_dCellStart, m_dCellEnd, m_dCellAdj, m_numParticles, m_maxNeigh);
+		//fprintf(stderr, "QWE\n");
+		if(maxn > m_maxNeigh){
+			printf("Extending NList from %u to %u\n", m_maxNeigh, maxn);
+			cudaFree(m_dNeighList);
+			m_maxNeigh = maxn+2;//see if adding some margin fixes a potential error?
+			assert(cudaMalloc((void**)&m_dNeighList, m_numParticles*m_maxNeigh*sizeof(uint)) == cudaSuccess);
+			cudaMemset(m_dNeighList, 0, m_numParticles*m_maxNeigh*sizeof(uint));
+			maxn = buildNList(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
+					m_dCellStart, m_dCellEnd, m_dCellAdj, m_numParticles, m_maxNeigh);
+
+		}
+
 		//printf("maxn: %d\n", maxn);
 		/*cudaMemcpy(m_hNumNeigh, m_dNumNeigh, sizeof(uint)*m_numParticles, cudaMemcpyDeviceToHost);
 		cudaMemcpy(m_hForces, m_dForces1, 4*sizeof(float)*m_numParticles, cudaMemcpyDeviceToHost);
@@ -373,7 +384,10 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 				}
 			}
 			printf("fdiscrep = %d\n", fdiscrep);
-		*/
+		*/	
+			//printf("params.externalH: %g %g %g, params.mup %g \n", m_params.externalH.x,m_params.externalH.y, m_params.externalH.z, m_params.mup);
+ 
+
 			magForces(	m_dMidPos, 		//yin: yn + 1/2*k1
 						m_dSortedPos, 	//yn
 						m_dPos, 		//yn + 1/2*k2
@@ -403,7 +417,6 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 			//find max force
 			//printf("callmax\n");
 			maxf = maxforce( (float4*) m_dForces1, m_numParticles);
-			//printf("force excess ratio %.3g\n", maxf/maxFdx);	
 		
 			if(maxf > maxFdx){
 				solve = true;
@@ -415,7 +428,7 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 			if(solve){
 				deltaTime *=.5f;
 				assert(deltaTime != 0);
-				printf("reducing timestep %.3g\n", deltaTime);
+				printf("force excess ratio %.3g\treducing timestep %.3g\n", maxf/maxFdx, deltaTime);
 				//getBadP();	
 			}
 		}
@@ -702,9 +715,9 @@ ParticleSystem::reset(ParticleConfig config)
 			for(uint k=0; k < m_params.gridSize.z; k++){
 				uint idx = i + j*m_params.gridSize.x + k*m_params.gridSize.y*m_params.gridSize.x;
 				uint cn = 0;
-				for(int ii=-2; ii<=2; ii++){
+				for(int kk=-2; kk<=2; kk++){
 					for(int jj=-2; jj<=2; jj++){
-						for(int kk=-2; kk<=2;kk++){
+						for(int ii=-2; ii<=2;ii++){
 							int ai = ii + i;
 							int aj = jj + j;
 							int ak = kk + k;

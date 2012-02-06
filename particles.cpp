@@ -724,7 +724,7 @@ main(int argc, char** argv)
 		if(crashlog == NULL){	
 			printf("Crash file failed to open!");
 		} else {
-			int a = fscanf(crashlog, "Time: %g ns\n", &simtime);
+			int a = fscanf(crashlog, "Time: %lg ns\n", &simtime);
 			if( a == 0) rewind(crashlog);	
 			a = fscanf(crashlog, "vfrtot: %*f\t v0: %f\t v1: %f\t v2: %f\n", &params.volfr[0], 
 					&params.volfr[1], &params.volfr[2]);
