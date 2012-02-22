@@ -50,14 +50,16 @@ ParticleRenderer::DisplayMode displayMode = ParticleRenderer::PARTICLE_SPHERES;
 
 FILE* datalog;
 FILE* crashlog;
-const char* filename = "filenameunset.dat";
+const char* filename = "filenameunsetasd";
 char logfile [256];
+char crashname[231];
 
 
 int mode = 0;
 bool displayEnabled = true;
 uint recordInterval = 0;
 uint logInterval = 0;
+uint partlogInt = 0;
 bool bPause = false;
 bool displaySliders = false;
 bool wireframe = false;
@@ -189,6 +191,15 @@ void qupdate()
 		psystem->logParams(crashlog);
 		psystem->logParticles(crashlog);
 		rewind(crashlog);//sets up the overwrite
+	}
+
+	if( (partlogInt!=0) && (frameCount % partlogInt == 0)){
+		char pname [256];
+		sprintf(pname, "/home/steve/Datasets/%s_plog%.5d.dat", filename, frameCount/partlogInt);
+		FILE* plog = fopen(pname, "w");
+		psystem->logParams(plog);
+		psystem->logParticles(plog);
+		fclose(plog);	
 	}
 
 	simtime += dtout;//so that it logs at the correct time
@@ -614,18 +625,15 @@ main(int argc, char** argv)
 	int devID = cutGetMaxGflopsDeviceId();
 	cudaSetDevice(devID);
 	printf("devID: %d\n", devID);
-    if (argc > 1) {
-		if(cutCheckCmdLineFlag(argc, (const char **)argv, "noGL"))
-				g_useGL = false;
-		cutGetCmdLineArgumenti(argc, (const char **)argv, "record", (int *) &recordInterval);
-		cutGetCmdLineArgumenti(argc, (const char **)argv, "logf", (int *) &logInterval);
-	}
-	
+	if(cutCheckCmdLineFlag(argc, (const char **)argv, "noGL"))
+			g_useGL = false;
+	cutGetCmdLineArgumenti(argc, (const char **)argv, "record", (int *) &recordInterval);
+	cutGetCmdLineArgumenti(argc, (const char **)argv, "logf", (int *) &logInterval);
+	cutGetCmdLineArgumenti(argc, (const char **)argv, "plogf", (int *) &partlogInt);	
 	//set the random seed
-	srand(time(NULL));
-	int randseed = 1;
-	if(cutGetCmdLineArgumenti(argc, (const char **)argv, "randseed", (int *) &randseed))
-		srand(randseed);
+	uint randseed = time(NULL);
+	cutGetCmdLineArgumenti(argc, (const char **)argv, "randseed", (int *) &randseed);
+	srand(randseed);
 	printf("randseed: %d\n", randseed);
 	
 	
@@ -676,7 +684,8 @@ main(int argc, char** argv)
 		filename = title;
 	}
 	
-   	sprintf(logfile, "/home/steve/Datasets/%s", filename);
+   	sprintf(logfile, "/home/steve/Datasets/%s.dat", filename);
+	sprintf(crashname, "/home/steve/Datasets/%s.crash.dat", filename);
 
 	params.flowmode = false;
 	if(cutCheckCmdLineFlag(argc, (const char **)argv, "flowmode")) {	
@@ -748,7 +757,7 @@ main(int argc, char** argv)
 	}
 
 	params.worldOrigin = worldSize*-0.5f;
-	float cellSize = 4.0f*params.particleRadius[0];
+	float cellSize = 8.0f*params.particleRadius[0];
 	params.cellSize = make_float3(cellSize, cellSize, cellSize);	
  
 	//gridSize.x = gridSize.y = gridSize.z = GRID_SIZE;
@@ -807,8 +816,6 @@ main(int argc, char** argv)
 		fprintf(datalog, "time\tshear\textH\tchainl\tedges\ttopf\tbotf\tgstress\tkinen\tM.x \tM.y \tM.z\n");
 	}
 	
-	char crashname[231];
-	sprintf(crashname, "%s.crash", logfile);
 	crashlog = fopen(crashname, "w");
 
 	for(int ii=0; ii < MV_AVG_SIZE; ii++){

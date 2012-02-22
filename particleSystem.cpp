@@ -142,8 +142,8 @@ ParticleSystem::_initialize(int numParticles)
 	assert(cudaMalloc((void**)&m_dNeighList, m_numParticles*m_maxNeigh*sizeof(uint)) == cudaSuccess);
 	m_hNeighList = new uint[m_numParticles*m_maxNeigh];
 
-	assert(cudaMalloc((void**)&m_dCellAdj, m_numGridCells*125*sizeof(uint)) == cudaSuccess);
-	m_hCellAdj = new uint[m_numGridCells*125];
+	assert(cudaMalloc((void**)&m_dCellAdj, m_numGridCells*27*sizeof(uint)) == cudaSuccess);
+	m_hCellAdj = new uint[m_numGridCells*27];
 
 	m_hCellHash = new uint[m_numGridCells];
 	cudaMalloc((void**)&m_dCellHash, m_numGridCells*sizeof(uint));
@@ -280,7 +280,7 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 		hnparams.Linv = 1/hnparams.L;
 		hnparams.max_ndr_sq = 8.1f*m_params.particleRadius[0]*8.1f*m_params.particleRadius[0];
 		hnparams.max_fdr_sq = 8.0f*m_params.particleRadius[0]*8.0f*m_params.particleRadius[0];
-		hnparams.num_c_neigh = 125;
+		hnparams.num_c_neigh = 27;
 		hnparams.spring = m_params.spring;
 		hnparams.uf = m_params.uf;
 		hnparams.shear = m_params.shear;
@@ -704,7 +704,7 @@ ParticleSystem::reset(ParticleConfig config)
 
 	}
 //	printf("gs: %d x%d x%d\n", m_params.gridSize.x, m_params.gridSize.y, m_params.gridSize.z);
-//	printf("alloced: %d", m_numGridCells*125);
+//	printf("alloced: %d", m_numGridCells*27);
 	//place holder, allowing us to put in the hilbert ordered hashes
 	for(uint i=0; i < m_numGridCells; i++){
 		m_hCellHash[i] = i;
@@ -715,9 +715,9 @@ ParticleSystem::reset(ParticleConfig config)
 			for(uint k=0; k < m_params.gridSize.z; k++){
 				uint idx = i + j*m_params.gridSize.x + k*m_params.gridSize.y*m_params.gridSize.x;
 				uint cn = 0;
-				for(int kk=-2; kk<=2; kk++){
-					for(int jj=-2; jj<=2; jj++){
-						for(int ii=-2; ii<=2;ii++){
+				for(int kk=-1; kk<=1; kk++){
+					for(int jj=-1; jj<=1; jj++){
+						for(int ii=-1; ii<=1;ii++){
 							int ai = ii + i;
 							int aj = jj + j;
 							int ak = kk + k;
@@ -741,7 +741,7 @@ ParticleSystem::reset(ParticleConfig config)
 		if(m_hCellHash[i] >= m_numGridCells)
 			printf("cell_adj entry %d has invaled entry %d\n", i, m_hCellHash[i]);
 	}
-	copyArrayToDevice(m_dCellAdj, m_hCellAdj,0, 125*m_numGridCells*sizeof(uint));
+	copyArrayToDevice(m_dCellAdj, m_hCellAdj,0, 27*m_numGridCells*sizeof(uint));
 	copyArrayToDevice(m_dCellHash, m_hCellHash, 0, m_numGridCells*sizeof(uint));
 	float volfr;
 	volfr = m_numParticles*4.0f/3.0f*CUDART_PI_F*pow(m_params.particleRadius[0],3)

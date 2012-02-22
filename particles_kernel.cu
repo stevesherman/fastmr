@@ -411,6 +411,7 @@ __global__ void integrate(	float4* oldPos,
 	uint index = __umul24(blockIdx.x,blockDim.x) + threadIdx.x;
     if (index >= numParticles) return;          // handle case when no. of particles not multiple of block size
 
+	//NOTE: volatile call because kernels aren't guaranteed to finish executing
 	volatile float4 posData = oldPos[index];    // ensure coalesced read
     volatile float4 f1 = forceA[index];
     volatile float4 f2 = forceB[index];
