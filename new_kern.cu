@@ -116,7 +116,7 @@ __global__ void magForcesK( float4* dSortedPos,	//i: pos we use to calculate for
 	
 	float3 force = make_float3(0,0,0);
 
-
+	uint edges = 0;
 	for(uint i = 0; i < n_neigh; i++)
 	{
 		uint neighbor = nlist[i*nparams.N + idx];
@@ -153,11 +153,12 @@ __global__ void magForcesK( float4* dSortedPos,	//i: pos we use to calculate for
 			float sepdist = radius1 + radius2;
 			force += 3.0f*nparams.uf*dm1m2/(2.0f*PI*pow(sepdist,4))*
 					exp(-nparams.spring*(sqrt(lsq)/sepdist - 1.0f))*er;
+			edges += lsq < 1.1f*sepdist*1.1f*sepdist ? 1 : 0;
 			
 		}
 			
 	}
-	dForce[idx] = make_float4(force, n_neigh);
+	dForce[idx] = make_float4(force, (float) edges);
 	float Cd = 6.0f*PI*radius1*nparams.viscosity;
 	float ybot = p1.y - nparams.worldOrigin.y;
 	force.x += nparams.shear*ybot*Cd;
