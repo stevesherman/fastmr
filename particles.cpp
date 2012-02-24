@@ -197,6 +197,7 @@ void qupdate()
 		char pname [256];
 		sprintf(pname, "/home/steve/Datasets/%s_plog%.5d.dat", filename, frameCount/partlogInt);
 		FILE* plog = fopen(pname, "w");
+		fprintf(crashlog, "Time: %g ns\n", simtime);
 		psystem->logParams(plog);
 		psystem->logParticles(plog);
 		fclose(plog);	
