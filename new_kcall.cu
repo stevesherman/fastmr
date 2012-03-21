@@ -37,7 +37,7 @@ void comp_phash(float* dpos, uint* d_pHash, uint* d_pIndex, uint* d_CellHash, ui
 */
 
 	comp_phashK<<<numBlocks, numThreads>>> ( (float4*) dpos, d_pHash, d_pIndex, d_CellHash);
-	cudaDeviceSynchronize();
+//	cudaDeviceSynchronize();
 	cutilCheckMsg("in phash computation");	
 /*	
 	maxkey = thrust::reduce(dev_ptr, dev_ptr+numParticles, 0, mx);
@@ -100,7 +100,7 @@ uint buildNList(uint* nlist, uint* num_neigh, float* dpos, uint* phash,
 	thrust::device_ptr<uint> numneigh_ptr(num_neigh);
 	uint max = 0;
 	max=thrust::reduce(numneigh_ptr, numneigh_ptr+numParticles, 0, mx);
-	cudaDeviceSynchronize();
+	//cudaDeviceSynchronize();
 	cutilCheckMsg("max nneigh thrust call");	
 
 	//fprintf(stderr, "C\t");	

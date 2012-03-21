@@ -4,7 +4,7 @@
 #include "connectedgraphs.h"
 #include "new_kern.cuh"
 #include "new_kcall.cuh"
-
+#include "sfc_pack.h"
 #include <cutil_inline.h>
 #include <cutil_math.h>
 
@@ -61,32 +61,10 @@ ParticleSystem::createVBO(uint size)
     return vbo;
 }
 
-/*inline float lerp(float a, float b, float t)
-{
-    return a + t*(b-a);
-}*/
-
 // create a color ramp
 void colorRamp(float /*t*/, float *r)
 {
-    /*const int ncolors = 7;
-    float c[ncolors][3] = {
-        { 1.0, 0.0, 0.0, },
-        { 1.0, 0.5, 0.0, },
-	    { 1.0, 1.0, 0.0, },
-	    { 0.0, 1.0, 0.0, },
-	    { 0.0, 1.0, 1.0, },
-	    { 0.0, 0.0, 1.0, },
-	    { 1.0, 0.0, 1.0, },
-    };
-    t = t * (ncolors-1);
-    int i = (int) t;
-    float u = t - floor(t);
-    r[0] = lerp(c[i][0], c[i+1][0], u);
-    r[1] = lerp(c[i][1], c[i+1][1], u);
-    r[2] = lerp(c[i][2], c[i+1][2], u);*/
-	//set all particles to one color
-	r[0] = .1;
+   	r[0] = .1;
 	r[1] = 1;
 	r[2] = .1;
 }
@@ -161,14 +139,8 @@ ParticleSystem::_initialize(int numParticles)
         float *ptr = data;
         for(uint i=0; i<m_numParticles; i++) {
             float t = i / (float) m_numParticles;
-    #if 0
-            *ptr++ = rand() / (float) RAND_MAX;
-            *ptr++ = rand() / (float) RAND_MAX;
-            *ptr++ = rand() / (float) RAND_MAX;
-    #else
             colorRamp(t, ptr);
             ptr+=3;
-    #endif
             *ptr++ = 1.0f;
         }
         glUnmapBufferARB(GL_ARRAY_BUFFER);
@@ -294,11 +266,7 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 		//isOutofBounds((float4*) m_dPos, m_params.worldOrigin.x, m_numParticles);
 		comp_phash(m_dPos, m_dGridParticleHash, m_dGridParticleIndex, m_dCellHash, m_numParticles, m_numGridCells);
 		// sort particles based on hash
-		//cudaDeviceSynchronize();
-		//fprintf(stderr, "asd\t");
 		sortParticles(m_dGridParticleHash, m_dGridParticleIndex, m_numParticles);
-		//fprintf(stderr, "ASD\n");
-		//cudaDeviceSynchronize();
 		// reorder particle arrays into sorted order and
 		// find start and end of each cell - also sets the fixed moment
 		find_cellStart(m_dCellStart, m_dCellEnd, m_dGridParticleHash, m_numParticles, m_numGridCells);
@@ -369,24 +337,6 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 						m_dForces1,   	//k1
 						m_dMomentsA, m_dNeighList, m_dNumNeigh, m_numParticles, deltaTime/2);
 			cutilCheckMsg("magForces");
-		/*	
-			cudaMemcpy(m_hForces, m_dForces1, 4*sizeof(float)*m_numParticles, cudaMemcpyDeviceToHost);
-			cudaMemcpy(m_hMoments,m_dForces3, 4*sizeof(float)*m_numParticles, cudaMemcpyDeviceToHost);
-			uint fdiscrep = 0;
-			for(uint i = 0; i < m_numParticles; i++){
-				float3 fold = make_float3(m_hForces[4*i], m_hForces[4*i+1], m_hForces[4*i+2]);
-				float3 fnew = make_float3(m_hMoments[4*i], m_hMoments[4*i+1], m_hMoments[4*i+2]);
-				//printf("fold: %g %g %g %.1f\t fnew: %g %g %g %.1f\n", fold.x, fold.y, fold.z, m_hForces[4*i+3], fnew.x, fnew.y, fnew.z, m_hMoments[4*i+3]);
-				if( length(fnew-fold)/length(fold) > 1e-4f){
-					printf("fold: %g %g %g %.1f\t fnew: %g %g %g %.1f\n", fold.x, fold.y, fold.z, m_hForces[4*i+3], fnew.x, fnew.y, fnew.z, m_hMoments[4*i+3]);
-					printf("Error of %g discrepancy in particle %u\n", length(fnew-fold)/length(fold),i);
-					fdiscrep++;
-				}
-			}
-			printf("fdiscrep = %d\n", fdiscrep);
-		*/	
-			//printf("params.externalH: %g %g %g, params.mup %g \n", m_params.externalH.x,m_params.externalH.y, m_params.externalH.z, m_params.mup);
- 
 
 			magForces(	m_dMidPos, 		//yin: yn + 1/2*k1
 						m_dSortedPos, 	//yn
@@ -421,9 +371,7 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 			if(maxf > maxFdx){
 				solve = true;
 			} else { //if not excess force, check for out of bounds
-				//printf("ok\n");
 				solve = isOutofBounds((float4*)m_dPos, -m_params.worldOrigin.x, m_numParticles);
-				//printf("plz\n");
 			}
 			if(solve){
 				deltaTime *=.5f;
@@ -580,7 +528,7 @@ ParticleSystem::logParams(FILE* file)
 	fprintf(file, "grid: %d x %d x %d = %d cells\n", m_params.gridSize.x, m_params.gridSize.y, m_params.gridSize.z, 
 			m_params.gridSize.x*m_params.gridSize.y*m_params.gridSize.z);
 	fprintf(file, "worldsize: %.4gmm x %.4gmm x %.4gmm\n", m_worldSize.x*1e3f, m_worldSize.y*1e3f, m_worldSize.z*1e3f);
-	fprintf(file, "spring: %.2f\tvisc: %.4f\tdipit: %d\n", m_params.spring, m_params.viscosity, m_params.mutDipIter);
+	fprintf(file, "spring: %.2f\tvisc: %.4f\tdipit: %d\trcut: %f\n", m_params.spring, m_params.viscosity, m_params.mutDipIter, 4.0f);
 	fprintf(file, "H.x: %.3g\tH.y: %.3g\tH.z: %.3g\n", m_params.externalH.x, m_params.externalH.y, m_params.externalH.z);
 
 }
@@ -592,14 +540,15 @@ void ParticleSystem::zeroDevice()
 	int ti = 0;
 	for(int j = 0; j < 3; j++){
 		int i;
+		xi = m_params.xi[j];
 		for ( i = 0; i < m_params.numParticles[j]; i++){
-			xi = m_params.xi[j];
 			m_hMoments[4*(i+ti)+0] = 0;
-			m_hMoments[4*(i+ti)+1] = m_params.externalH.y*4.0/3.0*3.14159*pow(m_params.particleRadius[j],3)* 3.0*(xi-1.0)/(xi+2.0);
+			m_hMoments[4*(i+ti)+1] = m_params.externalH.y*4.0/3.0*3.14159*
+					pow(m_params.particleRadius[j],3)* 3.0*(xi-1.0)/(xi+2.0);
 			m_hMoments[4*(i+ti)+2] = 0;
 			m_hMoments[4*(i+ti)+3] = xi;
 		}
-		ti=i;
+		ti+=i;
 	}
 
 	copyArrayToDevice(m_dMomentsA, m_hMoments, 0, 4*m_numParticles*sizeof(float));
@@ -670,7 +619,7 @@ ParticleSystem::reset(ParticleConfig config)
 					m_hPos[4*(i+ti)+2] = 2.0f*m_params.worldOrigin.z * (frand() - 0.5f);
 					m_hPos[4*(i+ti)+3] = m_params.particleRadius[j]; // radius
 				}
-				ti=i;
+				ti+=i;
 			}
 		}
 		m_randSet = m_params.randSetIter;
@@ -709,11 +658,20 @@ ParticleSystem::reset(ParticleConfig config)
 	for(uint i=0; i < m_numGridCells; i++){
 		m_hCellHash[i] = i;
 	}
+	
+	getSortedOrder3D( m_hCellHash, &m_params);
+	
+	for(uint i = 0; i < m_numGridCells; i++){
+		printf("%d,", m_hCellHash[i]);
+	}
+	printf("\n");
+
 	for(uint i=0; i < m_params.gridSize.x; i++){
 //		printf("hello\n");
 		for(uint j=0; j < m_params.gridSize.y; j++){
 			for(uint k=0; k < m_params.gridSize.z; k++){
-				uint idx = i + j*m_params.gridSize.x + k*m_params.gridSize.y*m_params.gridSize.x;
+				uint idc = i + j*m_params.gridSize.x + k*m_params.gridSize.y*m_params.gridSize.x;
+				uint idx = m_hCellHash[idc];
 				uint cn = 0;
 				for(int kk=-1; kk<=1; kk++){
 					for(int jj=-1; jj<=1; jj++){

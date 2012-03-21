@@ -41,7 +41,7 @@ __global__ void comp_phashK(const float4* d_pos, uint* d_pHash, uint* d_pIndex, 
 		gpos.z*nparams.gridSize.y*nparams.gridSize.x;
 	
 	d_pIndex[idx] = idx;
-	d_pHash[idx] = cell_id;
+	d_pHash[idx] = d_CellHash[cell_id];
 }
 
 

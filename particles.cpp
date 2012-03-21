@@ -1,6 +1,3 @@
-
-
-
 #define PI 3.141592653589793f
 
 // Graphics includes
@@ -149,38 +146,6 @@ void qupdate()
 	if(fabs(dtout - timestep) > .01f*dtout)
 		resolved++;
 
-		
-/*	
-	old_dt[frameCount % MV_AVG_SIZE] = dtout;
-	//printf("dtout: %g, timestep %g\n", dtout, timestep);
-	if(fabs(dtout - timestep) > .01f*dtout){
-		resolved++;
-		resolvetime[frameCount % MV_AVG_SIZE] = timestep + timestep - dtout;
-	} else {
-	   	printf("hi");	
-
-		resolvetime[frameCount % MV_AVG_SIZE] = 0;
-	}	
-	const float incrate = 0.05f;
-
-	float resolvetotalt = 0;
-	float dt_total = 0;
-	for(ii = 0; ii < MV_AVG_SIZE; ii++){
-		resolvetotalt += resolvetime[ii];
-		dt_total += old_dt[ii];
-	}
-
-
-	//incrate*dt_total is how much savings we expect
-	//resolve_totalt is the time we spent resolving
-	printf("timesaved by incing: %g \tdt: %f\t timespent resolving %g\n", dt_total*incrate, timestep, resolvetotalt);
-	if(frameCount > 300){
-		if(dt_total*incrate >  2*resolvetotalt)
-			timestep *= 1 + incrate;
-		if(dt_total*incrate < 0.5*resolvetotalt)		
-			timestep *= 1 - incrate;
-	}*/
-	//printf("timestep: %g\n", timestep);
 	if(logInterval != 0 && frameCount % logInterval == 0){
 		printf("iter %d at %.2f/%.1f us\n", frameCount, simtime*1e-3f, maxtime);
 		psystem->logStuff(datalog, simtime*1e-3);	
@@ -223,7 +188,7 @@ void initGL(int argc, char **argv)
     }
 
     glEnable(GL_DEPTH_TEST);
-    glClearColor(0.25, 0.25, 0.25, 1.0);
+    glClearColor(0.3, 0.3, 0.3, 1.0);
 
     glutReportErrors();
 }
@@ -297,7 +262,7 @@ void display()
     glGetFloatv(GL_MODELVIEW_MATRIX, modelView);
 
     // cube
-    //glColor3f(1.0, 1.0, 1.0);
+    glColor3f(0.0, 0.0, 0.0);
     glutWireCube(worldSize.x);
 
     if (renderer && displayEnabled)
@@ -701,7 +666,7 @@ main(int argc, char** argv)
 	params.volfr[0] = 0.30f;
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "vfr0", (float*) &params.volfr[0]);
 	params.xi[0] = 2000;
-	cutGetCmdLineArgumentf(argc, (const char**)argv, "xi0", (float*) &params.volfr[0]);
+	cutGetCmdLineArgumentf(argc, (const char**)argv, "xi0", (float*) &params.xi[0]);
 	params.numParticles[0] = (params.volfr[0] * volume) / (4.0f/3.0f*PI*pow(params.particleRadius[0],3)); 
 		
 	radius = 6.0f;
@@ -710,7 +675,7 @@ main(int argc, char** argv)
 	params.volfr[1] = 0.0f;
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "vfr1", (float*) &params.volfr[1]);
 	params.xi[1] = 1;
-	cutGetCmdLineArgumentf(argc, (const char**)argv, "xi1", (float*) &params.volfr[1]);
+	cutGetCmdLineArgumentf(argc, (const char**)argv, "xi1", (float*) &params.xi[1]);
 	params.numParticles[1] = (params.volfr[1] * volume) / (4.0f/3.0f*PI*pow(params.particleRadius[1],3)); 
 	
 	radius = 3.5f;
@@ -719,11 +684,11 @@ main(int argc, char** argv)
 	params.volfr[2] = 0.0f;
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "vfr2", (float*) &params.volfr[2]);
 	params.xi[2] = 2000;
-	cutGetCmdLineArgumentf(argc, (const char**)argv, "xi2", (float*) &params.volfr[2]);
+	cutGetCmdLineArgumentf(argc, (const char**)argv, "xi2", (float*) &params.xi[2]);
 	params.numParticles[2] = (params.volfr[2] * volume) / (4.0f/3.0f*PI*pow(params.particleRadius[2],3)); 
 
 	params.numBodies = params.numParticles[0] + params.numParticles[1] + params.numParticles[2];
-    bool benchmark = cutCheckCmdLineFlag(argc, (const char**) argv, "benchmark") != 0;
+	bool benchmark = cutCheckCmdLineFlag(argc, (const char**) argv, "benchmark") != 0;
 
 
 	if(cutGetCmdLineArgumentstr( argc, (const char**)argv, "crash", &title )){//some of crash flag
