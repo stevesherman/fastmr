@@ -589,10 +589,12 @@ main(int argc, char** argv)
 
 	numIterations = 0;
 	int devID = cutGetMaxGflopsDeviceId();
+	if(cutCheckCmdLineFlag(argc, (const char **)argv, "noGL")) {
+		g_useGL = false;
+		cutGetCmdLineArgumenti(argc, (const char**) argv, "device", (int *) &devID);
+	}
 	cudaSetDevice(devID);
 	printf("devID: %d\n", devID);
-	if(cutCheckCmdLineFlag(argc, (const char **)argv, "noGL"))
-			g_useGL = false;
 	cutGetCmdLineArgumenti(argc, (const char **)argv, "record", (int *) &recordInterval);
 	cutGetCmdLineArgumenti(argc, (const char **)argv, "logf", (int *) &logInterval);
 	cutGetCmdLineArgumenti(argc, (const char **)argv, "plogf", (int *) &partlogInt);	

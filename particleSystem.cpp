@@ -36,7 +36,7 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize):
 	m_params.boundaryDamping = -0.03f;
 
 	m_numParticles = m_params.numBodies;
-	m_maxNeigh = 220;
+	m_maxNeigh = (uint) ((m_params.volfr[0]+m_params.volfr[1]+m_params.volfr[2])*725.0f);
 
 	m_bUseOpenGL = useGL;
 	_initialize(m_params.numBodies);
@@ -229,7 +229,7 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 		calcHash(m_dGridParticleHash, m_dGridParticleIndex, m_dPos, m_numParticles);
 		//printf("hi\t");	
 		sortParticles(m_dGridParticleHash, m_dGridParticleIndex, m_numParticles);
-		cudaDeviceSynchronize();
+		//cudaDeviceSynchronize();
 		//printf("why\n");
 		reorderDataAndFindCellStart(
    		    m_dCellStart, m_dCellEnd, m_dSortedPos, m_dForces1, //Forces1 is sortedVel
@@ -337,7 +337,6 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 						m_dForces1,   	//k1
 						m_dMomentsA, m_dNeighList, m_dNumNeigh, m_numParticles, deltaTime/2);
 			cutilCheckMsg("magForces");
-
 			magForces(	m_dMidPos, 		//yin: yn + 1/2*k1
 						m_dSortedPos, 	//yn
 						m_dPos, 		//yn + 1/2*k2
@@ -353,7 +352,7 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 						m_dPos, 		// doesn't matter
 						m_dForces4,		//k4
 						m_dMomentsA, m_dNeighList, m_dNumNeigh, m_numParticles, deltaTime/2);
-			
+
 			RK4integrate(m_dSortedPos,//yn 
 						m_dPos, //yn+1
 						m_dForces1, //1/6*(k1 + 2*k2 + 2*k3 + k4) 
@@ -661,9 +660,9 @@ ParticleSystem::reset(ParticleConfig config)
 	
 	getSortedOrder3D( m_hCellHash, &m_params);
 	
-	for(uint i = 0; i < m_numGridCells; i++){
+	/*for(uint i = 0; i < m_numGridCells; i++){
 		printf("%d,", m_hCellHash[i]);
-	}
+	}*/
 	printf("\n");
 
 	for(uint i=0; i < m_params.gridSize.x; i++){
@@ -671,7 +670,7 @@ ParticleSystem::reset(ParticleConfig config)
 		for(uint j=0; j < m_params.gridSize.y; j++){
 			for(uint k=0; k < m_params.gridSize.z; k++){
 				uint idc = i + j*m_params.gridSize.x + k*m_params.gridSize.y*m_params.gridSize.x;
-				uint idx = m_hCellHash[idc];
+				uint hash = m_hCellHash[idc];
 				uint cn = 0;
 				for(int kk=-1; kk<=1; kk++){
 					for(int jj=-1; jj<=1; jj++){
@@ -685,19 +684,23 @@ ParticleSystem::reset(ParticleConfig config)
 							ak -= m_params.gridSize.z*floor((double)ak/(double)m_params.gridSize.z);
 
 							uint cellId = ai + aj*m_params.gridSize.x + ak*m_params.gridSize.y*m_params.gridSize.x;
-							m_hCellAdj[idx + cn*m_numGridCells] = m_hCellHash[cellId];
+							//store cellAdj with the first neighbor for each contiguous
+							//m_hCellAdj[hash + cn*m_numGridCells] = m_hCellHash[cellId];
+							//store cellAdj with all neighbors for a cell contiguous
+							m_hCellAdj[hash*27 + cn] = m_hCellHash[cellId];
 							cn++;
 							//printf("hi %d %d %d %d\n", cn, ii,jj,kk);
 						}
 					}
 				}
+				std::sort(&m_hCellAdj[hash*27], &m_hCellAdj[hash*27+cn]);
 			//	printf("idx: %d gl: %d %d %d\n", idx, i,j,k);
 			}
 		}
 	}
 	for(uint i=0; i < m_numGridCells; i++){
 		if(m_hCellHash[i] >= m_numGridCells)
-			printf("cell_adj entry %d has invaled entry %d\n", i, m_hCellHash[i]);
+			printf("cell_hash entry %d has invaled entry %d\n", i, m_hCellHash[i]);
 	}
 	copyArrayToDevice(m_dCellAdj, m_hCellAdj,0, 27*m_numGridCells*sizeof(uint));
 	copyArrayToDevice(m_dCellHash, m_hCellHash, 0, m_numGridCells*sizeof(uint));

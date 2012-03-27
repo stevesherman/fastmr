@@ -14,6 +14,10 @@
 __constant__ newParams nparams;
 __constant__ SimParams params;
 
+texture<float4, 1, cudaReadModeElementType> pos_tex;
+texture<float4, 1, cudaReadModeElementType> mom_tex;
+
+
 __device__ uint3 calcGPos(float3 p)
 {
 	uint3 gpos;
@@ -93,11 +97,11 @@ __global__ void reorderK(uint* dSortedIndex, float4* sortedPos, float4* sortedMo
 }
 
 
-__global__ void magForcesK( float4* dSortedPos,	//i: pos we use to calculate forces
-							float4* dMom,		//i: the moment
-							float4* integrPos,	//i: pos we use as base to integrate from
-							uint* nlist,		//i: the neighbor list
-							uint* num_neigh,	//i: the number of inputs
+__global__ void magForcesK( const float4* dSortedPos,	//i: pos we use to calculate forces
+							const float4* dMom,		//i: the moment
+							const float4* integrPos,	//i: pos we use as base to integrate from
+							const uint* nlist,		//i: the neighbor list
+							const uint* num_neigh,	//i: the number of inputs
 							float4* dForce,		//o: the magnetic force on a particle
 							float4* newPos,		//o: the integrated position
 							float deltaTime)	//o: the timestep
@@ -108,35 +112,42 @@ __global__ void magForcesK( float4* dSortedPos,	//i: pos we use to calculate for
 	}
 	uint n_neigh = num_neigh[idx];
 	float4 pos1 = dSortedPos[idx];
+	//float4 pos1 = tex1Dfetch(pos_tex,idx);
 	float3 p1 = make_float3(pos1);
 	float radius1 = pos1.w;
+
 	float4 mom1 = dMom[idx];
+	//float4 mom1 = tex1Dfetch(mom_tex,idx);
 	float3 m1 = make_float3(mom1);
 	float xi1 = mom1.w;
 	
 	float3 force = make_float3(0,0,0);
 
 	uint edges = 0;
+	#pragma unroll 100
 	for(uint i = 0; i < n_neigh; i++)
 	{
 		uint neighbor = nlist[i*nparams.N + idx];
 		
-		float4 pos2 = dSortedPos[neighbor];
+		//float4 pos2 = dSortedPos[neighbor];
+		float4 pos2 = tex1Dfetch(pos_tex, neighbor);
+		//float4 mom2 = dMom[neighbor];
+		float4 mom2 = tex1Dfetch(mom_tex, neighbor);
+
 		float3 p2 = make_float3(pos2);
 		float radius2 = pos2.w;
 
-		float4 mom2 = dMom[neighbor];
 		float3 m2 = make_float3(mom2);
 		float xi2 = mom2.w;
 
-		float3 dr = p1 - p2;
-		dr.x = dr.x - nparams.L.x*rintf(dr.x*nparams.Linv.x);
-		dr.z = dr.z - nparams.L.x*rintf(dr.z*nparams.Linv.z);
-		float lsq = dr.x*dr.x + dr.y*dr.y + dr.z*dr.z;
-		float3 er = dr*rsqrt(lsq);
+		float3 er = p1 - p2;//start it out as dr, then modify to get er
+		er.x = er.x - nparams.L.x*rintf(er.x*nparams.Linv.x);
+		er.z = er.z - nparams.L.x*rintf(er.z*nparams.Linv.z);
+		float lsq = er.x*er.x + er.y*er.y + er.z*er.z;
+		er = er*rsqrt(lsq);
 
 		//do a quicky spring	
-		if(lsq <= nparams.max_fdr_sq){
+		//if(lsq <= nparams.max_fdr_sq){
 			float dm1m2 = dot(m1,m2);
 			float dm1er = dot(m1,er);
 			float dm2er = dot(m2,er);
@@ -145,17 +156,17 @@ __global__ void magForcesK( float4* dSortedPos,	//i: pos we use to calculate for
 			force += 3.0f*nparams.uf/(4*PI*lsq*lsq) *( dm1m2*er + dm1er*m2
 					+ dm2er*m1 - 5.0f*dm1er*dm2er*er);
 			
-			m1 = (xi1 == 1.0f) ? nparams.mup*nparams.externalH : m1;
+/*			m1 = (xi1 == 1.0f) ? nparams.mup*nparams.externalH : m1;
 			m2 = (xi2 == 1.0f) ? nparams.mup*nparams.externalH : m2;
 			dm1m2 = dot(m1,m2);
-
+*/
 			
 			float sepdist = radius1 + radius2;
 			force += 3.0f*nparams.uf*dm1m2/(2.0f*PI*pow(sepdist,4))*
 					exp(-nparams.spring*(sqrt(lsq)/sepdist - 1.0f))*er;
 			edges += lsq < 1.1f*sepdist*1.1f*sepdist ? 1 : 0;
 			
-		}
+		//}
 			
 	}
 	dForce[idx] = make_float4(force, (float) edges);
@@ -193,13 +204,15 @@ __global__ void buildNListK(	uint* nlist,	//	o:neighbor list
 
 	for(uint i = 0; i < nparams.num_c_neigh; i++)
 	{
-		uint nhash = cellAdj[i*nparams.numGridCells + hash];
+		//uint nhash = cellAdj[i*nparams.numGridCells + hash];
+		uint nhash = cellAdj[i + hash*nparams.num_c_neigh];
 		uint cstart = cellStart[nhash];
 		if(cstart != 0xffffffff) {
 			uint cend = cellEnd[nhash];
 			for(uint idx2 = cstart; idx2 < cend; idx2++){
 				if(idx != idx2){
 					float4 pos2 = dpos[idx2];
+					//float4 pos2 = tex1Dfetch(pos_tex, idx2);
 					float3 p2 = make_float3(pos2);
 					//float rad2 = pos2.w;
 					float3 dr = p1 - p2;

@@ -71,16 +71,21 @@ void reorder(uint* d_pSortedIndex, float* dSortedPos, float* dSortedMom, float* 
 uint buildNList(uint* nlist, uint* num_neigh, float* dpos, uint* phash, 
 		uint* cellStart, uint* cellEnd, uint* cellAdj, uint numParticles, uint max_neigh)
 {
-	uint numThreads = 64;
+	uint numThreads = 128;
 	//printf("N %d\n", numParticles);
 	uint numBlocks = iDivUp2(numParticles, numThreads);
 	cudaFuncSetCacheConfig(buildNListK, cudaFuncCachePreferL1);	
 	//printf("nT: %d, nB: %d\n", numThreads, numBlocks);
 
+	//cudaBindTexture(0, pos_tex, dpos, numParticles*sizeof(float4));
+
 	buildNListK<<<numBlocks, numThreads>>>(nlist, num_neigh, (float4*) dpos, 
 			phash, cellStart, cellEnd, cellAdj);
 	cutilCheckMsg("preSync");
 	//cudaDeviceSynchronize();
+
+	//cudaUnbindTexture(pos_tex);
+
 
 	cutilCheckMsg("inNList");
 	//find the maximum value using thrust - alternatively atomicMax as in HOOMD
@@ -113,13 +118,21 @@ void magForces(	float* dSortedPos, float* dIntPos, float* newPos, float* dForce,
 {
 	assert(newPos != dIntPos);
 	assert(newPos != dSortedPos);
-	uint numThreads = 64;
+	uint numThreads = 128;
 	uint numBlocks = iDivUp2(numParticles, numThreads);
 	//printf("numP: %d numThreads %d, numBlocks %d\n", numParticles, numThreads, numBlocks);	
 	cudaFuncSetCacheConfig(magForcesK, cudaFuncCachePreferL1);
 	
+	cudaBindTexture(0, pos_tex, dSortedPos, numParticles*sizeof(float4));
+	cudaBindTexture(0, mom_tex, dMom, numParticles*sizeof(float4));
+
+
 	magForcesK<<<numBlocks,numThreads>>>( 	(float4*)dSortedPos, (float4*) dMom, (float4*) dIntPos, 
 											nlist, num_neigh, (float4*) dForce, (float4*) newPos, deltaTime);
+	
+	cudaUnbindTexture(pos_tex);
+	cudaUnbindTexture(mom_tex);
+
 	cutilCheckMsg("hi");
 }
 
