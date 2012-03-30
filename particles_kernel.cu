@@ -152,7 +152,6 @@ __device__ float3 addFlowVel(float3 pos, float3 force, float radius)
 		if(ybot > params.worldSize.y - 1.5f*radius){
 			force = make_float3(0,0,0);
 		}
-
 	} else { 
 		force.x += ybot *params.shear*Cd;
 		if(ybot > params.worldSize.y - 1.5f*radius){//moving upper wall
@@ -452,13 +451,13 @@ __global__ void integrateRK4(const float4* oldPos,
 	uint index = __umul24(blockIdx.x,blockDim.x) + threadIdx.x;
     if (index >= numParticles) return;          // handle case when no. of particles not multiple of block size
 
-	volatile float4 posData = oldPos[index];    // ensure coalesced read
+	float4 posData = oldPos[index];    // ensure coalesced read
     float3 pos = make_float3(posData.x, posData.y, posData.z);
 	float radius = posData.w;
-	volatile float4 f1 = forceA[index];
-    volatile float4 f2 = forceB[index];
-	volatile float4 f3 = forceC[index];
-	volatile float4 f4 = forceD[index];
+	float4 f1 = forceA[index];
+    float4 f2 = forceB[index];
+	float4 f3 = forceC[index];
+	float4 f4 = forceD[index];
 	
 	float3 force1 = make_float3(f1.x, f1.y, f1.z);
 	float3 force2 = make_float3(f2.x, f2.y, f2.z);

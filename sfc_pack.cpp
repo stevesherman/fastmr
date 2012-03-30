@@ -203,7 +203,9 @@ void getSortedOrder3D( unsigned int* m_hCellHash, const SimParams* params)
     // start by checking the saneness of some member variables
     assert(params->gridSize.x == params->gridSize.y && params->gridSize.y == params->gridSize.z);
 	unsigned int m_grid = params->gridSize.x;
-	
+	//check if gridsize is power of two
+	assert((m_grid != 0) && !(m_grid & (m_grid-1)));
+
 	std::vector<unsigned int> reverse_order(m_grid*m_grid*m_grid);
 	reverse_order.clear();
 	// we need to start the hilbert curve with a seed order 0,1,2,3,4,5,6,7

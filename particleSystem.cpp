@@ -36,7 +36,7 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize):
 	m_params.boundaryDamping = -0.03f;
 
 	m_numParticles = m_params.numBodies;
-	m_maxNeigh = (uint) ((m_params.volfr[0]+m_params.volfr[1]+m_params.volfr[2])*725.0f);
+	m_maxNeigh = (uint) ((m_params.volfr[0]+m_params.volfr[1]+m_params.volfr[2])*680.0f);
 
 	m_bUseOpenGL = useGL;
 	_initialize(m_params.numBodies);
@@ -261,8 +261,7 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 		hnparams.externalH = m_params.externalH;
 		hnparams.mup = m_params.mup;
 		setNParameters(&hnparams);
-		
-		
+
 		//isOutofBounds((float4*) m_dPos, m_params.worldOrigin.x, m_numParticles);
 		comp_phash(m_dPos, m_dGridParticleHash, m_dGridParticleIndex, m_dCellHash, m_numParticles, m_numGridCells);
 		// sort particles based on hash
@@ -285,7 +284,7 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 		if(maxn > m_maxNeigh){
 			printf("Extending NList from %u to %u\n", m_maxNeigh, maxn);
 			cudaFree(m_dNeighList);
-			m_maxNeigh = maxn+2;//see if adding some margin fixes a potential error?
+			m_maxNeigh = maxn;//see if adding some margin fixes a potential error?
 			assert(cudaMalloc((void**)&m_dNeighList, m_numParticles*m_maxNeigh*sizeof(uint)) == cudaSuccess);
 			cudaMemset(m_dNeighList, 0, m_numParticles*m_maxNeigh*sizeof(uint));
 			maxn = buildNList(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
@@ -516,6 +515,13 @@ ParticleSystem::logParticles(FILE* file)
 void
 ParticleSystem::logParams(FILE* file)
 {
+	#ifndef DATE_FLAG
+	#define DATE_FLAG "No date"  
+	#endif 
+	#ifndef SVN_REV
+	#define SVN_REV "no svn verion number"
+	#endif
+	fprintf(file, "Build Date: %s\t svn version: %s\n", DATE, SVN_REV);
 	fprintf(file, "vfrtot: %.3f\t v0: %.3f\t v1: %.3f\t v2: %.3f\n", m_params.volfr[0]+m_params.volfr[1]+m_params.volfr[2],
 			m_params.volfr[0], m_params.volfr[1], m_params.volfr[2]);
 	fprintf(file, "ntotal: %d\t n0: %d  \t n1: %d  \t n2: %d\n", m_params.numBodies, m_params.numParticles[0],
@@ -657,8 +663,11 @@ ParticleSystem::reset(ParticleConfig config)
 	for(uint i=0; i < m_numGridCells; i++){
 		m_hCellHash[i] = i;
 	}
-	
-	getSortedOrder3D( m_hCellHash, &m_params);
+/*
+	if( (m_params.gridSize.x != 0) && !(m_params.gridSize.x & (m_params.gridSize.x-1))){
+		printf("Using SFCSort.\n");
+		getSortedOrder3D( m_hCellHash, &m_params);
+	}*/
 	
 	/*for(uint i = 0; i < m_numGridCells; i++){
 		printf("%d,", m_hCellHash[i]);

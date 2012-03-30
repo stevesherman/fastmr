@@ -124,7 +124,7 @@ __global__ void magForcesK( const float4* dSortedPos,	//i: pos we use to calcula
 	float3 force = make_float3(0,0,0);
 
 	uint edges = 0;
-	#pragma unroll 100
+	
 	for(uint i = 0; i < n_neigh; i++)
 	{
 		uint neighbor = nlist[i*nparams.N + idx];
@@ -147,7 +147,7 @@ __global__ void magForcesK( const float4* dSortedPos,	//i: pos we use to calcula
 		er = er*rsqrt(lsq);
 
 		//do a quicky spring	
-		//if(lsq <= nparams.max_fdr_sq){
+		if(lsq <= nparams.max_fdr_sq){
 			float dm1m2 = dot(m1,m2);
 			float dm1er = dot(m1,er);
 			float dm2er = dot(m2,er);
@@ -156,31 +156,31 @@ __global__ void magForcesK( const float4* dSortedPos,	//i: pos we use to calcula
 			force += 3.0f*nparams.uf/(4*PI*lsq*lsq) *( dm1m2*er + dm1er*m2
 					+ dm2er*m1 - 5.0f*dm1er*dm2er*er);
 			
-/*			m1 = (xi1 == 1.0f) ? nparams.mup*nparams.externalH : m1;
+			m1 = (xi1 == 1.0f) ? nparams.mup*nparams.externalH : m1;
 			m2 = (xi2 == 1.0f) ? nparams.mup*nparams.externalH : m2;
 			dm1m2 = dot(m1,m2);
-*/
+
 			
 			float sepdist = radius1 + radius2;
 			force += 3.0f*nparams.uf*dm1m2/(2.0f*PI*pow(sepdist,4))*
 					exp(-nparams.spring*(sqrt(lsq)/sepdist - 1.0f))*er;
 			edges += lsq < 1.1f*sepdist*1.1f*sepdist ? 1 : 0;
 			
-		//}
+		}
 			
 	}
 	dForce[idx] = make_float4(force, (float) edges);
 	float Cd = 6.0f*PI*radius1*nparams.viscosity;
 	float ybot = p1.y - nparams.worldOrigin.y;
 	force.x += nparams.shear*ybot*Cd;
+	
+	//apply BCs
 	if(ybot < 1.5f*radius1)
 		force = make_float3(0,0,0);
 	if(ybot - nparams.worldOrigin.y > nparams.L.y - 1.5f*radius1)
 		force.x = nparams.shear*nparams.L.y*Cd;
 
 	float3 ipos = make_float3(integrPos[idx]);
-	//since newPos can == sortedPos, need to sync to ensure that all threads are recieving the same information
-	//__syncthreads();
 	newPos[idx] = make_float4(ipos + force/Cd*deltaTime, radius1);
 
 }
