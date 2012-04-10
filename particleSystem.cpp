@@ -476,7 +476,7 @@ float ParticleSystem::getEdges(){
 void ParticleSystem::logStuff(FILE* file, float simtime)
 {
 	if(m_randSet == 0){ //dont log if we're setting ICs
-	   	float edges = getEdges();
+	   	float edges = getEdges();//i think these get us the latest force data
 		float graphs = getGraphs();
 		//edges + force h as put the most recent data onto host
 		float topforce=0, bottomforce=0, speckinen = 0, gstress = 0;

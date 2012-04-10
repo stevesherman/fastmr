@@ -725,26 +725,16 @@ main(int argc, char** argv)
 	}
 
 	params.worldOrigin = worldSize*-0.5f;
-	float cellSize = 8.0f*params.particleRadius[0];
-	params.cellSize = make_float3(cellSize, cellSize, cellSize);	
+	float cellSize_des = 8.0f*params.particleRadius[0];
  
 	//gridSize.x = gridSize.y = gridSize.z = GRID_SIZE;
-	if(fmod(worldSize.x , cellSize) < (.1f*params.particleRadius[0])){
-		params.gridSize.x = floor(worldSize.x/cellSize);
-	} else {
-		params.gridSize.x = ceil(worldSize.x/cellSize);
-	}
-	if(fmod(worldSize.y , cellSize) < (.1f*params.particleRadius[0])){
-		params.gridSize.y = floor(worldSize.y/cellSize);
-	} else {
-		params.gridSize.y = ceil(worldSize.y/cellSize);
-	}
-	if(fmod(worldSize.z , cellSize) < (.1f*params.particleRadius[0])){
-		params.gridSize.z = floor(worldSize.z/cellSize);
-	} else {
-		params.gridSize.z = ceil(worldSize.z/cellSize);
-	}
+	params.gridSize.x = floor(worldSize.x/cellSize_des);
+	params.gridSize.y = floor(worldSize.y/cellSize_des);
+	params.gridSize.z = floor(worldSize.z/cellSize_des);
 
+	params.cellSize.x = params.worldSize.x/params.gridSize.x;
+	params.cellSize.y = params.worldSize.y/params.gridSize.y;
+	params.cellSize.z = params.worldSize.z/params.gridSize.z;
 
 	//INITIALIZE THE DATA STRUCTURES
 
