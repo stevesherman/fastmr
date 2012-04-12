@@ -492,7 +492,7 @@ void ParticleSystem::logStuff(FILE* file, float simtime)
 		}
 		float4 M = magnetization((float4*) m_dMomentsA, m_numParticles, 8*pow(-m_params.worldOrigin.x,3));
 		gstress = gstress / (-2.0f*m_params.worldOrigin.x*-2.0f*m_params.worldOrigin.y*-2.0f*m_params.worldOrigin.z); 
-		fprintf(file, "%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t\n", simtime, m_params.shear, 
+		fprintf(file, "%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\n", simtime, m_params.shear, 
 				m_params.externalH.y, (float)m_numParticles/graphs, edges, topforce, bottomforce, gstress, speckinen, M.x, M.y, M.z);
 	}
 }
