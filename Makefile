@@ -15,6 +15,9 @@ SVN_REV := -D'SVN_REV="$(shell svnversion -n .)"'
 DATE_FLAG := -D'DATE="$(shell date)"'
 PFLAGS := $(SVN_REV) $(DATE_FLAG) 
 
+CXXFLAGS += $(PFLAGS)
+CFLAGS += $(PFLAGS)
+
 USEGLLIB	     := 1
 USEPARAMGL	     := 1
 USEGLUT		     := 1
