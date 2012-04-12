@@ -515,8 +515,8 @@ ParticleSystem::logParticles(FILE* file)
 void
 ParticleSystem::logParams(FILE* file)
 {
-	#ifndef DATE_FLAG
-	#define DATE_FLAG "No date"  
+	#ifndef DATE
+	#define DATE "No date"  
 	#endif 
 	#ifndef SVN_REV
 	#define SVN_REV "no svn verion number"
