@@ -591,7 +591,7 @@ ParticleSystem::initGrid(uint3 size, float3 spacing, float3 jitter, uint numPart
             }
         }
     }
-	if(numParticles == 2){
+	if(numParticles >= 2){
 		m_hPos[0*4+0] = (m_params.worldOrigin.x + m_params.particleRadius[0]);
 		m_hPos[0*4+1] = m_params.particleRadius[0];
 		m_hPos[0*4+2] = 0; m_hPos[0*4+3] = m_params.particleRadius[0];
