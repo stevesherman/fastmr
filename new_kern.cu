@@ -191,7 +191,9 @@ __global__ void buildNListK(	uint* nlist,	//	o:neighbor list
 							uint* phash,
 							uint* cellStart,
 							uint* cellEnd,
-							uint* cellAdj)
+							uint* cellAdj,
+							uint max_neigh,
+							float max_dist_sq)
 {
 	uint idx = blockIdx.x*blockDim.x + threadIdx.x;
 	if(idx >= nparams.N)
@@ -222,8 +224,8 @@ __global__ void buildNListK(	uint* nlist,	//	o:neighbor list
 
 					float lsq = dr.x*dr.x + dr.y*dr.y + dr.z*dr.z;
 
-					if(lsq <= nparams.max_ndr_sq){
-						if(n_neigh < nparams.max_neigh){
+					if(lsq <= max_dist_sq){
+						if(n_neigh < max_neigh){
 							nlist[nparams.N*n_neigh + idx] = idx2;
 						}
 						n_neigh++;

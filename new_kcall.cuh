@@ -9,7 +9,10 @@ void find_cellStart(uint* cellStart, uint* cellEnd, uint* phash, uint numParticl
 
 void reorder(uint* sortedIndex, float* sortedPos, float* sortedMom, float* oldPos, float* oldMom, uint numParticles);
 
-uint buildNList(uint* nlist, uint* num_neigh, float* dpos, uint* phash, uint* cellStart, uint* cellEnd, uint* cellAdj, uint numParticles, uint max_neigh);
+uint buildNList(uint*& nlist, uint* num_neigh, float* dpos, 
+		uint* phash, uint* cellStart, uint* cellEnd, 
+		uint* cellAdj, uint numParticles, 
+		uint& max_neigh, float max_dist);
 
 void magForces(	float* dSortedPos, float* dIntPos, float* newPos, float* dForce, float* dMom, uint* nlist, uint* num_neigh, uint numParticles, float deltaTime);
 

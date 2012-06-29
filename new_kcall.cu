@@ -68,49 +68,36 @@ void reorder(uint* d_pSortedIndex, float* dSortedPos, float* dSortedMom, float* 
 	reorderK<<<numBlocks, numThreads>>>(d_pSortedIndex, (float4*)dSortedPos, (float4*)dSortedMom, (float4*)oldPos, (float4*)oldMom);
 }
 
-uint buildNList(uint* nlist, uint* num_neigh, float* dpos, uint* phash, 
-		uint* cellStart, uint* cellEnd, uint* cellAdj, uint numParticles, uint max_neigh)
+//Note: this func modifies nlist and max_neigh
+uint buildNList(uint*& nlist, uint* num_neigh, float* dpos, uint* phash, 
+		uint* cellStart, uint* cellEnd, uint* cellAdj, uint numParticles, uint& max_neigh, float max_dist)
 {
 	uint numThreads = 128;
-	//printf("N %d\n", numParticles);
 	uint numBlocks = iDivUp2(numParticles, numThreads);
 	cudaFuncSetCacheConfig(buildNListK, cudaFuncCachePreferL1);	
-	//printf("nT: %d, nB: %d\n", numThreads, numBlocks);
-
-	//cudaBindTexture(0, pos_tex, dpos, numParticles*sizeof(float4));
 
 	buildNListK<<<numBlocks, numThreads>>>(nlist, num_neigh, (float4*) dpos, 
-			phash, cellStart, cellEnd, cellAdj);
-	cutilCheckMsg("preSync");
-	//cudaDeviceSynchronize();
-
-	//cudaUnbindTexture(pos_tex);
-
-
+			phash, cellStart, cellEnd, cellAdj, max_neigh, max_dist*max_dist);
+	cudaDeviceSynchronize();
 	cutilCheckMsg("inNList");
-	//find the maximum value using thrust - alternatively atomicMax as in HOOMD
-	//if exceeds, realloc and regen
-
 	thrust::maximum<uint> mx;
-	/*
-	//fprintf(stderr, "A\t");	
-	thrust::device_ptr<uint> thr_nlist(nlist);
-	uint maxn = 0;
-	maxn = thrust::reduce(thr_nlist, thr_nlist+max_neigh*numParticles, 0, mx);
-	if(maxn >= numParticles)
-		printf("nlist generation is FUCKED\n");
-	//fprintf(stderr, "B\t");	
-	*/
-	
 	thrust::device_ptr<uint> numneigh_ptr(num_neigh);
-	uint max = 0;
-	max=thrust::reduce(numneigh_ptr, numneigh_ptr+numParticles, 0, mx);
-	//cudaDeviceSynchronize();
+	uint maxn = thrust::reduce(numneigh_ptr, numneigh_ptr+numParticles, 0, mx);
 	cutilCheckMsg("max nneigh thrust call");	
+	
+	if(maxn > max_neigh){
+		printf("Extending NList from %u to %u\n", max_neigh, maxn);
+		cudaFree(nlist);
+		assert(cudaMalloc((void**)&nlist, numParticles*maxn*sizeof(uint)) == cudaSuccess);
+		cudaMemset(nlist, 0, numParticles*maxn*sizeof(uint));
+		buildNListK<<<numBlocks, numThreads>>>(nlist, num_neigh, (float4*) dpos, 
+			phash, cellStart, cellEnd, cellAdj, maxn, max_dist*max_dist);
+		cutilCheckMsg("after extension");
+		max_neigh = maxn;
+	}
 
-	//fprintf(stderr, "C\t");	
 
-return max;
+return maxn;
 }
 
 		

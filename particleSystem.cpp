@@ -239,7 +239,7 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 			m_dForces2, m_dSortedPos, m_dForces1, m_dGridParticleIndex,
 			m_dCellStart, m_dCellEnd, m_numParticles, m_numGridCells);
 		m_randSet--;
-
+		deltaTime = 0.0f;
 	} else {
 		newParams hnparams;
 		hnparams.N = m_numParticles;
@@ -276,53 +276,9 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 		m_dMomentsB = m_dMomentsA;
 		m_dMomentsA = temp;
 			
-		//printf("test N: %d %d\n", hnparams.N, m_numParticles);
-		//fprintf(stderr, "qwe\t");	
-		uint maxn = buildNList(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
-				m_dCellStart, m_dCellEnd, m_dCellAdj, m_numParticles, m_maxNeigh);
-		//fprintf(stderr, "QWE\n");
-		if(maxn > m_maxNeigh){
-			printf("Extending NList from %u to %u\n", m_maxNeigh, maxn);
-			cudaFree(m_dNeighList);
-			m_maxNeigh = maxn;//see if adding some margin fixes a potential error?
-			assert(cudaMalloc((void**)&m_dNeighList, m_numParticles*m_maxNeigh*sizeof(uint)) == cudaSuccess);
-			cudaMemset(m_dNeighList, 0, m_numParticles*m_maxNeigh*sizeof(uint));
-			maxn = buildNList(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
-					m_dCellStart, m_dCellEnd, m_dCellAdj, m_numParticles, m_maxNeigh);
-
-		}
-
-		//printf("maxn: %d\n", maxn);
-		/*cudaMemcpy(m_hNumNeigh, m_dNumNeigh, sizeof(uint)*m_numParticles, cudaMemcpyDeviceToHost);
-		cudaMemcpy(m_hForces, m_dForces1, 4*sizeof(float)*m_numParticles, cudaMemcpyDeviceToHost);
-		float max_neigh = 0;
-		for(uint i = 0; i < m_numParticles; i++){
-			max_neigh = m_hForces[4*i+3] > max_neigh ? m_hForces[4*i+3] : max_neigh;
-			if( m_hNumNeigh[i] != (uint) m_hForces[4*i+3] && m_randSet == 0)
-				printf("particle %d has a neighbor discrepancy: %d v %f\n", i,  m_hNumNeigh[i], m_hForces[4*i+3]);
-		}
-		printf("host max neigh = %f\n", max_neigh);*/
-		/*cudaMemcpy(m_hNeighList, m_dNeighList, sizeof(uint)*m_numParticles*m_maxNeigh, cudaMemcpyDeviceToHost);	
-		for(uint i = 0; i < hnparams.N; i++){
-			for(uint j = 0; j < m_hNumNeigh[i]; j++){
-				uint neigh = m_hNeighList[j*hnparams.N + i];
-				if(neigh > hnparams.N){
-					printf("Particle %d neighbor num: %d has val: %d which exceeds N: %d\n", i,j,neigh,hnparams.N);
-				}
-				if(neigh == i){
-					printf("Particle %d is listed as neighbors with itself(!)\n Has neighbors:\t", i);
-					for(uint k=0; k<m_hNumNeigh[i]; k++){
-					   printf("%d\t", m_hNeighList[k*hnparams.N + i+1]);
-					}
-				}
-			}
-			
-		}*/
-		//start debugging the new kern code
-		if(maxn > m_maxNeigh){
-			printf("maxn is too large (!) %u of %u\n", maxn, m_maxNeigh);
-			assert(maxn <= m_maxNeigh);
-		}
+		buildNList(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
+				m_dCellStart, m_dCellEnd, m_dCellAdj, m_numParticles, m_maxNeigh, 4.0f*7e-6f);
+		
 		bool solve = true;
 		double Cd, maxf, maxFdx;
 		Cd = 6*CUDART_PI_F*m_params.viscosity*m_params.particleRadius[0];
