@@ -640,7 +640,7 @@ main(int argc, char** argv)
 	cutGetCmdLineArgumentf(argc, (const char**)argc, "cspring", (float*)&params.cspring);
 	params.boundaryDamping = -0.03f;
 
-	params.randSetIter = 300;
+	params.randSetIter = 200;
 	cutGetCmdLineArgumenti(argc, (const char**)argc, "randit", (int*)&params.randSetIter);
 		
 	params.mutDipIter = 0;

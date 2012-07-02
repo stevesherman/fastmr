@@ -39,7 +39,6 @@
 #include "thrust/reduce.h"
 
 #include "particles_kernel.cu"
-#include "collisionkern.cu"
 
 extern "C"
 {
@@ -135,131 +134,7 @@ void computeGridSize(uint n, uint blockSize, uint &numBlocks, uint &numThreads)
     numBlocks = iDivUp(n, numThreads);
 }
 
-void calcForces	(float *sortedPos,//read in for calculations
-                float* integrPos,//pos we read in for integration   
-				float *newPos,
-				float *forceOut,
-				float *oldMoments,
-				float deltaTime,
-				uint* cellStart,
-				uint* cellEnd,
-				uint numParticles)
-{
-    uint numThreads, numBlocks;
-    computeGridSize(numParticles, 64, numBlocks, numThreads);
 
-    // execute the kernel
-    calcParticleForce<<< numBlocks, numThreads >>>	((float4*)sortedPos,
-												(float4*) integrPos,
-												(float4*) newPos,
-												(float4*) forceOut,
-												(float4*) oldMoments,
-                                           		deltaTime,
-												cellStart,
-												cellEnd,
-												numParticles);
-    
-    // check if kernel invocation generated an error
-    cutilCheckMsg("integrate kernel execution failed");
-}
-
-void calcHash(uint*  gridParticleHash,
-              uint*  gridParticleIndex,
-              float* pos, 
-              int    numParticles)
-{
-    uint numThreads, numBlocks;
-    computeGridSize(numParticles, 256, numBlocks, numThreads);
-    // execute the kernel
-    calcHashD<<< numBlocks, numThreads >>>(gridParticleHash,
-                                           gridParticleIndex,
-                                           (float4 *) pos,
-                                           numParticles);
-    
-    // check if kernel invocation generated an error
-    cutilCheckMsg("Hash Kernel execution failed");
-}
-
-void reorderDataAndFindCellStart(uint*  cellStart,
-							     uint*  cellEnd,
-							     float* sortedPos,
-                                 float* newMoment,
-								 uint*  gridParticleHash,
-                                 uint*  gridParticleIndex,
-							     float* oldPos,
-							     float* oldMoment,
-								 uint   numParticles,
-							     uint   numCells)
-{
-    uint numThreads, numBlocks;
-    computeGridSize(numParticles, 256, numBlocks, numThreads);
-    // set all cells to empty
-	//printf("CELLSTART: %p\t, numCells: %d\n", cellStart, numCells);
-	cudaMemset(cellStart, 0xffffffff, numCells*sizeof(uint));
-
-#if USE_TEX
-    cudaBindTexture(0, oldPosTex, oldPos, numParticles*sizeof(float4));
-	cudaBindTexture(0, oldMomentTex, oldPos, numparticles*sizeof(float4));
-#endif
-
-    uint smemSize = sizeof(uint)*(numThreads+1);
-    reorderDataAndFindCellStartD<<< numBlocks, numThreads, smemSize>>>(
-        cellStart,
-        cellEnd,
-        (float4*) sortedPos,
-		(float4*) newMoment,
-		gridParticleHash,
-		gridParticleIndex,
-        (float4 *) oldPos,
-		(float4 *) oldMoment,
-        numParticles);
-    cutilCheckMsg("Kernel execution failed: reorderDataAndFindCellStartD");
-
-#if USE_TEX
-    cudaUnbindTexture(oldPosTex);
-	cudaUnbindTexture(oldMomentTex);
-#endif
-}
-
-void calcMoments(float* oldPos,
-             	float* oldMoment,
-				float* newMoment,
-             uint*  gridParticleIndex,
-             uint*  cellStart,
-             uint*  cellEnd,
-             uint   numParticles,
-             uint   numCells)
-{
-#if USE_TEX
-    cudaBindTexture(0, oldPosTex, oldPos, numParticles*sizeof(float4));
-    cudaBindTexture(0, oldMomentTex, oldMoment, numParticles*sizeof(float4));
-    cudaBindTexture(0, cellStartTex, cellStart, numCells*sizeof(uint));
-    cudaBindTexture(0, cellEndTex, cellEnd, numCells*sizeof(uint));    
-#endif
-
-    // thread per particle
-    uint numThreads, numBlocks;
-    computeGridSize(numParticles, 64, numBlocks, numThreads);
-
-    // execute the kernel
-    calcMoments<<< numBlocks, numThreads >>>((float4*)oldPos,
-                                          (float4*)oldMoment,
-                                          (float4*)newMoment,
-										  gridParticleIndex,
-                                          cellStart,
-                                          cellEnd,
-                                          numParticles);
-
-    // check if kernel invocation generated an error
-    //cutilCheckMsg("Kernel execution failed");
-
-#if USE_TEX
-    cudaUnbindTexture(oldPosTex);
-    cudaUnbindTexture(oldMomentTex);
-    cudaUnbindTexture(cellStartTex);
-    cudaUnbindTexture(cellEndTex);
-#endif
-}
 
 void integrate(	float* oldPos,
 				float* newPos,
@@ -301,65 +176,6 @@ void RK4integrate(	float* oldPos,
 												numParticles);
 }
 
-
-void collIntegrateSystem(float *pos,
-                     float *vel,
-                     float deltaTime,
-                     uint numParticles)
-{
-    uint numThreads, numBlocks;
-    computeGridSize(numParticles, 256, numBlocks, numThreads);
-
-    // execute the kernel
-    cintegrate<<< numBlocks, numThreads >>>((float4*)pos,
-                                           (float4*)vel,
-                                           deltaTime,
-                                           numParticles);
-    
-    // check if kernel invocation generated an error
-    cutilCheckMsg("integrate kernel execution failed");
-}
-
-
-void collCollide(float* newVel,
-             float* sortedPos,
-             float* sortedVel,
-             uint*  gridParticleIndex,
-             uint*  cellStart,
-             uint*  cellEnd,
-             uint   numParticles,
-             uint   numCells)
-{
-#if USE_TEX
-    cudaBindTexture(0, oldPosTex, sortedPos, numParticles*sizeof(float4));
-    cudaBindTexture(0, oldVelTex, sortedVel, numParticles*sizeof(float4));
-    cudaBindTexture(0, cellStartTex, cellStart, numCells*sizeof(uint));
-    cudaBindTexture(0, cellEndTex, cellEnd, numCells*sizeof(uint));    
-#endif
-
-    // thread per particle
-    uint numThreads, numBlocks;
-    computeGridSize(numParticles, 64, numBlocks, numThreads);
-
-    // execute the kernel
-    ccollideD<<< numBlocks, numThreads >>>((float4*)newVel,
-                                          (float4*)sortedPos,
-                                          (float4*)sortedVel,
-                                          gridParticleIndex,
-                                          cellStart,
-                                          cellEnd,
-                                          numParticles);
-
-    // check if kernel invocation generated an error
-    cutilCheckMsg("Kernel execution failed");
-
-#if USE_TEX
-    cudaUnbindTexture(oldPosTex);
-    cudaUnbindTexture(oldVelTex);
-    cudaUnbindTexture(cellStartTex);
-    cudaUnbindTexture(cellEndTex);
-#endif
-}
 	
 void sortParticles(uint *dGridParticleHash, uint *dGridParticleIndex, uint numParticles)
 {

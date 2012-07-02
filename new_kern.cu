@@ -12,11 +12,10 @@
 #include "particles_kernel.cuh"
 
 __constant__ newParams nparams;
-__constant__ SimParams params;
 
-texture<float4, 1, cudaReadModeElementType> pos_tex;
-texture<float4, 1, cudaReadModeElementType> mom_tex;
-
+texture<float4, cudaTextureType1D, cudaReadModeElementType> pos_tex;
+texture<float4, cudaTextureType1D, cudaReadModeElementType> mom_tex;
+texture<float4, cudaTextureType1D, cudaReadModeElementType> vel_tex;
 
 __device__ uint3 calcGPos(float3 p)
 {
@@ -107,9 +106,8 @@ __global__ void magForcesK( const float4* dSortedPos,	//i: pos we use to calcula
 							float deltaTime)	//o: the timestep
 {
 	uint idx = blockDim.x*blockIdx.x + threadIdx.x;
-	if(idx >= nparams.N){
+	if(idx >= nparams.N)
 		return;
-	}
 	uint n_neigh = num_neigh[idx];
 	float4 pos1 = dSortedPos[idx];
 	//float4 pos1 = tex1Dfetch(pos_tex,idx);
@@ -129,14 +127,11 @@ __global__ void magForcesK( const float4* dSortedPos,	//i: pos we use to calcula
 	{
 		uint neighbor = nlist[i*nparams.N + idx];
 		
-		//float4 pos2 = dSortedPos[neighbor];
 		float4 pos2 = tex1Dfetch(pos_tex, neighbor);
-		//float4 mom2 = dMom[neighbor];
-		float4 mom2 = tex1Dfetch(mom_tex, neighbor);
-
 		float3 p2 = make_float3(pos2);
 		float radius2 = pos2.w;
-
+		
+		float4 mom2 = tex1Dfetch(mom_tex, neighbor);
 		float3 m2 = make_float3(mom2);
 		float xi2 = mom2.w;
 
@@ -146,20 +141,20 @@ __global__ void magForcesK( const float4* dSortedPos,	//i: pos we use to calcula
 		float lsq = er.x*er.x + er.y*er.y + er.z*er.z;
 		er = er*rsqrt(lsq);
 
-		//do a quicky spring	
 		if(lsq <= nparams.max_fdr_sq){
 			float dm1m2 = dot(m1,m2);
 			float dm1er = dot(m1,er);
 			float dm2er = dot(m2,er);
 			
-			
 			force += 3.0f*nparams.uf/(4*PI*lsq*lsq) *( dm1m2*er + dm1er*m2
 					+ dm2er*m1 - 5.0f*dm1er*dm2er*er);
 			
+			//create a false moment for nonmagnetic particles
+			//note that here mup gives the wrong volume, so the magnitude of 
+			//the repulsion strength is wrong		
 			m1 = (xi1 == 1.0f) ? nparams.mup*nparams.externalH : m1;
 			m2 = (xi2 == 1.0f) ? nparams.mup*nparams.externalH : m2;
 			dm1m2 = dot(m1,m2);
-
 			
 			float sepdist = radius1 + radius2;
 			force += 3.0f*nparams.uf*dm1m2/(2.0f*PI*pow(sepdist,4))*
@@ -237,8 +232,74 @@ __global__ void buildNListK(	uint* nlist,	//	o:neighbor list
 	num_neigh[idx] = n_neigh;
 }
 
+__global__ void collisionK( const float4* sortedPos,	//i: pos we use to calculate forces
+							const float4* oldVel,
+							const uint* nlist,		//i: the neighbor list
+							const uint* num_neigh,	//i: the number of inputs
+							float4* newVel,		//o: the magnetic force on a particle
+							float4* newPos,		//o: the integrated position
+							float deltaTime)	//o: the timestep
+{
+	uint idx = blockDim.x*blockIdx.x + threadIdx.x;
+	if(idx >= nparams.N)
+		return;
+	
+	uint n_neigh = num_neigh[idx];
+	
+	float4 pos1 = sortedPos[idx];
+	float3 p1 = make_float3(pos1);
+	float radius1 = pos1.w;
+	float3 v1 = make_float3(oldVel[idx]);
 
+	float3 force = make_float3(0,0,0);
+	
+	for(uint i = 0; i < n_neigh; i++)
+	{
+		uint neighbor = nlist[i*nparams.N + idx];
+		
+		float4 pos2 = tex1Dfetch(pos_tex, neighbor);
+		float3 p2 = make_float3(pos2);
+		float radius2 = pos2.w;
+		float3 v2 = make_float3(tex1Dfetch(vel_tex,neighbor));
 
+		float3 er = p1 - p2;//start it out as dr, then modify to get er
+		er.x = er.x - nparams.L.x*rintf(er.x*nparams.Linv.x);
+		er.z = er.z - nparams.L.x*rintf(er.z*nparams.Linv.z);
+		float dist = sqrt(er.x*er.x + er.y*er.y + er.z*er.z);
+	
+		float sepdist = 1.01f*(radius1 + radius2);
+
+		//do a quicky spring	
+		if(dist  <= sepdist){
+			er = er/dist;
+			float3 relVel = v2-v1;  	
+			force += -10.0f*(dist - sepdist)*er;
+			force += .03f*relVel;
+		}
+			
+	}
+	//yes this integration is totally busted, but it works, soooo
+	v1 = (v1 + force)*.8f;
+	p1 = p1 + v1*deltaTime;
+
+	if(p1.x > -nparams.worldOrigin.x ) { p1.x -= nparams.L.x;}
+    if(p1.x < nparams.worldOrigin.x ) { p1.x += nparams.L.x;}
+	
+	if(p1.y+radius1 > -nparams.worldOrigin.y){ 
+		p1.y = -nparams.worldOrigin.y - radius1;
+		v1.y*= -.03f;	
+	}
+    if(p1.y-radius1 <  nparams.worldOrigin.y){ 
+		p1.y = nparams.worldOrigin.y + radius1;
+		v1.y*= -.03f;	
+	}
+	
+	if(p1.z > -nparams.worldOrigin.z ) { p1.z -= nparams.L.z;}
+	if(p1.z < nparams.worldOrigin.z ) { p1.z += nparams.L.z;}
+
+	newVel[idx] = make_float4(v1);
+	newPos[idx]	= make_float4(p1, radius1); 
+}
 
 
 

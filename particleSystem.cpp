@@ -97,7 +97,7 @@ ParticleSystem::_initialize(int numParticles)
         m_posVbo = createVBO(memSize);    
 		registerGLBufferObject(m_posVbo, &m_cuda_posvbo_resource);
     } else {
-        cutilSafeCall( cudaMalloc( (void **)&m_cudaPosVBO, memSize )) ;
+       	cutilSafeCall( cudaMalloc( (void **)&m_cudaPosVBO, memSize )) ;
     }
 
     cudaMalloc((void**)&m_dMomentsA, memSize);
@@ -117,8 +117,6 @@ ParticleSystem::_initialize(int numParticles)
     assert(cudaMalloc((void**)&m_dCellStart, m_numGridCells*sizeof(uint)) == cudaSuccess);
     cudaMalloc((void**)&m_dCellEnd, m_numGridCells*sizeof(uint));
 
-	assert(cudaMalloc((void**)&m_dNeighList, m_numParticles*m_maxNeigh*sizeof(uint)) == cudaSuccess);
-	m_hNeighList = new uint[m_numParticles*m_maxNeigh];
 
 	assert(cudaMalloc((void**)&m_dCellAdj, m_numGridCells*27*sizeof(uint)) == cudaSuccess);
 	m_hCellAdj = new uint[m_numGridCells*27];
@@ -147,7 +145,11 @@ ParticleSystem::_initialize(int numParticles)
     } else {
         cutilSafeCall( cudaMalloc( (void **)&m_cudaColorVBO, sizeof(float)*numParticles*4) );
     }
-    cutilCheckError(cutCreateTimer(&m_timer));
+ 	
+	assert(cudaMalloc((void**)&m_dNeighList, m_numParticles*m_maxNeigh*sizeof(uint)) == cudaSuccess);
+	//m_hNeighList = new uint[m_numParticles*m_maxNeigh];
+	
+	cutilCheckError(cutCreateTimer(&m_timer));
 	
     setParameters(&m_params);
 	m_bInitialized = true;
@@ -166,13 +168,13 @@ ParticleSystem::_finalize()
 	
 	delete [] m_hCellAdj;
 	delete [] m_hNumNeigh;
-	delete [] m_hNeighList;
+	//delete [] m_hNeighList;
+	delete [] m_hCellHash;
+	
+	cudaFree(m_dCellHash);
+	cudaFree(m_dCellAdj);
 	cudaFree(m_dNeighList);
 	cudaFree(m_dNumNeigh);
-	cudaFree(m_dCellAdj);
-
-	delete [] m_hCellHash;
-	cudaFree(m_dCellHash);
 
     cudaFree(m_dMomentsA);
 	cudaFree(m_dMomentsB);
@@ -180,14 +182,17 @@ ParticleSystem::_finalize()
     cudaFree(m_dForces2);
 	cudaFree(m_dForces3);
 	cudaFree(m_dForces4);
+	
 	cudaFree(m_dSortedPos);
+	cudaFree(m_dPos);
 	cudaFree(m_dMidPos);
-    cudaFree(m_dGridParticleHash);
+    
+	cudaFree(m_dGridParticleHash);
     cudaFree(m_dGridParticleIndex);
     cudaFree(m_dCellStart);
     cudaFree(m_dCellEnd);
-	cudaFree(m_dPos);
-    if (m_bUseOpenGL) {
+    
+	if (m_bUseOpenGL) {
         unregisterGLBufferObject(m_cuda_posvbo_resource);
         glDeleteBuffers(1, (const GLuint*)&m_posVbo);
         glDeleteBuffers(1, (const GLuint*)&m_colorVBO);
@@ -219,48 +224,54 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
     }
 	cutilCheckMsg("ohno");	
 	setParameters(&m_params);
+	newParams hnparams;
+	hnparams.N = m_numParticles;
+	hnparams.gridSize = m_params.gridSize;
+	hnparams.numGridCells = m_numGridCells;
+	hnparams.cellSize = m_params.cellSize;
+	hnparams.worldOrigin = m_params.worldOrigin;
+	hnparams.L = m_params.worldSize;
+	hnparams.Linv = 1/hnparams.L;
+	hnparams.max_ndr_sq = 8.1f*m_params.particleRadius[0]*8.1f*m_params.particleRadius[0];
+	hnparams.max_fdr_sq = 8.0f*m_params.particleRadius[0]*8.0f*m_params.particleRadius[0];
+	hnparams.num_c_neigh = 27;
+	hnparams.spring = m_params.spring;
+	hnparams.uf = m_params.uf;
+	hnparams.shear = m_params.shear;
+	hnparams.viscosity = m_params.viscosity;
+	hnparams.max_neigh = m_maxNeigh;
+	hnparams.externalH = m_params.externalH;
+	hnparams.mup = m_params.mup;
+	setNParameters(&hnparams);
 
 	
 	if(m_randSet > 0)
 	{
-		//copy the randset function
-		collIntegrateSystem(m_dPos, m_dForces2, .001f, m_numParticles);
-		
-		calcHash(m_dGridParticleHash, m_dGridParticleIndex, m_dPos, m_numParticles);
-		//printf("hi\t");	
+		//isOutofBounds((float4*) m_dPos, m_params.worldOrigin.x, m_numParticles);
+		comp_phash(m_dPos, m_dGridParticleHash, m_dGridParticleIndex, m_dCellHash, m_numParticles, m_numGridCells);
+		// sort particles based on hash
 		sortParticles(m_dGridParticleHash, m_dGridParticleIndex, m_numParticles);
-		//cudaDeviceSynchronize();
-		//printf("why\n");
-		reorderDataAndFindCellStart(
-   		    m_dCellStart, m_dCellEnd, m_dSortedPos, m_dForces1, //Forces1 is sortedVel
-   	   		m_dGridParticleHash, m_dGridParticleIndex, m_dPos, m_dForces2,//dVel
-			m_numParticles, m_numGridCells);
-		collCollide(
-			m_dForces2, m_dSortedPos, m_dForces1, m_dGridParticleIndex,
-			m_dCellStart, m_dCellEnd, m_numParticles, m_numGridCells);
+		// reorder particle arrays into sorted order and
+		// find start and end of each cell - also sets the fixed moment
+		find_cellStart(m_dCellStart, m_dCellEnd, m_dGridParticleHash, m_numParticles, m_numGridCells);
+		cutilCheckMsg("Cstart");
+		reorder(m_dGridParticleIndex, m_dSortedPos, m_dMomentsB, m_dPos, m_dMomentsA, m_numParticles);	
+		cutilCheckMsg("Reorder");
+		float* temp = m_dMomentsB;
+		m_dMomentsB = m_dMomentsA;
+		m_dMomentsA = temp;
+			
+		buildNList(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
+				m_dCellStart, m_dCellEnd, m_dCellAdj, m_numParticles, m_maxNeigh, 3.1f*m_params.particleRadius[0]);
+		
+		temp = m_dForces2;
+		m_dForces2 = m_dForces1;
+		m_dForces1 = temp;
+
+		collision_new(m_dSortedPos, m_dForces2, m_dNeighList, m_dNumNeigh, m_dForces1, m_dPos, m_numParticles, 0.01f);
+		deltaTime = 0;
 		m_randSet--;
-		deltaTime = 0.0f;
 	} else {
-		newParams hnparams;
-		hnparams.N = m_numParticles;
-		hnparams.gridSize = m_params.gridSize;
-		hnparams.numGridCells = m_numGridCells;
-		hnparams.cellSize = m_params.cellSize;
-		//printf("cs: %g %g %g ocs: %g %g %g\n", hnparams.cellSize.x, hnparams.cellSize.y, hnparams.cellSize.z, m_params.cellSize.x, m_params.cellSize.y, m_params.cellSize.z);
-		hnparams.worldOrigin = m_params.worldOrigin;
-		hnparams.L = m_params.worldSize;
-		hnparams.Linv = 1/hnparams.L;
-		hnparams.max_ndr_sq = 8.1f*m_params.particleRadius[0]*8.1f*m_params.particleRadius[0];
-		hnparams.max_fdr_sq = 8.0f*m_params.particleRadius[0]*8.0f*m_params.particleRadius[0];
-		hnparams.num_c_neigh = 27;
-		hnparams.spring = m_params.spring;
-		hnparams.uf = m_params.uf;
-		hnparams.shear = m_params.shear;
-		hnparams.viscosity = m_params.viscosity;
-		hnparams.max_neigh = m_maxNeigh;
-		hnparams.externalH = m_params.externalH;
-		hnparams.mup = m_params.mup;
-		setNParameters(&hnparams);
 
 		//isOutofBounds((float4*) m_dPos, m_params.worldOrigin.x, m_numParticles);
 		comp_phash(m_dPos, m_dGridParticleHash, m_dGridParticleIndex, m_dCellHash, m_numParticles, m_numGridCells);
@@ -277,7 +288,7 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 		m_dMomentsA = temp;
 			
 		buildNList(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
-				m_dCellStart, m_dCellEnd, m_dCellAdj, m_numParticles, m_maxNeigh, 4.0f*7e-6f);
+				m_dCellStart, m_dCellEnd, m_dCellAdj, m_numParticles, m_maxNeigh, 8.1f*m_params.particleRadius[0]);
 		
 		bool solve = true;
 		double Cd, maxf, maxFdx;

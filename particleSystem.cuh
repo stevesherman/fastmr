@@ -32,41 +32,6 @@ void unmapGLBufferObject(struct cudaGraphicsResource *cuda_vbo_resource);
 
 void setParameters(SimParams *hostParams);
 
-void calcForces(float *sortedPos,
-				float *integrPos,
-				float *newPos,
-				float *force,
-				float *moments,
-				float deltaTime,
-				uint* cellStart,
-				uint* cellEnd,
-                uint numParticles);
-
-void calcHash(uint*  gridParticleHash,
-              uint*  gridParticleIndex,
-              float* pos, 
-              int    numParticles);
-
-void reorderDataAndFindCellStart(uint*  cellStart,
-							     uint*  cellEnd,
-							     float* sortedPos,
-                                 float* newMoment,
-								 uint*  gridParticleHash,
-                                 uint*  gridParticleIndex,
-							     float* oldPos,
-							     float* oldMoment,
-								 uint   numParticles,
-							     uint   numCells);
-
-void calcMoments(float* oldPos,
-                float* oldMoment,
-				float* newMoment,
-             uint*  gridParticleIndex,
-             uint*  cellStart,
-             uint*  cellEnd,
-             uint   numParticles,
-             uint   numCells);
-
 void integrate(float* oldPos,
 				float* newPos,
 				float* forceA,
@@ -88,29 +53,8 @@ bool excessForce(float4* pos, float force, uint numparticles);
 float maxforce(float4* pos, uint numpartices);
 float4 magnetization(float4* pos, uint numparticles, float simVol);
 
-void collComputeGridSize(uint n, uint blockSize, uint &numBlocks, uint &numThreads);
-
-	
-void collIntegrateSystem(float *sortedPos,
-				float *vel,
-				float deltaTime,
-                uint numParticles);
-
-void collCalcHash(uint*  gridParticleHash,
-              uint*  gridParticleIndex,
-              float* pos, 
-              int    numParticles);
-
-void collCollide(float* newVel, 
-				float* sortedPos, 
-				float* sortedVel,
-				uint* gridParticleIndex,
-				uint* cellStart,
-				uint* cellEnd,
-				uint numParticles,
-				uint numCells);
-
 void sortParticles(uint *dGridParticleHash, uint *dGridParticleIndex, uint numParticles);
+
 void renderStuff(const float* post, 
 				const float* moment,
 				const float* force,
