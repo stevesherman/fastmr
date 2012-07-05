@@ -37,6 +37,7 @@
 #include "thrust/functional.h"
 #include "thrust/extrema.h"
 #include "thrust/reduce.h"
+#include "thrust/inner_product.h"
 
 #include "particles_kernel.cu"
 
@@ -210,21 +211,49 @@ bool isOutofBounds(float4* positions, float border, uint numParticles)
 }
 
 
-struct fuckyou 
-{
-	__host__ __device__ float4 operator()(const float4 &f1, const float4 &f2){
-		return f1+f2;
-	}
-};
-
 float4 magnetization(float4* moments, uint numParticles, float worldVol){
 	float4 totalDp =  thrust::reduce(thrust::device_ptr<float4>(moments),
 			thrust::device_ptr<float4>(moments+numParticles), 
-			make_float4(0,0,0,0), fuckyou() );
+			make_float4(0,0,0,0), thrust::plus<float4>() );
 	return totalDp/worldVol;
 
 }
 
+uint edgeCount(float4* forces, uint numParticles){
+	float4 edge = thrust::reduce(thrust::device_ptr<float4>(forces),
+			thrust::device_ptr<float4>(forces+numParticles), 
+			make_float4(0,0,0,0), thrust::plus<float4>());
+	return (uint) edge.w/2.0f;
+}
+
+struct isTop {
+	isTop(float cut) : cut(cut) {}
+	__host__ __device__ float4 operator()(const float4& force, const float4& pos){
+		if(pos.y > cut)
+			return force;
+		else 
+			return make_float4(0,0,0,0);
+	}
+	const float cut;
+};
+
+struct isBot {
+	isBot(float cut) : cut(cut) {}
+	__host__ __device__ float4 operator()(const float4& force, const float4& pos){
+		if(pos.y < cut)
+			return force;
+		else 
+			return make_float4(0,0,0,0);
+	}
+	const float cut;
+};
+
+float calcTopForce(float4* forces, float4* position, uint numParticles, float cut){
+	float4 tforce = thrust::inner_product(thrust::device_ptr<float4>(forces),
+			thrust::device_ptr<float4>(forces+numParticles),thrust::device_ptr<float4>(position),
+			make_float4(0,0,0,0), thrust::plus<float4>(), isTop(cut));
+	return tforce.x;
+}
 
 struct forcemax 
 {
@@ -266,6 +295,9 @@ bool  excessForce(float4* forces, float maxforce, uint numParticles){
 	return x>0;
 
 }
+
+
+
 
 
 void renderStuff(const float* pos, 

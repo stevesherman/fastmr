@@ -25,7 +25,7 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize):
 	m_bInitialized(false),
 	m_bUseOpenGL(false)
 {
-	m_worldSize = worldSize;
+	newp.L = worldSize;
 	m_params = params;
 	m_numGridCells = m_params.gridSize.x*m_params.gridSize.y*m_params.gridSize.z;	
 	
@@ -46,7 +46,6 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize):
 	newp.numCells = m_numGridCells;
 	newp.cellSize = m_params.cellSize;
 	newp.origin = m_params.worldOrigin;
-	newp.L = m_params.worldSize;
 	newp.Linv = 1/newp.L;
 	newp.max_fdr_sq = 8.0f*m_params.particleRadius[0]*8.0f*m_params.particleRadius[0];
 	newp.numAdjCells = 27;
@@ -351,7 +350,8 @@ ParticleSystem::dumpGrid()
     }
    	printf("maximum particles per cell = %d\n", maxCellSize);
 }
-
+//should not be called, as it is very slow!
+//use is out!
 void ParticleSystem::getBadP()
 {
 	int nans = 0, outbounds = 0;
@@ -369,7 +369,7 @@ void ParticleSystem::getBadP()
 
 void ParticleSystem::getMagnetization()
 {
-	float4 M = magnetization((float4*) m_dMomentsA, m_numParticles, 8*pow(-m_params.worldOrigin.x,3));
+	float4 M = magnetization((float4*) m_dMomentsA, m_numParticles, newp.L.x*newp.L.y*newp.L.z);
 	printf("M: %g %g %g\n", M.x, M.y, M.z );
 }
 
@@ -417,34 +417,41 @@ ParticleSystem::dumpParticles(uint start, uint count)
 	printf("IR = %d edges %f\n", m_params.interactionr, numEdges);
 }
 
-float ParticleSystem::getEdges(){
-	copyArrayFromDevice(m_hForces, m_dForces1,0, sizeof(float)*4*m_numParticles);
-	float numEdges = 0;
-	for(uint i = 0; i < m_numParticles; i++){
-		numEdges+= m_hForces[i*4+3];}
-	return  (numEdges/2.0f);
+uint ParticleSystem::getEdges(){
+	return edgeCount((float4*) m_dForces1, m_numParticles);
+
 }
 
 void ParticleSystem::logStuff(FILE* file, float simtime)
 {
+ 	copyArrayFromDevice(m_hPos, m_dPos, 0, sizeof(float)*4*m_numParticles);
+	copyArrayFromDevice(m_hForces, m_dForces1,0, sizeof(float)*4*m_numParticles);
+
+
 	if(m_randSet == 0){ //dont log if we're setting ICs
-	   	float edges = getEdges();//i think these get us the latest force data
+	   	uint edges = getEdges();//i think these get us the latest force data
 		float graphs = getGraphs();
 		//edges + force h as put the most recent data onto host
 		float topforce=0, bottomforce=0, speckinen = 0, gstress = 0;
 		float Cd = 6*CUDART_PI_F*m_params.viscosity*m_params.particleRadius[0];
+		float topcut = 	-m_params.worldOrigin.y - 2*m_params.particleRadius[0];
+
 		for(uint i=0; i < m_numParticles; i++){
-			if(m_hPos[i*4+1] > -m_params.worldOrigin.y - 2*m_params.particleRadius[0])
+			if(m_hPos[i*4+1] > topcut)
 				topforce += m_hForces[i*4];
 			if(m_hPos[i*4+1] < m_params.worldOrigin.y + 2*m_params.particleRadius[0])
 				bottomforce += m_hForces[i*4];
 			gstress += m_hPos[i*4+1]*m_hForces[i*4];
-			speckinen += 1/(2*Cd*Cd)*(m_hForces[i*4]*m_hForces[i*4] + m_hForces[i*4+1]*m_hForces[i*4+1] + m_hForces[i*4+2]*m_hForces[i*4+2]);
+			speckinen += 1/(2*Cd*Cd)*(m_hForces[i*4]*m_hForces[i*4] + m_hForces[i*4+1]*m_hForces[i*4+1] 
+					+ m_hForces[i*4+2]*m_hForces[i*4+2]);
 				
 		}
-		float4 M = magnetization((float4*) m_dMomentsA, m_numParticles, 8*pow(-m_params.worldOrigin.x,3));
+		float tf = calcTopForce( (float4*) m_dForces1, (float4*) m_dPos, m_numParticles, topcut);
+				
+		printf("tstress: local %g cuda %g\n", topforce, tf);
+		float4 M = magnetization((float4*) m_dMomentsA, m_numParticles, newp.L.x*newp.L.y*newp.L.z);
 		gstress = gstress / (-2.0f*m_params.worldOrigin.x*-2.0f*m_params.worldOrigin.y*-2.0f*m_params.worldOrigin.z); 
-		fprintf(file, "%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\n", simtime, m_params.shear, 
+		fprintf(file, "%.5g\t%.5g\t%.5g\t%.5g\t%d\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\n", simtime, m_params.shear, 
 				m_params.externalH.y, (float)m_numParticles/graphs, edges, topforce, bottomforce, gstress, speckinen, M.x, M.y, M.z);
 	}
 }
@@ -484,7 +491,7 @@ ParticleSystem::logParams(FILE* file)
 
 	fprintf(file, "grid: %d x %d x %d = %d cells\n", m_params.gridSize.x, m_params.gridSize.y, m_params.gridSize.z, 
 			m_params.gridSize.x*m_params.gridSize.y*m_params.gridSize.z);
-	fprintf(file, "worldsize: %.4gmm x %.4gmm x %.4gmm\n", m_worldSize.x*1e3f, m_worldSize.y*1e3f, m_worldSize.z*1e3f);
+	fprintf(file, "worldsize: %.4gmm x %.4gmm x %.4gmm\n", newp.L.x*1e3f, newp.L.y*1e3f, newp.L.z*1e3f);
 	fprintf(file, "spring: %.2f\tvisc: %.4f\tdipit: %d\trcut: %f\n", m_params.spring, m_params.viscosity, m_params.mutDipIter, 4.0f);
 	fprintf(file, "H.x: %.3g\tH.y: %.3g\tH.z: %.3g\n", m_params.externalH.x, m_params.externalH.y, m_params.externalH.z);
 
@@ -587,18 +594,18 @@ ParticleSystem::reset(ParticleConfig config)
             //uint s;
 			uint3 gridSize;
 			float spc;		
-			if(m_worldSize.z == 0){
-				spc = sqrt(m_worldSize.x*m_worldSize.y/m_numParticles);
-				gridSize.x=ceil(m_worldSize.x/spc);
-				gridSize.y=ceil(m_worldSize.y/spc);
+			if(newp.L.z == 0){
+				spc = sqrt(newp.L.x*newp.L.y/m_numParticles);
+				gridSize.x=ceil(newp.L.x/spc);
+				gridSize.y=ceil(newp.L.y/spc);
 				gridSize.z=1;
 			} else {
-				spc = pow(m_worldSize.x*m_worldSize.y*m_worldSize.z/m_numParticles, 1.0f/3.0f);
-				gridSize.x=ceil(m_worldSize.x/spc);
-				gridSize.y=ceil(m_worldSize.y/spc);
-				gridSize.z=ceil(m_worldSize.z/spc);
+				spc = pow(newp.L.x*newp.L.y*newp.L.z/m_numParticles, 1.0f/3.0f);
+				gridSize.x=ceil(newp.L.x/spc);
+				gridSize.y=ceil(newp.L.y/spc);
+				gridSize.z=ceil(newp.L.z/spc);
 			}
-			float3 spacing = m_worldSize/make_float3(gridSize.x,gridSize.y,gridSize.z);
+			float3 spacing = newp.L/make_float3(gridSize.x,gridSize.y,gridSize.z);
 			float3 jitter = 1.2*(spacing - 2*m_params.particleRadius[0])/2;
 			printf("gs %d %d %d\n", gridSize.x, gridSize.y, gridSize.z);
 			printf("spacing: %.4g %.4g %.4g, particle radius: %g\n", spacing.x, spacing.y, spacing.z, m_params.particleRadius[0]);
@@ -667,7 +674,7 @@ ParticleSystem::reset(ParticleConfig config)
 	copyArrayToDevice(m_dCellHash, m_hCellHash, 0, m_numGridCells*sizeof(uint));
 	float volfr;
 	volfr = m_numParticles*4.0f/3.0f*CUDART_PI_F*pow(m_params.particleRadius[0],3)
-		/(m_worldSize.x*m_worldSize.y*m_worldSize.z);
+		/(newp.L.x*newp.L.y*newp.L.z);
 	
 	copyArrayToDevice(m_dPos, m_hPos, 0, 4*m_numParticles*sizeof(float));
 

@@ -70,7 +70,7 @@ public:
     float3 getWorldOrigin() { return m_params.worldOrigin; }
     float3 getCellSize() { return m_params.cellSize; }
 	
-	float getEdges();
+	uint getEdges();
 	int getGraphs();
 	
 	int getInteractionRadius() { return m_params.interactionr;}	
