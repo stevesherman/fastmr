@@ -35,8 +35,9 @@ struct SimParams {
 	float3 cellSize;
 	float3 worldSize;
 
-    uint numBodies;//total number of particles
-    uint maxParticlesPerCell;
+ 	//total number of particles
+   uint numBodies;    
+   uint maxParticlesPerCell;
 	
 	float3 externalH;
 	int interactionr;

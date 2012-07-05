@@ -1,7 +1,7 @@
 
 extern "C" {
 
-void setNParameters(newParams* hostParams);
+void setNParameters(NewParams* hostParams);
 
 void comp_phash(float* dpos, uint* d_pHash, uint* d_pIndex, uint* d_cell_hash, uint numParticles, uint numGridCells);
 

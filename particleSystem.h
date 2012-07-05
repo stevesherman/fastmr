@@ -6,6 +6,7 @@
 #define DO_TIMING 0
 
 #include "particles_kernel.cuh"
+#include "new_kern.cuh"
 #include "vector_functions.h"
 #include <cstdio>
 #include <cstdlib>
@@ -50,18 +51,19 @@ public:
 	void getMagnetization();
 
 	void zeroDevice();
-    
-	void setGlobalDamping(float x) { m_params.globalDamping = x; }
-	void setRepelSpring(float x) { m_params.spring = x; }
-    void setCollideSpring(float x) { m_params.cspring = x;}
+   
+	void setCollideSpring(float x) { m_params.cspring = x;}
 	void setCollideDamping(float x) { m_params.cdamping = x; }
-    void setShear(float x) { m_params.shear = x; }
-	void setViscosity(float x) { m_params.viscosity = x;}
-	void setColorFmax(float x) { m_params.colorFmax=x;}
+	void setGlobalDamping(float x) { m_params.globalDamping = x; }
+	
+	void setRepelSpring(float x) { m_params.spring = x; newp.spring = x;}
+    void setShear(float x) { m_params.shear = x; newp.shear = x;}
+	void setViscosity(float x) { m_params.viscosity = x; newp.visc = x;}
+	void setColorFmax(float x) { m_params.colorFmax=x; m_colorFmax = x;}
 
 	void setDipIt(uint x) {m_params.mutDipIter = x;}
     void setInteractionRadius(uint x) {m_params.interactionr = x;}
-	void setExternalH(float3 x) {m_params.externalH = x;}
+	void setExternalH(float3 x) { m_params.externalH = x;}
 
 	float getParticleRadius() { return m_params.particleRadius[0]; }
     uint3 getGridSize() { return m_params.gridSize; }
@@ -89,7 +91,18 @@ protected: // data
 	uint m_numParticles;
 	uint m_maxNeigh;
 	int m_randSet;
-    // CPU data
+
+    // params
+    SimParams m_params;
+    NewParams newp;
+	uint3 m_gridSize;
+    float3 m_worldSize;
+	uint m_numGridCells;
+	float m_colorFmax;
+    uint m_timer;
+
+
+	// CPU data
     float* m_hPos;              // particle positions
 	float* m_hMoments;
 	float* m_hForces;
@@ -101,7 +114,6 @@ protected: // data
 	uint* m_hCellHash;
 	uint* m_hNumNeigh;
 	uint* m_hNeighList;
-
     // GPU data
     float* m_dPos;
     float* m_dMidPos;
@@ -139,13 +151,6 @@ protected: // data
     struct cudaGraphicsResource *m_cuda_colorvbo_resource; // handles OpenGL-CUDA exchange
 
 
-    // params
-    SimParams m_params;
-    uint3 m_gridSize;
-    float3 m_worldSize;
-	uint m_numGridCells;
-
-    uint m_timer;
 
 };
 

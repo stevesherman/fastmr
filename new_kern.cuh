@@ -5,29 +5,26 @@
 
 typedef unsigned int uint;
 
-struct newParams {
+struct NewParams {
 	uint N;
 	
 	uint3 gridSize;
-	uint numGridCells;	
+	uint numCells;	
 	float3 cellSize;
-	float3 worldOrigin;
+	float3 origin;
+	uint numAdjCells;
 
 	float3 L;
 	float3 Linv;
-
-	float max_ndr_sq;
+	
 	float max_fdr_sq;
-
-	uint num_c_neigh;
-	uint max_neigh;
 
 	float spring;
 	float uf;
-	float viscosity;
+	float visc;
 	float shear;
 
-	float3 externalH;
+	float3 extH;
 	float mup;	
 };
 #endif

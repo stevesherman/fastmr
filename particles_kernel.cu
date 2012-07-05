@@ -122,9 +122,10 @@ __global__ void integrateRK4(const float4* oldPos,
 	uint index = __umul24(blockIdx.x,blockDim.x) + threadIdx.x;
     if (index >= numParticles) return;          // handle case when no. of particles not multiple of block size
 
-	float4 posData = oldPos[index];    // ensure coalesced read
+	float4 posData = oldPos[index];
     float3 pos = make_float3(posData.x, posData.y, posData.z);
 	float radius = posData.w;
+	
 	float4 f1 = forceA[index];
     float4 f2 = forceB[index];
 	float4 f3 = forceC[index];
@@ -134,7 +135,6 @@ __global__ void integrateRK4(const float4* oldPos,
 	float3 force2 = make_float3(f2.x, f2.y, f2.z);
 	float3 force3 = make_float3(f3.x, f3.y, f3.z);
 	float3 force4 = make_float3(f4.x, f4.y, f4.z);
-	
 	
 	float3 fcomp = (force1 + 2*force2 + 2*force3 + force4)/6;//trapezoid rule	
 	forceA[index] = make_float4(fcomp, f1.w);//averaged force
@@ -159,19 +159,15 @@ __global__ void integrateRK4(const float4* oldPos,
     if (pos.y < params.worldOrigin.y ) { pos.y = 1.0f*params.worldOrigin.z; }
 
 	newPos[index] = make_float4(pos, radius);
-	
-
 }
-/*
-   This offers the potential ability to set the colors based on input parametsr
-*/
 
 
 __global__ void writeRender(const float4* pos, //never changes
 							const float4* moments,
 							const float4* forces,
-							float4* rendPos, //output VBO - writes may cause an error in cuda-memcheck
+							float4* rendPos, //output VBO - writes may cause an error in cuda-memcheck, b/c of leak from somewhere else?
 							float4* rendColor,
+							float colorFmax,
 							uint numParticles)
 {
 	uint index = blockIdx.x*blockDim.x + threadIdx.x;
@@ -190,8 +186,8 @@ __global__ void writeRender(const float4* pos, //never changes
 	*/
 	float3 force = make_float3(forces[index]);
 	float3 colorOut = make_float3(1,1,1);
-	float fmag = force.x + params.colorFmax/2;
-	fmag = (fmag > params.colorFmax) ? params.colorFmax : fmag;
+	float fmag = force.x + colorFmax/2.0f;
+	fmag = (fmag > colorFmax) ? colorFmax : fmag;
 	fmag = (fmag < 0) ? 0 : fmag;
 	
 	const int ncolors = 3;
@@ -202,7 +198,7 @@ __global__ void writeRender(const float4* pos, //never changes
 		make_float3(0.0, 0.0, 1.0),
 	};
 
-	float fcolor = fmag/(params.colorFmax )*(ncolors-1);
+	float fcolor = fmag/(colorFmax )*(ncolors-1);
 	int base = (int) fcolor;
 	float mix = fcolor - (float) base;
 	colorOut = c[base] + mix*(c[base+1]-c[base]);

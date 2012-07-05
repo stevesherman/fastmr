@@ -122,10 +122,7 @@ void setParameters(SimParams *hostParams)
      cudaMemcpyToSymbol(params, hostParams, sizeof(SimParams));
 }
 
-//Round a / b to nearest higher integer value
-/*uint iDivUp(uint a, uint b){
-    return (a % b != 0) ? (a / b + 1) : (a / b);
-}*/
+
 
 // compute grid and thread block size for a given number of elements
 void computeGridSize(uint n, uint blockSize, uint &numBlocks, uint &numThreads)
@@ -276,6 +273,7 @@ void renderStuff(const float* pos,
 				const float* force, 
 				float* rendPos, 
 				float* rendColor,
+				float colorFmax,
 				uint numParticles)
 {
 	uint numThreads, numBlocks;
@@ -285,6 +283,7 @@ void renderStuff(const float* pos,
 											(float4*)force,
 											(float4*)rendPos,
 											(float4*)rendColor,
+											colorFmax,
 											numParticles);
 	cutilCheckMsg("Render Kernel execution failed");
 }

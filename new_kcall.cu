@@ -45,8 +45,8 @@ void comp_phash(float* dpos, uint* d_pHash, uint* d_pIndex, uint* d_CellHash, ui
 }
 
 
-void setNParameters(newParams *hostParams){
-	cudaMemcpyToSymbol(nparams, hostParams, sizeof(newParams));
+void setNParameters(NewParams *hostParams){
+	cudaMemcpyToSymbol(nparams, hostParams, sizeof(NewParams));
 }
 
 void find_cellStart(uint* cellStart, uint* cellEnd, uint* phash, uint numParticles, uint numCells)

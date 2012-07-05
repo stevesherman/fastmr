@@ -11,7 +11,7 @@
 #include "new_kern.cuh"
 #include "particles_kernel.cuh"
 
-__constant__ newParams nparams;
+__constant__ NewParams nparams;
 
 texture<float4, cudaTextureType1D, cudaReadModeElementType> pos_tex;
 texture<float4, cudaTextureType1D, cudaReadModeElementType> mom_tex;
@@ -20,9 +20,9 @@ texture<float4, cudaTextureType1D, cudaReadModeElementType> vel_tex;
 __device__ uint3 calcGPos(float3 p)
 {
 	uint3 gpos;
-	gpos.x = floor((p.x - nparams.worldOrigin.x)/nparams.cellSize.x);
-	gpos.y = floor((p.y - nparams.worldOrigin.y)/nparams.cellSize.y);
-	gpos.z = floor((p.z - nparams.worldOrigin.z)/nparams.cellSize.z);
+	gpos.x = floor((p.x - nparams.origin.x)/nparams.cellSize.x);
+	gpos.y = floor((p.y - nparams.origin.y)/nparams.cellSize.y);
+	gpos.z = floor((p.z - nparams.origin.z)/nparams.cellSize.z);
 	gpos.x = (nparams.gridSize.x + gpos.x) % nparams.gridSize.x;
 	gpos.y = (nparams.gridSize.y + gpos.y) % nparams.gridSize.y;
 	gpos.z = (nparams.gridSize.z + gpos.z) % nparams.gridSize.z;
@@ -152,12 +152,12 @@ __global__ void magForcesK( const float4* dSortedPos,	//i: pos we use to calcula
 			//create a false moment for nonmagnetic particles
 			//note that here mup gives the wrong volume, so the magnitude of 
 			//the repulsion strength is wrong		
-			m1 = (xi1 == 1.0f) ? nparams.mup*nparams.externalH : m1;
-			m2 = (xi2 == 1.0f) ? nparams.mup*nparams.externalH : m2;
+			m1 = (xi1 == 1.0f) ? nparams.mup*nparams.extH : m1;
+			m2 = (xi2 == 1.0f) ? nparams.mup*nparams.extH : m2;
 			dm1m2 = dot(m1,m2);
 			
 			float sepdist = radius1 + radius2;
-			force += 3.0f*nparams.uf*dm1m2/(2.0f*PI*pow(sepdist,4))*
+			force += 3.0f*nparams.uf*dm1m2/(2.0f*PI*sepdist*sepdist*sepdist*sepdist)*
 					exp(-nparams.spring*(sqrt(lsq)/sepdist - 1.0f))*er;
 			edges += lsq < 1.1f*sepdist*1.1f*sepdist ? 1 : 0;
 			
@@ -165,14 +165,14 @@ __global__ void magForcesK( const float4* dSortedPos,	//i: pos we use to calcula
 			
 	}
 	dForce[idx] = make_float4(force, (float) edges);
-	float Cd = 6.0f*PI*radius1*nparams.viscosity;
-	float ybot = p1.y - nparams.worldOrigin.y;
+	float Cd = 6.0f*PI*radius1*nparams.visc;
+	float ybot = p1.y - nparams.origin.y;
 	force.x += nparams.shear*ybot*Cd;
 	
 	//apply BCs
 	if(ybot < 1.5f*radius1)
 		force = make_float3(0,0,0);
-	if(ybot - nparams.worldOrigin.y > nparams.L.y - 1.5f*radius1)
+	if(ybot - nparams.origin.y > nparams.L.y - 1.5f*radius1)
 		force.x = nparams.shear*nparams.L.y*Cd;
 
 	float3 ipos = make_float3(integrPos[idx]);
@@ -199,10 +199,10 @@ __global__ void buildNListK(	uint* nlist,	//	o:neighbor list
 	uint hash = phash[idx];
 	uint n_neigh = 0;
 
-	for(uint i = 0; i < nparams.num_c_neigh; i++)
+	for(uint i = 0; i < nparams.numAdjCells; i++)
 	{
-		//uint nhash = cellAdj[i*nparams.numGridCells + hash];
-		uint nhash = cellAdj[i + hash*nparams.num_c_neigh];
+		//uint nhash = cellAdj[i*nparams.numCells + hash];
+		uint nhash = cellAdj[i + hash*nparams.numAdjCells];
 		uint cstart = cellStart[nhash];
 		if(cstart != 0xffffffff) {
 			uint cend = cellEnd[nhash];
@@ -282,20 +282,20 @@ __global__ void collisionK( const float4* sortedPos,	//i: pos we use to calculat
 	v1 = (v1 + force)*.8f;
 	p1 = p1 + v1*deltaTime;
 
-	if(p1.x > -nparams.worldOrigin.x ) { p1.x -= nparams.L.x;}
-    if(p1.x < nparams.worldOrigin.x ) { p1.x += nparams.L.x;}
+	if(p1.x > -nparams.origin.x ) { p1.x -= nparams.L.x;}
+    if(p1.x < nparams.origin.x ) { p1.x += nparams.L.x;}
 	
-	if(p1.y+radius1 > -nparams.worldOrigin.y){ 
-		p1.y = -nparams.worldOrigin.y - radius1;
+	if(p1.y+radius1 > -nparams.origin.y){ 
+		p1.y = -nparams.origin.y - radius1;
 		v1.y*= -.03f;	
 	}
-    if(p1.y-radius1 <  nparams.worldOrigin.y){ 
-		p1.y = nparams.worldOrigin.y + radius1;
+    if(p1.y-radius1 <  nparams.origin.y){ 
+		p1.y = nparams.origin.y + radius1;
 		v1.y*= -.03f;	
 	}
 	
-	if(p1.z > -nparams.worldOrigin.z ) { p1.z -= nparams.L.z;}
-	if(p1.z < nparams.worldOrigin.z ) { p1.z += nparams.L.z;}
+	if(p1.z > -nparams.origin.z ) { p1.z -= nparams.L.z;}
+	if(p1.z < nparams.origin.z ) { p1.z += nparams.L.z;}
 
 	newVel[idx] = make_float4(v1);
 	newPos[idx]	= make_float4(p1, radius1); 

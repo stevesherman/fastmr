@@ -40,6 +40,23 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize):
 
 	m_bUseOpenGL = useGL;
 	_initialize(m_params.numBodies);
+
+	newp.N = m_numParticles;
+	newp.gridSize = m_params.gridSize;
+	newp.numCells = m_numGridCells;
+	newp.cellSize = m_params.cellSize;
+	newp.origin = m_params.worldOrigin;
+	newp.L = m_params.worldSize;
+	newp.Linv = 1/newp.L;
+	newp.max_fdr_sq = 8.0f*m_params.particleRadius[0]*8.0f*m_params.particleRadius[0];
+	newp.numAdjCells = 27;
+	newp.spring = m_params.spring;
+	newp.uf = m_params.uf;
+	newp.shear = m_params.shear;
+	newp.visc = m_params.viscosity;
+	newp.extH = m_params.externalH;
+	newp.mup = m_params.mup;
+
 }
 
 
@@ -213,7 +230,7 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
         dRendPos = (float *) mapGLBufferObject(&m_cuda_posvbo_resource);
     	dRendColor = (float *) mapGLBufferObject(&m_cuda_colorvbo_resource);
 		
-		renderStuff(m_dPos, m_dMomentsA, m_dForces1, dRendPos, dRendColor, m_numParticles);
+		renderStuff(m_dPos, m_dMomentsA, m_dForces1, dRendPos, dRendColor, m_colorFmax, m_numParticles);
 		
 		unmapGLBufferObject(m_cuda_posvbo_resource);
 		unmapGLBufferObject(m_cuda_colorvbo_resource);
@@ -224,72 +241,40 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
     }
 	cutilCheckMsg("ohno");	
 	setParameters(&m_params);
-	newParams hnparams;
-	hnparams.N = m_numParticles;
-	hnparams.gridSize = m_params.gridSize;
-	hnparams.numGridCells = m_numGridCells;
-	hnparams.cellSize = m_params.cellSize;
-	hnparams.worldOrigin = m_params.worldOrigin;
-	hnparams.L = m_params.worldSize;
-	hnparams.Linv = 1/hnparams.L;
-	hnparams.max_ndr_sq = 8.1f*m_params.particleRadius[0]*8.1f*m_params.particleRadius[0];
-	hnparams.max_fdr_sq = 8.0f*m_params.particleRadius[0]*8.0f*m_params.particleRadius[0];
-	hnparams.num_c_neigh = 27;
-	hnparams.spring = m_params.spring;
-	hnparams.uf = m_params.uf;
-	hnparams.shear = m_params.shear;
-	hnparams.viscosity = m_params.viscosity;
-	hnparams.max_neigh = m_maxNeigh;
-	hnparams.externalH = m_params.externalH;
-	hnparams.mup = m_params.mup;
-	setNParameters(&hnparams);
+	setNParameters(&newp);
 
-	
+	//isOutofBounds((float4*) m_dPos, m_params.worldOrigin.x, m_numParticles);
+	comp_phash(m_dPos, m_dGridParticleHash, m_dGridParticleIndex, m_dCellHash, m_numParticles, m_numGridCells);
+	// sort particles based on hash
+	sortParticles(m_dGridParticleHash, m_dGridParticleIndex, m_numParticles);
+	// reorder particle arrays into sorted order and
+	// find start and end of each cell - also sets the fixed moment
+	find_cellStart(m_dCellStart, m_dCellEnd, m_dGridParticleHash, m_numParticles, m_numGridCells);
+	cutilCheckMsg("Cstart");
+	reorder(m_dGridParticleIndex, m_dSortedPos, m_dMomentsB, m_dPos, m_dMomentsA, m_numParticles);	
+	cutilCheckMsg("Reorder");
+	float* temp = m_dMomentsB;
+	m_dMomentsB = m_dMomentsA;
+	m_dMomentsA = temp;
+			
+
 	if(m_randSet > 0)
 	{
-		//isOutofBounds((float4*) m_dPos, m_params.worldOrigin.x, m_numParticles);
-		comp_phash(m_dPos, m_dGridParticleHash, m_dGridParticleIndex, m_dCellHash, m_numParticles, m_numGridCells);
-		// sort particles based on hash
-		sortParticles(m_dGridParticleHash, m_dGridParticleIndex, m_numParticles);
-		// reorder particle arrays into sorted order and
-		// find start and end of each cell - also sets the fixed moment
-		find_cellStart(m_dCellStart, m_dCellEnd, m_dGridParticleHash, m_numParticles, m_numGridCells);
-		cutilCheckMsg("Cstart");
-		reorder(m_dGridParticleIndex, m_dSortedPos, m_dMomentsB, m_dPos, m_dMomentsA, m_numParticles);	
-		cutilCheckMsg("Reorder");
-		float* temp = m_dMomentsB;
-		m_dMomentsB = m_dMomentsA;
-		m_dMomentsA = temp;
-			
-		buildNList(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
-				m_dCellStart, m_dCellEnd, m_dCellAdj, m_numParticles, m_maxNeigh, 3.1f*m_params.particleRadius[0]);
 		
 		temp = m_dForces2;
 		m_dForces2 = m_dForces1;
 		m_dForces1 = temp;
+		buildNList(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
+				m_dCellStart, m_dCellEnd, m_dCellAdj, m_numParticles, m_maxNeigh, 3.1f*m_params.particleRadius[0]);
 
 		collision_new(m_dSortedPos, m_dForces2, m_dNeighList, m_dNumNeigh, m_dForces1, m_dPos, m_numParticles, 0.01f);
 		deltaTime = 0;
 		m_randSet--;
 	} else {
-
-		//isOutofBounds((float4*) m_dPos, m_params.worldOrigin.x, m_numParticles);
-		comp_phash(m_dPos, m_dGridParticleHash, m_dGridParticleIndex, m_dCellHash, m_numParticles, m_numGridCells);
-		// sort particles based on hash
-		sortParticles(m_dGridParticleHash, m_dGridParticleIndex, m_numParticles);
-		// reorder particle arrays into sorted order and
-		// find start and end of each cell - also sets the fixed moment
-		find_cellStart(m_dCellStart, m_dCellEnd, m_dGridParticleHash, m_numParticles, m_numGridCells);
-		cutilCheckMsg("Cstart");
-		reorder(m_dGridParticleIndex, m_dSortedPos, m_dMomentsB, m_dPos, m_dMomentsA, m_numParticles);	
-		cutilCheckMsg("Reorder");
-		float* temp = m_dMomentsB;
-		m_dMomentsB = m_dMomentsA;
-		m_dMomentsA = temp;
-			
 		buildNList(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
 				m_dCellStart, m_dCellEnd, m_dCellAdj, m_numParticles, m_maxNeigh, 8.1f*m_params.particleRadius[0]);
-		
+
+	
 		bool solve = true;
 		double Cd, maxf, maxFdx;
 		Cd = 6*CUDART_PI_F*m_params.viscosity*m_params.particleRadius[0];
