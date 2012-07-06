@@ -41,6 +41,8 @@
 
 #include "particles_kernel.cu"
 
+using namespace thrust;
+
 extern "C"
 {
 
@@ -177,9 +179,9 @@ void RK4integrate(	float* oldPos,
 	
 void sortParticles(uint *dGridParticleHash, uint *dGridParticleIndex, uint numParticles)
 {
-    thrust::sort_by_key(thrust::device_ptr<uint>(dGridParticleHash),
-                        thrust::device_ptr<uint>(dGridParticleHash + numParticles),
-                        thrust::device_ptr<uint>(dGridParticleIndex));
+    sort_by_key(device_ptr<uint>(dGridParticleHash),
+                        device_ptr<uint>(dGridParticleHash + numParticles),
+                        device_ptr<uint>(dGridParticleIndex));
 }
 
 
@@ -203,8 +205,8 @@ struct isOut
 
 bool isOutofBounds(float4* positions, float border, uint numParticles)
 {
-	int x = thrust::count_if(thrust::device_ptr<float4>(positions),
-					thrust::device_ptr<float4>(positions+numParticles),
+	int x = count_if(device_ptr<float4>(positions),
+					device_ptr<float4>(positions+numParticles),
 					isOut(border));
 	if(x>0) printf("%d particles outofbounds\n", x);
 	return x>0;
@@ -212,17 +214,17 @@ bool isOutofBounds(float4* positions, float border, uint numParticles)
 
 
 float4 magnetization(float4* moments, uint numParticles, float worldVol){
-	float4 totalDp =  thrust::reduce(thrust::device_ptr<float4>(moments),
-			thrust::device_ptr<float4>(moments+numParticles), 
-			make_float4(0,0,0,0), thrust::plus<float4>() );
+	float4 totalDp =  reduce(device_ptr<float4>(moments),
+			device_ptr<float4>(moments+numParticles), 
+			make_float4(0,0,0,0), plus<float4>() );
 	return totalDp/worldVol;
 
 }
 
 uint edgeCount(float4* forces, uint numParticles){
-	float4 edge = thrust::reduce(thrust::device_ptr<float4>(forces),
-			thrust::device_ptr<float4>(forces+numParticles), 
-			make_float4(0,0,0,0), thrust::plus<float4>());
+	float4 edge = reduce(device_ptr<float4>(forces),
+			device_ptr<float4>(forces+numParticles), 
+			make_float4(0,0,0,0), plus<float4>());
 	return (uint) edge.w/2.0f;
 }
 
@@ -249,12 +251,47 @@ struct isBot {
 };
 
 float calcTopForce(float4* forces, float4* position, uint numParticles, float cut){
-	float4 tforce = thrust::inner_product(thrust::device_ptr<float4>(forces),
-			thrust::device_ptr<float4>(forces+numParticles),thrust::device_ptr<float4>(position),
-			make_float4(0,0,0,0), thrust::plus<float4>(), isTop(cut));
+	float4 tforce = inner_product(device_ptr<float4>(forces),
+			device_ptr<float4>(forces+numParticles),device_ptr<float4>(position),
+			make_float4(0,0,0,0), plus<float4>(), isTop(cut));
 	return tforce.x;
 }
 
+float calcBotForce(float4* forces, float4* position, uint numParticles, float cut){
+	float4 tforce = inner_product(device_ptr<float4>(forces),
+			device_ptr<float4>(forces+numParticles),device_ptr<float4>(position),
+			make_float4(0,0,0,0), plus<float4>(), isBot(cut));
+	return tforce.x;
+}
+
+struct stressThing : public binary_function<float4, float4, float3>{
+	__host__ __device__ float3 operator()(const float4& force, const float4& pos){
+		return make_float3(force.x, force.y, force.z)*pos.y;
+	}
+};
+
+float calcGlForce(float4* forces, float4* position, uint numParticles){
+
+	float3 glf = inner_product(device_ptr<float4>(forces), 
+			device_ptr<float4>(forces+numParticles), device_ptr<float4>(position), 
+			make_float3(0,0,0), plus<float3>(), stressThing()); 
+	return glf.x;
+}
+
+struct f4norm : public unary_function<float4, float>{
+	__host__ __device__ float operator()(const float4& f) 
+	{
+		return f.x*f.x + f.y*f.y + f.z*f.z;
+	}
+};
+
+float calcKinEn(float4* forces, uint numParticles){
+	
+	float kin = transform_reduce(device_ptr<float4>(forces),
+				device_ptr<float4>(forces+numParticles), f4norm(),	
+				0.0f, plus<float>());
+	return kin;
+}
 struct forcemax 
 {
 	__host__ __device__ float4 operator() (const float4 &f1, const float4 &f2){
@@ -268,8 +305,8 @@ struct forcemax
 float maxforce(float4* forces, uint numParticles)
 {
 	
-	float4 max1 = thrust::reduce(thrust::device_ptr<float4>(forces), 
-			thrust::device_ptr<float4>(forces+numParticles), make_float4(0,0,0,0), forcemax());
+	float4 max1 = reduce(device_ptr<float4>(forces), 
+			device_ptr<float4>(forces+numParticles), make_float4(0,0,0,0), forcemax());
 	return sqrt(max1.x*max1.x + max1.y*max1.y + max1.z*max1.z);	
 }
 struct isExcessForce
@@ -287,8 +324,8 @@ struct isExcessForce
 
 bool  excessForce(float4* forces, float maxforce, uint numParticles){
 
-	int x = thrust::count_if(thrust::device_ptr<float4>(forces),
-			thrust::device_ptr<float4>(forces+numParticles),
+	int x = count_if(device_ptr<float4>(forces),
+			device_ptr<float4>(forces+numParticles),
 			isExcessForce(maxforce));
 
 	if(x>0) printf("%d particles with excessive movement\n", x);

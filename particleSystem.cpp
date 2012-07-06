@@ -39,7 +39,6 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize):
 	m_maxNeigh = (uint) ((m_params.volfr[0]+m_params.volfr[1]+m_params.volfr[2])*680.0f);
 
 	m_bUseOpenGL = useGL;
-	_initialize(m_params.numBodies);
 
 	newp.N = m_numParticles;
 	newp.gridSize = m_params.gridSize;
@@ -55,6 +54,8 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize):
 	newp.visc = m_params.viscosity;
 	newp.extH = m_params.externalH;
 	newp.mup = m_params.mup;
+
+	_initialize(m_params.numBodies);
 
 }
 
@@ -424,36 +425,47 @@ uint ParticleSystem::getEdges(){
 
 void ParticleSystem::logStuff(FILE* file, float simtime)
 {
- 	copyArrayFromDevice(m_hPos, m_dPos, 0, sizeof(float)*4*m_numParticles);
+ 	
+	if(m_randSet != 0)  //dont log if we're setting ICs
+		return;
+
+	copyArrayFromDevice(m_hPos, m_dPos, 0, sizeof(float)*4*m_numParticles);
 	copyArrayFromDevice(m_hForces, m_dForces1,0, sizeof(float)*4*m_numParticles);
+		
+	uint edges = getEdges();//i think these get us the latest force data
+	float graphs = getGraphs();
+	float4 M = magnetization((float4*) m_dMomentsA, m_numParticles, newp.L.x*newp.L.y*newp.L.z);
 
-
-	if(m_randSet == 0){ //dont log if we're setting ICs
-	   	uint edges = getEdges();//i think these get us the latest force data
-		float graphs = getGraphs();
-		//edges + force h as put the most recent data onto host
-		float topforce=0, bottomforce=0, speckinen = 0, gstress = 0;
-		float Cd = 6*CUDART_PI_F*m_params.viscosity*m_params.particleRadius[0];
-		float topcut = 	-m_params.worldOrigin.y - 2*m_params.particleRadius[0];
-
-		for(uint i=0; i < m_numParticles; i++){
-			if(m_hPos[i*4+1] > topcut)
-				topforce += m_hForces[i*4];
-			if(m_hPos[i*4+1] < m_params.worldOrigin.y + 2*m_params.particleRadius[0])
-				bottomforce += m_hForces[i*4];
-			gstress += m_hPos[i*4+1]*m_hForces[i*4];
-			speckinen += 1/(2*Cd*Cd)*(m_hForces[i*4]*m_hForces[i*4] + m_hForces[i*4+1]*m_hForces[i*4+1] 
-					+ m_hForces[i*4+2]*m_hForces[i*4+2]);
-				
-		}
-		float tf = calcTopForce( (float4*) m_dForces1, (float4*) m_dPos, m_numParticles, topcut);
-				
-		printf("tstress: local %g cuda %g\n", topforce, tf);
-		float4 M = magnetization((float4*) m_dMomentsA, m_numParticles, newp.L.x*newp.L.y*newp.L.z);
-		gstress = gstress / (-2.0f*m_params.worldOrigin.x*-2.0f*m_params.worldOrigin.y*-2.0f*m_params.worldOrigin.z); 
-		fprintf(file, "%.5g\t%.5g\t%.5g\t%.5g\t%d\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\n", simtime, m_params.shear, 
-				m_params.externalH.y, (float)m_numParticles/graphs, edges, topforce, bottomforce, gstress, speckinen, M.x, M.y, M.z);
+	float topcut = 	-newp.origin.y - 2*m_params.particleRadius[0];
+	float topforce=0, botforce=0, speckinen=0, gstress=0;
+	float Cd = 6*CUDART_PI_F*m_params.viscosity*m_params.particleRadius[0];
+	
+	for(uint i=0; i < m_numParticles; i++){
+		if(m_hPos[i*4+1] > topcut)
+			topforce += m_hForces[i*4];
+		if(m_hPos[i*4+1] < -topcut)
+			botforce += m_hForces[i*4];
+		gstress += m_hPos[i*4+1]*m_hForces[i*4];
+		speckinen += 1.0f/(2.0f*Cd*Cd)*(m_hForces[i*4]*m_hForces[i*4] + m_hForces[i*4+1]*m_hForces[i*4+1] 
+				+ m_hForces[i*4+2]*m_hForces[i*4+2]);
+			
 	}
+	gstress = gstress*newp.Linv.x*newp.Linv.y*newp.Linv.z;
+
+	//cuda calls for faster computation - need to verify against host code
+/*	float tf = calcTopForce( (float4*) m_dForces1, (float4*) m_dPos, m_numParticles, topcut);
+	float bf = calcBotForce( (float4*) m_dForces1, (float4*) m_dPos, m_numParticles, -topcut);
+	float gs = calcGlForce( (float4*) m_dForces1, (float4*) m_dPos, m_numParticles)*newp.Linv.x*newp.Linv.y*newp.Linv.z;
+	float kinen = calcKinEn( (float4*) m_dForces1, m_numParticles)/(2.0f*Cd*Cd);
+	
+	printf("topforce\tlocal: %g\tcuda:%g\n", topforce, tf);
+	printf("botforce\tlocal: %g\t cuda:%g\n", botforce, bf);
+	printf("gstress\tlocal: %g\tcuda:%g\n", gstress, gs);
+	printf("Kinen local: %g cuda: %g\n", speckinen, kinen);
+*/	
+	fprintf(file, "%.5g\t%.5g\t%.5g\t%.5g\t%d\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\n", simtime, m_params.shear, 
+			m_params.externalH.y, (float)m_numParticles/graphs, edges, topforce, botforce, gstress, speckinen, M.x, M.y, M.z);
+	
 }
 
 void
