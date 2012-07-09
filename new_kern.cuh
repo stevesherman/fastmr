@@ -24,6 +24,9 @@ struct NewParams {
 	float visc;
 	float shear;
 
+	float contact_d_sq;
+	float pin_d;
+
 	float3 extH;
 	float mup;	
 };

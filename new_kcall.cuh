@@ -9,7 +9,13 @@ void find_cellStart(uint* cellStart, uint* cellEnd, uint* phash, uint numParticl
 
 void reorder(uint* sortedIndex, float* sortedPos, float* sortedMom, float* oldPos, float* oldMom, uint numParticles);
 
-uint buildNList(uint*& nlist, uint* num_neigh, float* dpos, 
+uint NListFixed(uint*& nlist, uint* num_neigh, float* dpos, 
+		uint* phash, uint* cellStart, uint* cellEnd, 
+		uint* cellAdj, uint numParticles, 
+		uint& max_neigh, float max_dist);
+
+
+uint NListVar(uint*& nlist, uint* num_neigh, float* dpos, 
 		uint* phash, uint* cellStart, uint* cellEnd, 
 		uint* cellAdj, uint numParticles, 
 		uint& max_neigh, float max_dist);
@@ -20,5 +26,13 @@ void collision_new(	const float* dSortedPos, const float* dOldVel,
 					const uint* nlist, const uint* num_neigh, float* dNewVel, float* dNewPos, 
 					uint numParticles, float deltaTime);
 
+void RK4integrate(float* oldPos,
+				float* newPos,
+				float* force1,
+				float* force2,
+				float* force3,
+				float* force4,
+				float deltaTime,
+				uint numParticles);
 
 }

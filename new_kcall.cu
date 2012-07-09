@@ -24,24 +24,10 @@ void comp_phash(float* dpos, uint* d_pHash, uint* d_pIndex, uint* d_CellHash, ui
 {
 	uint numThreads = 256;
 	uint numBlocks = iDivUp2(numParticles, numThreads);
-/*	
-	uint maxkey = 0;
-	thrust::device_ptr<uint> dev_ptr(d_pHash);
-	thrust::maximum<uint> mx;
-	maxkey = thrust::reduce(dev_ptr, dev_ptr+numParticles, 0, mx);
-	printf("omaxkey: %u\n", maxkey);		
 
-	thrust::device_ptr<uint> hashes(d_CellHash);
-	maxkey = thrust::reduce(hashes, hashes+numGridCells, 0, mx);
-	printf("max hash: %u\n", maxkey);
-*/
 
 	comp_phashK<<<numBlocks, numThreads>>> ( (float4*) dpos, d_pHash, d_pIndex, d_CellHash);
-//	cudaDeviceSynchronize();
 	cutilCheckMsg("in phash computation");	
-/*	
-	maxkey = thrust::reduce(dev_ptr, dev_ptr+numParticles, 0, mx);
-	printf("nmaxkey: %u\n", maxkey);*/
 }
 
 
@@ -70,35 +56,68 @@ void reorder(uint* d_pSortedIndex, float* dSortedPos, float* dSortedMom, float* 
 			(float4*)oldPos, (float4*)oldMom);
 }
 
+//uses adjacency definition based on a fixed maximum distace, max_dist
 //Note: this func modifies nlist and max_neigh
-uint buildNList(uint*& nlist, uint* num_neigh, float* dpos, uint* phash, uint* cellStart, 
+uint NListFixed(uint*& nlist, uint* num_neigh, float* dpos, uint* phash, uint* cellStart, 
 		uint* cellEnd, uint* cellAdj, uint numParticles, uint& max_neigh, float max_dist)
 {
 	uint numThreads = 128;
 	uint numBlocks = iDivUp2(numParticles, numThreads);
-	cudaFuncSetCacheConfig(buildNListK, cudaFuncCachePreferL1);	
+	cudaFuncSetCacheConfig(NListFixedK, cudaFuncCachePreferL1);	
 
-	buildNListK<<<numBlocks, numThreads>>>(nlist, num_neigh, (float4*) dpos, 
+	NListFixedK<<<numBlocks, numThreads>>>(nlist, num_neigh, (float4*) dpos, 
 			phash, cellStart, cellEnd, cellAdj, max_neigh, max_dist*max_dist);
 	
 	//cudaDeviceSynchronize();
-	cutilCheckMsg("inNList");
+	cutilCheckMsg("NListFixed");
 	thrust::maximum<uint> mx;
 	thrust::device_ptr<uint> numneigh_ptr(num_neigh);
 	uint maxn = thrust::reduce(numneigh_ptr, numneigh_ptr+numParticles, 0, mx);
 	cutilCheckMsg("max nneigh thrust call");	
 	
 	if(maxn > max_neigh){
-		printf("Extending NList from %u to %u\n", max_neigh, maxn);
+		printf("Extending FixNList from %u to %u\n", max_neigh, maxn);
 		cudaFree(nlist);
 		assert(cudaMalloc((void**)&nlist, numParticles*maxn*sizeof(uint)) == cudaSuccess);
 		cudaMemset(nlist, 0, numParticles*maxn*sizeof(uint));
-		buildNListK<<<numBlocks, numThreads>>>(nlist, num_neigh, (float4*) dpos, 
+		NListFixedK<<<numBlocks, numThreads>>>(nlist, num_neigh, (float4*) dpos, 
 			phash, cellStart, cellEnd, cellAdj, maxn, max_dist*max_dist);
 		cutilCheckMsg("after extension");
 		max_neigh = maxn;
 	}
 
+return maxn;
+}
+
+//uses an adjacency definition based on max_dist_m*(rad1 + rad2)
+//Note: this func modifies nlist and max_neigh
+uint NListVar(uint*& nlist, uint* num_neigh, float* dpos, uint* phash, uint* cellStart, 
+		uint* cellEnd, uint* cellAdj, uint numParticles, uint& max_neigh, float max_dist_m)
+{
+	uint numThreads = 128;
+	uint numBlocks = iDivUp2(numParticles, numThreads);
+	cudaFuncSetCacheConfig(NListVarK, cudaFuncCachePreferL1);	
+
+	NListVarK<<<numBlocks, numThreads>>>(nlist, num_neigh, (float4*) dpos, 
+			phash, cellStart, cellEnd, cellAdj, max_neigh, max_dist_m*max_dist_m);
+	
+	//cudaDeviceSynchronize();
+	cutilCheckMsg("NListVar");
+	thrust::maximum<uint> mx;
+	thrust::device_ptr<uint> numneigh_ptr(num_neigh);
+	uint maxn = thrust::reduce(numneigh_ptr, numneigh_ptr+numParticles, 0, mx);
+	cutilCheckMsg("max nneigh thrust call");	
+	
+	if(maxn > max_neigh){
+		printf("Extending VarNList from %u to %u\n", max_neigh, maxn);
+		cudaFree(nlist);
+		assert(cudaMalloc((void**)&nlist, numParticles*maxn*sizeof(uint)) == cudaSuccess);
+		cudaMemset(nlist, 0, numParticles*maxn*sizeof(uint));
+		NListVarK<<<numBlocks, numThreads>>>(nlist, num_neigh, (float4*) dpos, 
+			phash, cellStart, cellEnd, cellAdj, maxn, max_dist_m*max_dist_m);
+		cutilCheckMsg("after extension");
+		max_neigh = maxn;
+	}
 
 return maxn;
 }
@@ -123,6 +142,28 @@ void magForces(	float* dSortedPos, float* dIntPos, float* newPos, float* dForce,
 	cudaUnbindTexture(mom_tex);
 
 	cutilCheckMsg("Magforces error");
+}
+
+void RK4integrate(	float* oldPos,
+					float* newPos,
+					float* force1,
+					float* force2,
+					float* force3, 
+					float* force4,
+					float deltaTime,
+					uint numParticles)
+{
+	uint numThreads = 256; 
+	uint numBlocks = iDivUp2(numParticles, numThreads);
+
+	integrateRK4 <<< numBlocks, numThreads >>> ((float4*) oldPos, 
+												(float4*) newPos,
+												(float4*) force1,
+												(float4*) force2,
+												(float4*) force3,
+												(float4*) force4,
+												deltaTime,
+												numParticles);
 }
 
 void collision_new(	const float* dSortedPos, const float* dOldVel, const uint* nlist, 

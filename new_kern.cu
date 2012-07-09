@@ -20,9 +20,9 @@ texture<float4, cudaTextureType1D, cudaReadModeElementType> vel_tex;
 __device__ uint3 calcGPos(float3 p)
 {
 	uint3 gpos;
-	gpos.x = floor((p.x - nparams.origin.x)/nparams.cellSize.x);
-	gpos.y = floor((p.y - nparams.origin.y)/nparams.cellSize.y);
-	gpos.z = floor((p.z - nparams.origin.z)/nparams.cellSize.z);
+	gpos.x = floorf((p.x - nparams.origin.x)/nparams.cellSize.x);
+	gpos.y = floorf((p.y - nparams.origin.y)/nparams.cellSize.y);
+	gpos.z = floorf((p.z - nparams.origin.z)/nparams.cellSize.z);
 	gpos.x = (nparams.gridSize.x + gpos.x) % nparams.gridSize.x;
 	gpos.y = (nparams.gridSize.y + gpos.y) % nparams.gridSize.y;
 	gpos.z = (nparams.gridSize.z + gpos.z) % nparams.gridSize.z;
@@ -159,7 +159,7 @@ __global__ void magForcesK( const float4* dSortedPos,	//i: pos we use to calcula
 			float sepdist = radius1 + radius2;
 			force += 3.0f*nparams.uf*dm1m2/(2.0f*PI*sepdist*sepdist*sepdist*sepdist)*
 					exp(-nparams.spring*(sqrt(lsq)/sepdist - 1.0f))*er;
-			edges += lsq < 1.1f*sepdist*1.1f*sepdist ? 1 : 0;
+			edges += lsq < nparams.contact_d_sq*sepdist*sepdist ? 1 : 0;
 			
 		}
 			
@@ -169,18 +169,73 @@ __global__ void magForcesK( const float4* dSortedPos,	//i: pos we use to calcula
 	float ybot = p1.y - nparams.origin.y;
 	force.x += nparams.shear*ybot*Cd;
 	
-	//apply BCs
-	if(ybot < 1.5f*radius1)
+	//apply flow BCs
+	if(ybot < nparams.pin_d*radius1)
 		force = make_float3(0,0,0);
-	if(ybot - nparams.origin.y > nparams.L.y - 1.5f*radius1)
-		force.x = nparams.shear*nparams.L.y*Cd;
+	if(ybot > nparams.L.y - nparams.pin_d*radius1)
+		force = make_float3(nparams.shear*nparams.L.y*Cd,0,0);
 
 	float3 ipos = make_float3(integrPos[idx]);
 	newPos[idx] = make_float4(ipos + force/Cd*deltaTime, radius1);
 
 }
+__global__ void integrateRK4(const float4* oldPos,
+							float4* newPos,
+							float4* forceA,
+							const float4* forceB,
+							const float4* forceC,
+							const float4* forceD,
+							const float deltaTime,
+							const uint numParticles)
+{
+   
 
-__global__ void buildNListK(	uint* nlist,	//	o:neighbor list
+	uint index = __umul24(blockIdx.x,blockDim.x) + threadIdx.x;
+    if (index >= numParticles) return;          // handle case when no. of particles not multiple of block size
+
+	float4 posData = oldPos[index];
+    float3 pos = make_float3(posData.x, posData.y, posData.z);
+	float radius = posData.w;
+	
+	float4 f1 = forceA[index];
+    float4 f2 = forceB[index];
+	float4 f3 = forceC[index];
+	float4 f4 = forceD[index];
+	
+	float3 force1 = make_float3(f1.x, f1.y, f1.z);
+	float3 force2 = make_float3(f2.x, f2.y, f2.z);
+	float3 force3 = make_float3(f3.x, f3.y, f3.z);
+	float3 force4 = make_float3(f4.x, f4.y, f4.z);
+	
+	float3 fcomp = (force1 + 2*force2 + 2*force3 + force4)/6;//trapezoid rule	
+	forceA[index] = make_float4(fcomp, f1.w);//averaged force
+	
+	float Cd = 6*PI*nparams.visc*radius;
+
+	float ybot = pos.y - nparams.origin.y;
+	fcomp.x += nparams.shear*ybot*Cd;
+	
+	//apply flow BCs
+	if(ybot < nparams.pin_d*radius)
+		fcomp = make_float3(0,0,0);
+	if(ybot > nparams.L.y - nparams.pin_d*radius)
+		fcomp = make_float3(nparams.shear*nparams.L.y*Cd,0,0);
+
+		
+	//integrate	
+	pos += fcomp*deltaTime/Cd;
+
+	//periodic boundary conditions
+   	pos.x -= nparams.L.x*floorf((pos.x - nparams.origin.x)*nparams.Linv.x);
+	pos.z -= nparams.L.z*floorf((pos.z - nparams.origin.z)*nparams.Linv.z);
+	
+	if (pos.y > -1.0f*nparams.origin.y ) { pos.y = -1.0f*nparams.origin.z;}
+    if (pos.y < nparams.origin.y ) { pos.y = 1.0f*nparams.origin.z; }
+
+	newPos[index] = make_float4(pos, radius);
+}
+
+__global__ void NListFixedK(uint* nlist,	//	o:neighbor list
 							uint* num_neigh,//	o:num neighbors
 							float4* dpos,	// 	i: position
 							uint* phash,
@@ -231,6 +286,61 @@ __global__ void buildNListK(	uint* nlist,	//	o:neighbor list
 	}
 	num_neigh[idx] = n_neigh;
 }
+
+
+
+__global__ void NListVarK(uint* nlist,	//	o:neighbor list
+							uint* num_neigh,//	o:num neighbors
+							const float4* dpos,	// 	i: position
+							const uint* phash,
+							const uint* cellStart,
+							const uint* cellEnd,
+							const uint* cellAdj,
+							uint max_neigh,
+							float distm_sq)
+{
+	uint idx = blockIdx.x*blockDim.x + threadIdx.x;
+	if(idx >= nparams.N)
+		return;
+	float4 pos1 = dpos[idx];
+	float3 p1 = make_float3(pos1);
+	float rad1 = pos1.w;
+	uint hash = phash[idx];
+	uint n_neigh = 0;
+
+	for(uint i = 0; i < nparams.numAdjCells; i++)
+	{
+		//uint nhash = cellAdj[i*nparams.numCells + hash];
+		uint nhash = cellAdj[i + hash*nparams.numAdjCells];
+		uint cstart = cellStart[nhash];
+		if(cstart != 0xffffffff) {
+			uint cend = cellEnd[nhash];
+			for(uint idx2 = cstart; idx2 < cend; idx2++){
+				if(idx != idx2){
+					float4 pos2 = dpos[idx2];
+					//float4 pos2 = tex1Dfetch(pos_tex, idx2);
+					float3 p2 = make_float3(pos2);
+					float rad2 = pos2.w;
+					float sepdist = rad1+rad2;
+
+					float3 dr = p1 - p2;
+					dr.x = dr.x - nparams.L.x*rintf(dr.x*nparams.Linv.x);
+					dr.z = dr.z - nparams.L.z*rintf(dr.z*nparams.Linv.z);
+					float lsq = dr.x*dr.x + dr.y*dr.y + dr.z*dr.z;
+					
+					if(lsq <= distm_sq*sepdist*sepdist){
+						if(n_neigh < max_neigh){
+							nlist[nparams.N*n_neigh + idx] = idx2;
+						}
+						n_neigh++;
+					}
+				}
+			}
+		}
+	}
+	num_neigh[idx] = n_neigh;
+}
+
 
 __global__ void collisionK( const float4* sortedPos,	//i: pos we use to calculate forces
 							const float4* oldVel,

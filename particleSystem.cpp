@@ -54,7 +54,9 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize):
 	newp.visc = m_params.viscosity;
 	newp.extH = m_params.externalH;
 	newp.mup = m_params.mup;
-
+	newp.contact_d_sq = 1.1f*1.1f;//lsq < contact_d_sq * sepdist*sepdist
+	newp.pin_d = 1.5f;  //ybot < radius*pin_d
+	
 	_initialize(m_params.numBodies);
 
 }
@@ -264,14 +266,14 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 		temp = m_dForces2;
 		m_dForces2 = m_dForces1;
 		m_dForces1 = temp;
-		buildNList(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
+		NListFixed(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
 				m_dCellStart, m_dCellEnd, m_dCellAdj, m_numParticles, m_maxNeigh, 3.1f*m_params.particleRadius[0]);
 
 		collision_new(m_dSortedPos, m_dForces2, m_dNeighList, m_dNumNeigh, m_dForces1, m_dPos, m_numParticles, 0.01f);
 		deltaTime = 0;
 		m_randSet--;
 	} else {
-		buildNList(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
+		NListFixed(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
 				m_dCellStart, m_dCellEnd, m_dCellAdj, m_numParticles, m_maxNeigh, 8.1f*m_params.particleRadius[0]);
 
 	
@@ -376,9 +378,11 @@ void ParticleSystem::getMagnetization()
 
 int ParticleSystem::getGraphs()
 {
+	printf("start copy\n");
 	copyArrayFromDevice(m_hCellStart, m_dCellStart, 0, sizeof(uint)*m_numGridCells);
     copyArrayFromDevice(m_hCellEnd, m_dCellEnd, 0, sizeof(uint)*m_numGridCells);
     copyArrayFromDevice(m_hPos, m_dPos, 0, sizeof(float)*4*m_numParticles);
+	printf("end copy\n");
 	int numEdges = getEdges();
 	
 	uint adjlistsize = (2*numEdges + m_numParticles + 1);
@@ -389,10 +393,11 @@ int ParticleSystem::getGraphs()
 		adjlist[i].node = -1;
 		adjlist[i].edge = -1;
 	}
-	
+	printf("hi ...\n");
 	makeAdjList( (float4*)m_hPos, m_hCellStart, m_hCellEnd, adjlist, adjstart, m_params, adjlistsize);
+	printf("bye\n");
 	int xyz = stackConGraphs(adjlist, adjstart, m_numParticles, adjlistsize);
-
+	printf("toc\n");
 	delete [] adjlist;
 	delete [] adjstart;
 
@@ -451,18 +456,19 @@ void ParticleSystem::logStuff(FILE* file, float simtime)
 			
 	}
 	gstress = gstress*newp.Linv.x*newp.Linv.y*newp.Linv.z;
-
+	
+	float tc_proper = -newp.origin.y - newp.pin_d*m_params.particleRadius[0];
 	//cuda calls for faster computation - need to verify against host code
-/*	float tf = calcTopForce( (float4*) m_dForces1, (float4*) m_dPos, m_numParticles, topcut);
-	float bf = calcBotForce( (float4*) m_dForces1, (float4*) m_dPos, m_numParticles, -topcut);
-	float gs = calcGlForce( (float4*) m_dForces1, (float4*) m_dPos, m_numParticles)*newp.Linv.x*newp.Linv.y*newp.Linv.z;
+	float tf = calcTopForce( (float4*) m_dForces1, (float4*) m_dPos, m_numParticles, tc_proper);
+	float bf = calcBotForce( (float4*) m_dForces1, (float4*) m_dPos, m_numParticles, -tc_proper);
+	float gs = calcGlForce(  (float4*) m_dForces1, (float4*) m_dPos, m_numParticles)*newp.Linv.x*newp.Linv.y*newp.Linv.z;
 	float kinen = calcKinEn( (float4*) m_dForces1, m_numParticles)/(2.0f*Cd*Cd);
 	
 	printf("topforce\tlocal: %g\tcuda:%g\n", topforce, tf);
 	printf("botforce\tlocal: %g\t cuda:%g\n", botforce, bf);
 	printf("gstress\tlocal: %g\tcuda:%g\n", gstress, gs);
 	printf("Kinen local: %g cuda: %g\n", speckinen, kinen);
-*/	
+	
 	fprintf(file, "%.5g\t%.5g\t%.5g\t%.5g\t%d\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\n", simtime, m_params.shear, 
 			m_params.externalH.y, (float)m_numParticles/graphs, edges, topforce, botforce, gstress, speckinen, M.x, M.y, M.z);
 	

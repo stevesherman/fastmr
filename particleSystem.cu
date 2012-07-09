@@ -135,48 +135,6 @@ void computeGridSize(uint n, uint blockSize, uint &numBlocks, uint &numThreads)
 }
 
 
-
-void integrate(	float* oldPos,
-				float* newPos,
-				float* forceA,
-				float* forceB,
-				float deltaTime,
-				uint numParticles)
-{
-	uint numThreads, numBlocks;
-	computeGridSize(numParticles,128, numBlocks, numThreads);
-	
-	integrate<<<numBlocks, numThreads>>>((float4*) oldPos,
-										(float4*) newPos,
-										(float4*) forceA,
-										(float4*) forceB,
-										deltaTime,
-										numParticles);
-}
-
-void RK4integrate(	float* oldPos,
-					float* newPos,
-					float* force1,
-					float* force2,
-					float* force3, 
-					float* force4,
-					float deltaTime,
-					uint numParticles)
-{
-	uint numThreads, numBlocks;
-	computeGridSize(numParticles,128,numBlocks, numThreads);
-
-	integrateRK4 <<< numBlocks, numThreads >>> ((float4*) oldPos, 
-												(float4*) newPos,
-												(float4*) force1,
-												(float4*) force2,
-												(float4*) force3,
-												(float4*) force4,
-												deltaTime,
-												numParticles);
-}
-
-	
 void sortParticles(uint *dGridParticleHash, uint *dGridParticleIndex, uint numParticles)
 {
     sort_by_key(device_ptr<uint>(dGridParticleHash),

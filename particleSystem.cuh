@@ -32,22 +32,6 @@ void unmapGLBufferObject(struct cudaGraphicsResource *cuda_vbo_resource);
 
 void setParameters(SimParams *hostParams);
 
-void integrate(float* oldPos,
-				float* newPos,
-				float* forceA,
-				float* forceB,
-				float deltaTime,
-				uint numParticles);
-
-void RK4integrate(float* oldPos,
-				float* newPos,
-				float* force1,
-				float* force2,
-				float* force3,
-				float* force4,
-				float deltaTime,
-				uint numParticles);
-
 bool isOutofBounds(float4* pos, float border, uint numparticles);
 bool excessForce(float4* pos, float force, uint numparticles);
 float maxforce(float4* pos, uint numpartices);
