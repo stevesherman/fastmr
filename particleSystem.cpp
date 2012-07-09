@@ -54,7 +54,7 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize):
 	newp.visc = m_params.viscosity;
 	newp.extH = m_params.externalH;
 	newp.mup = m_params.mup;
-	newp.contact_d_sq = 1.1f*1.1f;//lsq < contact_d_sq * sepdist*sepdist
+	newp.contact_d_sq = 1.05f*1.05f;//lsq < contact_d_sq * sepdist*sepdist
 	newp.pin_d = 1.5f;  //ybot < radius*pin_d
 	
 	_initialize(m_params.numBodies);
@@ -166,8 +166,7 @@ ParticleSystem::_initialize(int numParticles)
     }
  	
 	assert(cudaMalloc((void**)&m_dNeighList, m_numParticles*m_maxNeigh*sizeof(uint)) == cudaSuccess);
-	//m_hNeighList = new uint[m_numParticles*m_maxNeigh];
-	
+		
 	cutilCheckError(cutCreateTimer(&m_timer));
 	
     setParameters(&m_params);
@@ -187,7 +186,6 @@ ParticleSystem::_finalize()
 	
 	delete [] m_hCellAdj;
 	delete [] m_hNumNeigh;
-	//delete [] m_hNeighList;
 	delete [] m_hCellHash;
 	
 	cudaFree(m_dCellHash);
@@ -376,35 +374,22 @@ void ParticleSystem::getMagnetization()
 	printf("M: %g %g %g\n", M.x, M.y, M.z );
 }
 
-int ParticleSystem::getGraphs()
+
+uint ParticleSystem::getGraphs()
 {
-	printf("start copy\n");
-	copyArrayFromDevice(m_hCellStart, m_dCellStart, 0, sizeof(uint)*m_numGridCells);
-    copyArrayFromDevice(m_hCellEnd, m_dCellEnd, 0, sizeof(uint)*m_numGridCells);
-    copyArrayFromDevice(m_hPos, m_dPos, 0, sizeof(float)*4*m_numParticles);
-	printf("end copy\n");
-	int numEdges = getEdges();
+	uint maxn = NListVar(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
+			m_dCellStart, m_dCellEnd, m_dCellAdj, m_numParticles, m_maxNeigh, 1.05f);
+	printf("before copy\n");
 	
-	uint adjlistsize = (2*numEdges + m_numParticles + 1);
-	AdjPair* adjlist = new AdjPair[adjlistsize];
-	int* adjstart = new int[m_numParticles];
+	m_hNeighList = new uint[m_numParticles*maxn];
+	copyArrayFromDevice(m_hNeighList, m_dNeighList, 0, sizeof(uint)*m_numParticles*maxn);
+	copyArrayFromDevice(m_hNumNeigh,  m_dNumNeigh,  0, sizeof(uint)*m_numParticles);
 	
-	for(uint i = 0; i < adjlistsize; i++){
-		adjlist[i].node = -1;
-		adjlist[i].edge = -1;
-	}
-	printf("hi ...\n");
-	makeAdjList( (float4*)m_hPos, m_hCellStart, m_hCellEnd, adjlist, adjstart, m_params, adjlistsize);
-	printf("bye\n");
-	int xyz = stackConGraphs(adjlist, adjstart, m_numParticles, adjlistsize);
-	printf("toc\n");
-	delete [] adjlist;
-	delete [] adjstart;
-
-	return xyz;
-
+	printf("after\n");
+	uint ngraphs = adjConGraphs(m_hNeighList, m_hNumNeigh, m_numParticles);
+	delete [] m_hNeighList;
+	return ngraphs;
 }
-
 
 void
 ParticleSystem::dumpParticles(uint start, uint count)

@@ -71,8 +71,8 @@ public:
     float3 getCellSize() { return m_params.cellSize; }
 	
 	uint getEdges();
-	int getGraphs();
-	
+	uint getGraphs();
+
 	int getInteractionRadius() { return m_params.interactionr;}	
 
 

@@ -77,7 +77,7 @@ int numIterations = 0; // run until exit
 float maxtime = 0;
 
 // simulation parameters
-float timestep = 1000; //in units of nanoseconds
+float timestep = 500; //in units of nanoseconds
 double simtime = 0.0f;
 float externalH = 100; //kA/m
 float colorFmax = 3.5;
@@ -423,6 +423,7 @@ void key(unsigned char key, int /*x*/, int /*y*/)
 {
 
 	float ne = 0;
+	uint ngraphs = 0;
 	switch (key) 
     {
     case ' ':
@@ -451,14 +452,15 @@ void key(unsigned char key, int /*x*/, int /*y*/)
         psystem->dumpGrid();
         break;
 	case 'g':
-		printf("numgraphs: %d, chainl: %f\n", psystem->getGraphs(), (float)params.numBodies/(float)psystem->getGraphs());
+		ngraphs = psystem->getGraphs();
+		printf("numgraphs: %d, chainl: %f\n", ngraphs, (float)params.numBodies/ngraphs);
 		break;
     case 'u':
         psystem->dumpParticles(0, params.numBodies);
         break;
 	case 'c':
 		ne = psystem->getEdges();
-		printf("Edges = %f\n", ne);
+		printf("Edges = %f Mean edges = %f\n", ne, ne/(float)params.numBodies);
 		break;
     case 'r':
         displayEnabled = !displayEnabled;
@@ -617,7 +619,7 @@ main(int argc, char** argv)
 	params.shear = 500;
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "shear", (float*) &params.shear);
 	
-	params.spring = 25;	
+	params.spring = 50;	
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "k", (float*) &params.spring);
 
 	externalH = 100;

@@ -150,11 +150,11 @@ struct isOut
 	__host__ __device__ bool operator()(const float4 &p){
 		if(isnan(p.x) || isnan(p.y) || isnan(p.z))
 			return true;
-		if(p.x*p.x > bmax*bmax )
+		if(fabsf(p.x) > bmax )
 			return true;
-		if(p.y*p.y > bmax*bmax)//>= due to pinning BCs? not true anymore i think
+		if(fabsf(p.y) > bmax)//>= due to pinning BCs? not true anymore i think
 			return true;
-		if(p.z*p.z > bmax*bmax )
+		if(fabsf(p.z) > bmax )
 			return true;
 		return false;
 	}

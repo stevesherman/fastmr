@@ -226,8 +226,10 @@ __global__ void integrateRK4(const float4* oldPos,
 	pos += fcomp*deltaTime/Cd;
 
 	//periodic boundary conditions
-   	pos.x -= nparams.L.x*floorf((pos.x - nparams.origin.x)*nparams.Linv.x);
-	pos.z -= nparams.L.z*floorf((pos.z - nparams.origin.z)*nparams.Linv.z);
+	//note that it has issues if it's on the border, 
+	//but the resolver handles it (b/c rintf(0.5f)=0)
+   	pos.x -= nparams.L.x*rintf(pos.x*nparams.Linv.x);
+	pos.z -= nparams.L.z*rintf(pos.z*nparams.Linv.z);
 	
 	if (pos.y > -1.0f*nparams.origin.y ) { pos.y = -1.0f*nparams.origin.z;}
     if (pos.y < nparams.origin.y ) { pos.y = 1.0f*nparams.origin.z; }
