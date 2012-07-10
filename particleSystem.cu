@@ -186,39 +186,41 @@ uint edgeCount(float4* forces, uint numParticles){
 	return (uint) edge.w/2.0f;
 }
 
-struct isTop {
-	isTop(float cut) : cut(cut) {}
-	__host__ __device__ float4 operator()(const float4& force, const float4& pos){
-		if(pos.y > cut)
-			return force;
+struct isTop  : public binary_function<float4, float4, float3> {
+	isTop(float wsize, float cut) : rcut(cut), wsize(wsize) {}
+	__host__ __device__ float3 operator()(const float4& force, const float4& pos){
+		if(pos.y > wsize - rcut*pos.w)
+			return make_float3(force);
 		else 
-			return make_float4(0,0,0,0);
+			return make_float3(0,0,0);
 	}
-	const float cut;
+	const float wsize;//half the worldisze
+	const float rcut;
 };
 
-struct isBot {
-	isBot(float cut) : cut(cut) {}
-	__host__ __device__ float4 operator()(const float4& force, const float4& pos){
-		if(pos.y < cut)
-			return force;
+struct isBot : public binary_function<float4, float4, float3> {
+	isBot(float size, float cut) : rcut(cut), wsize(size) {}
+	__host__ __device__ float3 operator()(const float4& force, const float4& pos){
+		if(pos.y < -wsize + rcut*pos.w)
+			return make_float3(force);
 		else 
-			return make_float4(0,0,0,0);
+			return make_float3(0,0,0);
 	}
-	const float cut;
+	const float rcut;
+	const float wsize;
 };
 
-float calcTopForce(float4* forces, float4* position, uint numParticles, float cut){
-	float4 tforce = inner_product(device_ptr<float4>(forces),
+float calcTopForce(float4* forces, float4* position, uint numParticles, float wsize, float cut){
+	float3 tforce = inner_product(device_ptr<float4>(forces),
 			device_ptr<float4>(forces+numParticles),device_ptr<float4>(position),
-			make_float4(0,0,0,0), plus<float4>(), isTop(cut));
+			make_float3(0,0,0), plus<float3>(), isTop(wsize, cut));
 	return tforce.x;
 }
 
-float calcBotForce(float4* forces, float4* position, uint numParticles, float cut){
-	float4 tforce = inner_product(device_ptr<float4>(forces),
+float calcBotForce(float4* forces, float4* position, uint numParticles, float wsize, float cut){
+	float3 tforce = inner_product(device_ptr<float4>(forces),
 			device_ptr<float4>(forces+numParticles),device_ptr<float4>(position),
-			make_float4(0,0,0,0), plus<float4>(), isBot(cut));
+			make_float3(0,0,0), plus<float3>(), isBot(wsize, cut));
 	return tforce.x;
 }
 
@@ -236,22 +238,25 @@ float calcGlForce(float4* forces, float4* position, uint numParticles){
 	return glf.x;
 }
 
-struct f4norm : public unary_function<float4, float>{
-	__host__ __device__ float operator()(const float4& f) 
+struct kinen : public binary_function<float4, float4, float>{
+	kinen(float v): visc(v) {}	
+	__host__ __device__ float operator()(const float4& f, const float4& p) 
 	{
-		return f.x*f.x + f.y*f.y + f.z*f.z;
+		float Cd = 6*PI*visc*p.w;
+		return (f.x*f.x + f.y*f.y + f.z*f.z)/(Cd*Cd);
 	}
+	const float visc;
 };
 
-float calcKinEn(float4* forces, uint numParticles){
+float calcKinEn(float4* forces, float4* position, float visc, uint numParticles){
 	
-	float kin = transform_reduce(device_ptr<float4>(forces),
-				device_ptr<float4>(forces+numParticles), f4norm(),	
-				0.0f, plus<float>());
-	return kin;
+	float kin = inner_product(device_ptr<float4>(forces),
+				device_ptr<float4>(forces+numParticles), device_ptr<float4>(position),	
+				0.0f, plus<float>(), kinen(visc));
+	return kin/2;
 }
-struct forcemax 
-{
+
+struct forcemax {
 	__host__ __device__ float4 operator() (const float4 &f1, const float4 &f2){
 		if (sqrt(f1.x*f1.x + f1.y*f1.y + f1.z*f1.z) > sqrt(f2.x*f2.x + f2.y*f2.y + f2.z*f2.z))
 			return f1;

@@ -63,7 +63,7 @@ public:
 
 	void setDipIt(uint x) {m_params.mutDipIter = x;}
     void setInteractionRadius(uint x) {m_params.interactionr = x;}
-	void setExternalH(float3 x) { m_params.externalH = x;}
+	void setExternalH(float3 x) { m_params.externalH = x; newp.extH = x;}
 
 	float getParticleRadius() { return m_params.particleRadius[0]; }
     uint3 getGridSize() { return m_params.gridSize; }

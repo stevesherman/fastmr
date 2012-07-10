@@ -137,8 +137,8 @@ ParticleSystem::_initialize(int numParticles)
     cudaMalloc((void**)&m_dCellEnd, m_numGridCells*sizeof(uint));
 
 
-	assert(cudaMalloc((void**)&m_dCellAdj, m_numGridCells*27*sizeof(uint)) == cudaSuccess);
-	m_hCellAdj = new uint[m_numGridCells*27];
+	assert(cudaMalloc((void**)&m_dCellAdj, m_numGridCells*newp.numAdjCells*sizeof(uint)) == cudaSuccess);
+	m_hCellAdj = new uint[m_numGridCells*newp.numAdjCells];
 
 	m_hCellHash = new uint[m_numGridCells];
 	cudaMalloc((void**)&m_dCellHash, m_numGridCells*sizeof(uint));
@@ -320,9 +320,9 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 		
 			if(maxf > maxFdx){
 				solve = true;
-			} else { //if not excess force, check for out of bounds
+			} /*else { //if not excess force, check for out of bounds
 				solve = isOutofBounds((float4*)m_dPos, -m_params.worldOrigin.x, m_numParticles);
-			}
+			}*/
 			if(solve){
 				deltaTime *=.5f;
 				assert(deltaTime != 0);
@@ -379,13 +379,11 @@ uint ParticleSystem::getGraphs()
 {
 	uint maxn = NListVar(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
 			m_dCellStart, m_dCellEnd, m_dCellAdj, m_numParticles, m_maxNeigh, 1.05f);
-	printf("before copy\n");
 	
 	m_hNeighList = new uint[m_numParticles*maxn];
 	copyArrayFromDevice(m_hNeighList, m_dNeighList, 0, sizeof(uint)*m_numParticles*maxn);
 	copyArrayFromDevice(m_hNumNeigh,  m_dNumNeigh,  0, sizeof(uint)*m_numParticles);
 	
-	printf("after\n");
 	uint ngraphs = adjConGraphs(m_hNeighList, m_hNumNeigh, m_numParticles);
 	delete [] m_hNeighList;
 	return ngraphs;
@@ -418,44 +416,19 @@ void ParticleSystem::logStuff(FILE* file, float simtime)
  	
 	if(m_randSet != 0)  //dont log if we're setting ICs
 		return;
-
-	copyArrayFromDevice(m_hPos, m_dPos, 0, sizeof(float)*4*m_numParticles);
-	copyArrayFromDevice(m_hForces, m_dForces1,0, sizeof(float)*4*m_numParticles);
-		
+	
 	uint edges = getEdges();//i think these get us the latest force data
 	float graphs = getGraphs();
 	float4 M = magnetization((float4*) m_dMomentsA, m_numParticles, newp.L.x*newp.L.y*newp.L.z);
 
-	float topcut = 	-newp.origin.y - 2*m_params.particleRadius[0];
-	float topforce=0, botforce=0, speckinen=0, gstress=0;
-	float Cd = 6*CUDART_PI_F*m_params.viscosity*m_params.particleRadius[0];
-	
-	for(uint i=0; i < m_numParticles; i++){
-		if(m_hPos[i*4+1] > topcut)
-			topforce += m_hForces[i*4];
-		if(m_hPos[i*4+1] < -topcut)
-			botforce += m_hForces[i*4];
-		gstress += m_hPos[i*4+1]*m_hForces[i*4];
-		speckinen += 1.0f/(2.0f*Cd*Cd)*(m_hForces[i*4]*m_hForces[i*4] + m_hForces[i*4+1]*m_hForces[i*4+1] 
-				+ m_hForces[i*4+2]*m_hForces[i*4+2]);
-			
-	}
-	gstress = gstress*newp.Linv.x*newp.Linv.y*newp.Linv.z;
-	
-	float tc_proper = -newp.origin.y - newp.pin_d*m_params.particleRadius[0];
-	//cuda calls for faster computation - need to verify against host code
-	float tf = calcTopForce( (float4*) m_dForces1, (float4*) m_dPos, m_numParticles, tc_proper);
-	float bf = calcBotForce( (float4*) m_dForces1, (float4*) m_dPos, m_numParticles, -tc_proper);
+	//cuda calls for faster computation 
+	float tf = calcTopForce( (float4*) m_dForces1, (float4*) m_dPos, m_numParticles, -newp.origin.y, newp.pin_d);
+	float bf = calcBotForce( (float4*) m_dForces1, (float4*) m_dPos, m_numParticles, -newp.origin.y, newp.pin_d);
 	float gs = calcGlForce(  (float4*) m_dForces1, (float4*) m_dPos, m_numParticles)*newp.Linv.x*newp.Linv.y*newp.Linv.z;
-	float kinen = calcKinEn( (float4*) m_dForces1, m_numParticles)/(2.0f*Cd*Cd);
-	
-	printf("topforce\tlocal: %g\tcuda:%g\n", topforce, tf);
-	printf("botforce\tlocal: %g\t cuda:%g\n", botforce, bf);
-	printf("gstress\tlocal: %g\tcuda:%g\n", gstress, gs);
-	printf("Kinen local: %g cuda: %g\n", speckinen, kinen);
+	float kinen = calcKinEn( (float4*) m_dForces1, (float4*) m_dPos, newp.visc, m_numParticles);
 	
 	fprintf(file, "%.5g\t%.5g\t%.5g\t%.5g\t%d\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\n", simtime, m_params.shear, 
-			m_params.externalH.y, (float)m_numParticles/graphs, edges, topforce, botforce, gstress, speckinen, M.x, M.y, M.z);
+			newp.extH.y, (float)m_numParticles/graphs, edges, tf, bf, gs, kinen, M.x, M.y, M.z);
 	
 }
 
@@ -495,8 +468,8 @@ ParticleSystem::logParams(FILE* file)
 	fprintf(file, "grid: %d x %d x %d = %d cells\n", m_params.gridSize.x, m_params.gridSize.y, m_params.gridSize.z, 
 			m_params.gridSize.x*m_params.gridSize.y*m_params.gridSize.z);
 	fprintf(file, "worldsize: %.4gmm x %.4gmm x %.4gmm\n", newp.L.x*1e3f, newp.L.y*1e3f, newp.L.z*1e3f);
-	fprintf(file, "spring: %.2f\tvisc: %.4f\tdipit: %d\trcut: %f\n", m_params.spring, m_params.viscosity, m_params.mutDipIter, 4.0f);
-	fprintf(file, "H.x: %.3g\tH.y: %.3g\tH.z: %.3g\n", m_params.externalH.x, m_params.externalH.y, m_params.externalH.z);
+	fprintf(file, "spring: %.2f\tvisc: %.4f\n", m_params.spring, m_params.viscosity);
+	fprintf(file, "H.x: %.3g\tH.y: %.3g\tH.z: %.3g\n", newp.extH.x, newp.extH.y, newp.extH.z);
 
 }
 
@@ -510,14 +483,13 @@ void ParticleSystem::zeroDevice()
 		xi = m_params.xi[j];
 		for ( i = 0; i < m_params.numParticles[j]; i++){
 			m_hMoments[4*(i+ti)+0] = 0;
-			m_hMoments[4*(i+ti)+1] = m_params.externalH.y*4.0/3.0*3.14159*
+			m_hMoments[4*(i+ti)+1] = newp.extH.y*4.0/3.0*3.14159*
 					pow(m_params.particleRadius[j],3)* 3.0*(xi-1.0)/(xi+2.0);
 			m_hMoments[4*(i+ti)+2] = 0;
 			m_hMoments[4*(i+ti)+3] = xi;
 		}
 		ti+=i;
 	}
-
 	copyArrayToDevice(m_dMomentsA, m_hMoments, 0, 4*m_numParticles*sizeof(float));
 	copyArrayToDevice(m_dMomentsB, m_hMoments, 0, 4*m_numParticles*sizeof(float));
 	cudaMemset(m_dForces1, 0, 4*m_numParticles*sizeof(float));
@@ -620,24 +592,19 @@ ParticleSystem::reset(ParticleConfig config)
 
 	}
 //	printf("gs: %d x%d x%d\n", m_params.gridSize.x, m_params.gridSize.y, m_params.gridSize.z);
-//	printf("alloced: %d", m_numGridCells*27);
+//	printf("alloced: %d", m_numGridCells*newp.numAdjCells);
 	//place holder, allowing us to put in the hilbert ordered hashes
 	for(uint i=0; i < m_numGridCells; i++){
 		m_hCellHash[i] = i;
 	}
-/*
+/*  // if we can use the hilbert encoding for the grid apply it
+	//this is commented out because it doesn't do a goddamn thing :(
 	if( (m_params.gridSize.x != 0) && !(m_params.gridSize.x & (m_params.gridSize.x-1))){
 		printf("Using SFCSort.\n");
 		getSortedOrder3D( m_hCellHash, &m_params);
 	}*/
-	
-	/*for(uint i = 0; i < m_numGridCells; i++){
-		printf("%d,", m_hCellHash[i]);
-	}*/
-	printf("\n");
-
+	//generate the cell adjacency lists
 	for(uint i=0; i < m_params.gridSize.x; i++){
-//		printf("hello\n");
 		for(uint j=0; j < m_params.gridSize.y; j++){
 			for(uint k=0; k < m_params.gridSize.z; k++){
 				uint idc = i + j*m_params.gridSize.x + k*m_params.gridSize.y*m_params.gridSize.x;
@@ -658,13 +625,14 @@ ParticleSystem::reset(ParticleConfig config)
 							//store cellAdj with the first neighbor for each contiguous
 							//m_hCellAdj[hash + cn*m_numGridCells] = m_hCellHash[cellId];
 							//store cellAdj with all neighbors for a cell contiguous
-							m_hCellAdj[hash*27 + cn] = m_hCellHash[cellId];
+							m_hCellAdj[hash*newp.numAdjCells + cn] = m_hCellHash[cellId];
 							cn++;
 							//printf("hi %d %d %d %d\n", cn, ii,jj,kk);
 						}
 					}
 				}
-				std::sort(&m_hCellAdj[hash*27], &m_hCellAdj[hash*27+cn]);
+				//this sort is super performance enhancing!
+				std::sort(&m_hCellAdj[hash*newp.numAdjCells], &m_hCellAdj[hash*newp.numAdjCells+cn]);
 			//	printf("idx: %d gl: %d %d %d\n", idx, i,j,k);
 			}
 		}
@@ -673,11 +641,8 @@ ParticleSystem::reset(ParticleConfig config)
 		if(m_hCellHash[i] >= m_numGridCells)
 			printf("cell_hash entry %d has invaled entry %d\n", i, m_hCellHash[i]);
 	}
-	copyArrayToDevice(m_dCellAdj, m_hCellAdj,0, 27*m_numGridCells*sizeof(uint));
+	copyArrayToDevice(m_dCellAdj, m_hCellAdj,0, newp.numAdjCells*m_numGridCells*sizeof(uint));
 	copyArrayToDevice(m_dCellHash, m_hCellHash, 0, m_numGridCells*sizeof(uint));
-	float volfr;
-	volfr = m_numParticles*4.0f/3.0f*CUDART_PI_F*pow(m_params.particleRadius[0],3)
-		/(newp.L.x*newp.L.y*newp.L.z);
 	
 	copyArrayToDevice(m_dPos, m_hPos, 0, 4*m_numParticles*sizeof(float));
 

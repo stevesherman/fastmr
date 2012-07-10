@@ -25,7 +25,6 @@
 #include <shrUtils.h>
 #include <shrQATest.h>
 
-#define MV_AVG_SIZE 30 
 #define MAX_EPSILON_ERROR 5.00f
 #define THRESHOLD         0.30f
 
@@ -81,12 +80,8 @@ float timestep = 500; //in units of nanoseconds
 double simtime = 0.0f;
 float externalH = 100; //kA/m
 float colorFmax = 3.5;
-float maxdxpct = 0.10;
-float resolvetime [MV_AVG_SIZE];
+float maxdxpct = 0.08;
 
-
-float old_dt [MV_AVG_SIZE];
-float lost_time_old, lost_time_new;
 int resolved = 0;//number of times the integrator had to resolve a step
 
 ParticleSystem *psystem = 0;
@@ -112,7 +107,6 @@ CheckRender       *g_CheckRender = NULL;
 
 #define MAX(a,b) ((a > b) ? a : b)
 
-const char *sSDKsample = "CUDA MR Fluid Simulation";
 
 extern "C" void cudaInit(int argc, char **argv);
 extern "C" void cudaGLInit(int argc, char **argv);
@@ -610,7 +604,7 @@ main(int argc, char** argv)
 	
 	//DEFINE SIMULATION PARAMETERS
 
-	float worldsize1d = .224;//units of mm
+	float worldsize1d = .35;//units of mm
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "wsize", (float*) &worldsize1d);
 	worldSize = make_float3(worldsize1d*1e-3f, worldsize1d*1e-3f, worldsize1d*1e-3f);
 	params.worldSize = worldSize;
@@ -624,7 +618,7 @@ main(int argc, char** argv)
 
 	externalH = 100;
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "H", (float*) &externalH);
-	params.externalH = make_float3(0, externalH, 0);
+	params.externalH = make_float3(0, externalH*1e3f, 0);
 
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "dt", (float*) &timestep);//units of ns
 	cutGetCmdLineArgumenti(argc, (const char**) argv, "i", &numIterations);
@@ -695,7 +689,7 @@ main(int argc, char** argv)
 	bool benchmark = cutCheckCmdLineFlag(argc, (const char**) argv, "benchmark") != 0;
 
 
-	if(cutGetCmdLineArgumentstr( argc, (const char**)argv, "crash", &title )){//some of crash flag
+/*	if(cutGetCmdLineArgumentstr( argc, (const char**)argv, "crash", &title )){//some of crash flag
 		char xyz[256];
 	   	sprintf(xyz, "/home/steve/Datasets/%s", title);
 		printf("reading crash file:  %s\n",xyz);
@@ -725,6 +719,7 @@ main(int argc, char** argv)
 			fclose(crashlog);
 		}
 	}
+*/
 
 	params.worldOrigin = worldSize*-0.5f;
 	float cellSize_des = 8.0f*params.particleRadius[0];
@@ -778,10 +773,6 @@ main(int argc, char** argv)
 	
 	crashlog = fopen(crashname, "w");
 
-	for(int ii=0; ii < MV_AVG_SIZE; ii++){
-		resolvetime[ii]=0;
-		old_dt[ii] = 0;
-	}	
 
     if (benchmark || !g_useGL) 
     {
