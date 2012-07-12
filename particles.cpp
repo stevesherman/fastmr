@@ -58,7 +58,6 @@ uint logInterval = 0;
 uint partlogInt = 0;
 bool bPause = false;
 bool displaySliders = false;
-bool wireframe = false;
 bool demoMode = false;
 int idleCounter = 0;
 int demoCounter = 0;
@@ -80,7 +79,9 @@ float timestep = 500; //in units of nanoseconds
 double simtime = 0.0f;
 float externalH = 100; //kA/m
 float colorFmax = 3.5;
-float maxdxpct = 0.08;
+float maxdxpct = 0.05;
+float contact_dist = 1.05f;
+float pin_dist = 1.5f;
 
 int resolved = 0;//number of times the integrator had to resolve a step
 
@@ -130,6 +131,8 @@ void setParams(){
 	psystem->setColorFmax(colorFmax*1e-7f);
 	psystem->setViscosity(params.viscosity);
 	psystem->setDipIt(params.mutDipIter);
+	psystem->setPinDist(pin_dist);
+	psystem->setContactDist(contact_dist);
 }
 
 
@@ -416,8 +419,7 @@ void motion(int x, int y)
 void key(unsigned char key, int /*x*/, int /*y*/)
 {
 
-	float ne = 0;
-	uint ngraphs = 0;
+	uint nedges = 0, ngraphs = 0;
 	switch (key) 
     {
     case ' ':
@@ -442,24 +444,23 @@ void key(unsigned char key, int /*x*/, int /*y*/)
         displayMode = (ParticleRenderer::DisplayMode)
                       ((displayMode + 1) % ParticleRenderer::PARTICLE_NUM_MODES);
         break;
-    case 'd':
+	case 'i':
+		printf("interactions: %d\n", psystem->getInteractions());
+		break;
+	case 'd':
         psystem->dumpGrid();
         break;
 	case 'g':
-		ngraphs = psystem->getGraphs();
-		printf("numgraphs: %d, chainl: %f\n", ngraphs, (float)params.numBodies/ngraphs);
+		psystem->getGraphData(ngraphs,nedges);
+		printf("numgraphs: %d, chainl: %f\n", ngraphs, (float)params.numBodies/(float) ngraphs);
+		printf("Edges = %d Mean edges = %f\n", nedges, (float)nedges/(float)params.numBodies);
 		break;
     case 'u':
         psystem->dumpParticles(0, params.numBodies);
         break;
-	case 'c':
-		ne = psystem->getEdges();
-		printf("Edges = %f Mean edges = %f\n", ne, ne/(float)params.numBodies);
-		break;
     case 'r':
         displayEnabled = !displayEnabled;
         break;
-
     case '1':
         psystem->reset(ParticleSystem::CONFIG_GRID);
 		frameCount = 0; simtime = 0; resolved = 0;
@@ -488,10 +489,6 @@ void key(unsigned char key, int /*x*/, int /*y*/)
             posw[3] = 0.0f;
 
         }
-        break;
-
-    case 'w':
-        wireframe = !wireframe;
         break;
 
     case 'h':
@@ -542,13 +539,13 @@ void initParamList()
 		paramlist = new ParamListGL("misc");
         paramlist->AddParam(new Param<float>("time step (ns)", timestep, 0.0, 1200, 5, &timestep));
 		paramlist->AddParam(new Param<float>("spring constant",params.spring, 0, 100, 1, &params.spring));
-		paramlist->AddParam(new Param<int>("interaction radius", params.interactionr, 1,10,1,&params.interactionr));
 		paramlist->AddParam(new Param<float>("H (kA/m)", externalH, 0, 1e3, 5, &externalH));
 		paramlist->AddParam(new Param<float>("shear rate", params.shear, 0, 2000, 50, &params.shear));
 		paramlist->AddParam(new Param<float>("colorFmax", colorFmax, 0, 15, 0.1f, &colorFmax));
     	paramlist->AddParam(new Param<float>("visc", params.viscosity, 0.001f, .25f, 0.001f, &params.viscosity));
-		paramlist->AddParam(new Param<int>("DipIter", params.mutDipIter, 0, 5, 1, &params.mutDipIter));	
 		paramlist->AddParam(new Param<float>("max dx pct", maxdxpct, 0, .5f, 0.005f, &maxdxpct));
+		paramlist->AddParam(new Param<float>("pin dist", pin_dist, 1.0f, 2.0f, 0.005f, &pin_dist));
+		paramlist->AddParam(new Param<float>("contact_dist", contact_dist, 1.0f, 1.25f, 0.001f, &contact_dist));
 	}
 }
 
@@ -629,13 +626,14 @@ main(int argc, char** argv)
 	cutGetCmdLineArgumentf(argc, (const char**)argc, "visc", (float*) &params.viscosity);
 
 	params.colorFmax = colorFmax*1e-7;
- 	params.interactionr = 2;
 	params.globalDamping = 0.8f; 
 	params.cdamping = 0.03f;
 	params.cspring = 10;
 	cutGetCmdLineArgumentf(argc, (const char**)argc, "cspring", (float*)&params.cspring);
 	params.boundaryDamping = -0.03f;
 
+	cutGetCmdLineArgumentf(argc, (const char**)argc, "contact_dist", (float*)&contact_dist);
+	cutGetCmdLineArgumentf(argc, (const char**)argc, "maxdx",(float*)&maxdxpct); 
 	params.randSetIter = 200;
 	cutGetCmdLineArgumenti(argc, (const char**)argc, "randit", (int*)&params.randSetIter);
 		

@@ -171,11 +171,11 @@ bool isOutofBounds(float4* positions, float border, uint numParticles)
 }
 
 
-float4 magnetization(float4* moments, uint numParticles, float worldVol){
+float3 magnetization(float4* moments, uint numParticles, float worldVol){
 	float4 totalDp =  reduce(device_ptr<float4>(moments),
 			device_ptr<float4>(moments+numParticles), 
 			make_float4(0,0,0,0), plus<float4>() );
-	return totalDp/worldVol;
+	return make_float3(totalDp)/worldVol;
 
 }
 
@@ -229,6 +229,11 @@ struct stressThing : public binary_function<float4, float4, float3>{
 		return make_float3(force.x, force.y, force.z)*pos.y;
 	}
 };
+
+uint numInteractions(uint* neighList, uint numParticles){
+	return reduce(device_ptr<uint>(neighList), device_ptr<uint>(neighList+numParticles),
+			0, plus<uint>() );
+}
 
 float calcGlForce(float4* forces, float4* position, uint numParticles){
 

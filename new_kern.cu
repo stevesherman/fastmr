@@ -139,7 +139,7 @@ __global__ void magForcesK( const float4* dSortedPos,	//i: pos we use to calcula
 		er.x = er.x - nparams.L.x*rintf(er.x*nparams.Linv.x);
 		er.z = er.z - nparams.L.x*rintf(er.z*nparams.Linv.z);
 		float lsq = er.x*er.x + er.y*er.y + er.z*er.z;
-		er = er*rsqrt(lsq);
+		er = er*rsqrtf(lsq);
 
 		if(lsq <= nparams.max_fdr_sq){
 			float dm1m2 = dot(m1,m2);
@@ -158,8 +158,7 @@ __global__ void magForcesK( const float4* dSortedPos,	//i: pos we use to calcula
 			
 			float sepdist = radius1 + radius2;
 			force += 3.0f*nparams.uf*dm1m2/(2.0f*PI*sepdist*sepdist*sepdist*sepdist)*
-					exp(-nparams.spring*(sqrt(lsq)/sepdist - 1.0f))*er;
-			edges += lsq < nparams.contact_d_sq*sepdist*sepdist ? 1 : 0;
+					expf(-nparams.spring*(sqrtf(lsq)/sepdist - 1.0f))*er;
 			
 		}
 			
@@ -207,7 +206,7 @@ __global__ void integrateRK4(const float4* oldPos,
 	float3 force3 = make_float3(f3.x, f3.y, f3.z);
 	float3 force4 = make_float3(f4.x, f4.y, f4.z);
 	
-	float3 fcomp = (force1 + 2*force2 + 2*force3 + force4)/6;//trapezoid rule	
+	float3 fcomp = (force1 + 2*force2 + 2*force3 + force4)/6.0f;//trapezoid rule	
 	forceA[index] = make_float4(fcomp, f1.w);//averaged force
 	
 	float Cd = 6*PI*nparams.visc*radius;
@@ -377,7 +376,7 @@ __global__ void collisionK( const float4* sortedPos,	//i: pos we use to calculat
 		float3 er = p1 - p2;//start it out as dr, then modify to get er
 		er.x = er.x - nparams.L.x*rintf(er.x*nparams.Linv.x);
 		er.z = er.z - nparams.L.x*rintf(er.z*nparams.Linv.z);
-		float dist = sqrt(er.x*er.x + er.y*er.y + er.z*er.z);
+		float dist = sqrtf(er.x*er.x + er.y*er.y + er.z*er.z);
 	
 		float sepdist = 1.01f*(radius1 + radius2);
 
@@ -394,9 +393,9 @@ __global__ void collisionK( const float4* sortedPos,	//i: pos we use to calculat
 	v1 = (v1 + force)*.8f;
 	p1 = p1 + v1*deltaTime;
 
-	if(p1.x > -nparams.origin.x ) { p1.x -= nparams.L.x;}
-    if(p1.x < nparams.origin.x ) { p1.x += nparams.L.x;}
-	
+	p1.x -= nparams.L.x * rintf(p1.x*nparams.Linv.x);
+	p1.z -= nparams.L.x * rintf(p1.z*nparams.Linv.z);	
+
 	if(p1.y+radius1 > -nparams.origin.y){ 
 		p1.y = -nparams.origin.y - radius1;
 		v1.y*= -.03f;	
@@ -406,9 +405,6 @@ __global__ void collisionK( const float4* sortedPos,	//i: pos we use to calculat
 		v1.y*= -.03f;	
 	}
 	
-	if(p1.z > -nparams.origin.z ) { p1.z -= nparams.L.z;}
-	if(p1.z < nparams.origin.z ) { p1.z += nparams.L.z;}
-
 	newVel[idx] = make_float4(v1);
 	newPos[idx]	= make_float4(p1, radius1); 
 }

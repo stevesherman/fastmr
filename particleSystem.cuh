@@ -35,12 +35,13 @@ void setParameters(SimParams *hostParams);
 bool isOutofBounds(float4* pos, float border, uint numparticles);
 bool excessForce(float4* pos, float force, uint numparticles);
 float maxforce(float4* pos, uint numpartices);
-float4 magnetization(float4* pos, uint numparticles, float simVol);
+float3 magnetization(float4* pos, uint numparticles, float simVol);
 uint edgeCount(float4* forces, uint numParticles);
 float calcTopForce(float4* forces, float4* position, uint numParticles, float ws, float cut);
 float calcBotForce(float4* forces, float4* position, uint numParticles, float ws, float cut);
 float calcGlForce(float4* forces, float4* position, uint numParticles);
 float calcKinEn(float4* forces, float4* position, float visc, uint numParticles);
+uint numInteractions(uint* m_hNeighList, uint numParticles);
 
 
 

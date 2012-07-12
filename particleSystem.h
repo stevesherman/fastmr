@@ -64,15 +64,16 @@ public:
 	void setDipIt(uint x) {m_params.mutDipIter = x;}
     void setInteractionRadius(uint x) {m_params.interactionr = x;}
 	void setExternalH(float3 x) { m_params.externalH = x; newp.extH = x;}
+	void setPinDist(float x) { newp.pin_d = x;}
+	void setContactDist(float x) {m_contact_dist = x;}
 
 	float getParticleRadius() { return m_params.particleRadius[0]; }
     uint3 getGridSize() { return m_params.gridSize; }
     float3 getWorldOrigin() { return m_params.worldOrigin; }
     float3 getCellSize() { return m_params.cellSize; }
 	
-	uint getEdges();
-	uint getGraphs();
-
+	void getGraphData(uint& graphs, uint& edges);
+	uint getInteractions();
 	int getInteractionRadius() { return m_params.interactionr;}	
 
 
@@ -100,7 +101,7 @@ protected: // data
 	uint m_numGridCells;
 	float m_colorFmax;
     uint m_timer;
-
+	float m_contact_dist;
 
 	// CPU data
     float* m_hPos;              // particle positions

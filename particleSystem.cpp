@@ -54,9 +54,9 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize):
 	newp.visc = m_params.viscosity;
 	newp.extH = m_params.externalH;
 	newp.mup = m_params.mup;
-	newp.contact_d_sq = 1.05f*1.05f;//lsq < contact_d_sq * sepdist*sepdist
 	newp.pin_d = 1.5f;  //ybot < radius*pin_d
-	
+
+	m_contact_dist = 1.05f;	
 	_initialize(m_params.numBodies);
 
 }
@@ -243,7 +243,7 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 	setParameters(&m_params);
 	setNParameters(&newp);
 
-	//isOutofBounds((float4*) m_dPos, m_params.worldOrigin.x, m_numParticles);
+	//isOutofBounds((float4*) m_dPos, newp.origin.x, m_numParticles);
 	comp_phash(m_dPos, m_dGridParticleHash, m_dGridParticleIndex, m_dCellHash, m_numParticles, m_numGridCells);
 	// sort particles based on hash
 	sortParticles(m_dGridParticleHash, m_dGridParticleIndex, m_numParticles);
@@ -279,9 +279,9 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 		double Cd, maxf, maxFdx;
 		Cd = 6*CUDART_PI_F*m_params.viscosity*m_params.particleRadius[0];
 
+		//if the particles are moving too much, half the timestep and resolve
 		while(solve) {
-			maxFdx = maxdxpct*Cd*m_params.particleRadius[0]/deltaTime; //force to cause a dx
-
+			
 			magForces(	m_dSortedPos,	//yin: yn 
 						m_dSortedPos,	//yn
 						m_dMidPos,   	//yn + 1/2*k1
@@ -317,11 +317,12 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 			//find max force
 			//printf("callmax\n");
 			maxf = maxforce( (float4*) m_dForces1, m_numParticles);
-		
+			maxFdx = maxdxpct*Cd*m_params.particleRadius[0]/deltaTime; //force to cause a dx
+
 			if(maxf > maxFdx){
 				solve = true;
 			} /*else { //if not excess force, check for out of bounds
-				solve = isOutofBounds((float4*)m_dPos, -m_params.worldOrigin.x, m_numParticles);
+				solve = isOutofBounds((float4*)m_dPos, -newp.origin.x, m_numParticles);
 			}*/
 			if(solve){
 				deltaTime *=.5f;
@@ -360,8 +361,8 @@ void ParticleSystem::getBadP()
 	for(int i = 0; i < (int) m_numParticles; i++){
 		if( isnan(m_hPos[4*i]) || isnan(m_hPos[4*i+1]) || isnan(m_hPos[4*i+2]) )
 			nans++;
-		if( pow(m_hPos[4*i],2) > pow(m_params.worldOrigin.x,2) ||  pow(m_hPos[4*i+1],2) > pow(m_params.worldOrigin.y,2) || 
-				pow(m_hPos[4*i+2],2) > pow(m_params.worldOrigin.z,2) )
+		if( pow(m_hPos[4*i],2) > pow(newp.origin.x,2) ||  pow(m_hPos[4*i+1],2) > pow(newp.origin.y,2) || 
+				pow(m_hPos[4*i+2],2) > pow(newp.origin.z,2) )
 		   outbounds++;
 	}
 	printf("nans: %d \toutofbounds: %d\n", nans, outbounds);
@@ -370,23 +371,27 @@ void ParticleSystem::getBadP()
 
 void ParticleSystem::getMagnetization()
 {
-	float4 M = magnetization((float4*) m_dMomentsA, m_numParticles, newp.L.x*newp.L.y*newp.L.z);
+	float3 M = magnetization((float4*) m_dMomentsA, m_numParticles, 
+			newp.L.x*newp.L.y*newp.L.z);
 	printf("M: %g %g %g\n", M.x, M.y, M.z );
 }
 
 
-uint ParticleSystem::getGraphs()
+void ParticleSystem::getGraphData(uint& graphs, uint& edges)
 {
 	uint maxn = NListVar(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
-			m_dCellStart, m_dCellEnd, m_dCellAdj, m_numParticles, m_maxNeigh, 1.05f);
+			m_dCellStart, m_dCellEnd, m_dCellAdj, m_numParticles, m_maxNeigh, m_contact_dist);
+	edges = numInteractions(m_dNumNeigh, m_numParticles)/2;
 	
 	m_hNeighList = new uint[m_numParticles*maxn];
 	copyArrayFromDevice(m_hNeighList, m_dNeighList, 0, sizeof(uint)*m_numParticles*maxn);
 	copyArrayFromDevice(m_hNumNeigh,  m_dNumNeigh,  0, sizeof(uint)*m_numParticles);
-	
-	uint ngraphs = adjConGraphs(m_hNeighList, m_hNumNeigh, m_numParticles);
+	graphs = adjConGraphs(m_hNeighList, m_hNumNeigh, m_numParticles);
 	delete [] m_hNeighList;
-	return ngraphs;
+}
+
+uint ParticleSystem::getInteractions(){
+	return numInteractions(m_dNumNeigh, m_numParticles);
 }
 
 void
@@ -406,20 +411,15 @@ ParticleSystem::dumpParticles(uint start, uint count)
 	printf("IR = %d edges %f\n", m_params.interactionr, numEdges);
 }
 
-uint ParticleSystem::getEdges(){
-	return edgeCount((float4*) m_dForces1, m_numParticles);
-
-}
-
 void ParticleSystem::logStuff(FILE* file, float simtime)
 {
  	
 	if(m_randSet != 0)  //dont log if we're setting ICs
 		return;
 	
-	uint edges = getEdges();//i think these get us the latest force data
-	float graphs = getGraphs();
-	float4 M = magnetization((float4*) m_dMomentsA, m_numParticles, newp.L.x*newp.L.y*newp.L.z);
+	uint edges, graphs;
+    getGraphData(graphs,edges);
+	float3 M = magnetization((float4*) m_dMomentsA, m_numParticles, newp.L.x*newp.L.y*newp.L.z);
 
 	//cuda calls for faster computation 
 	float tf = calcTopForce( (float4*) m_dForces1, (float4*) m_dPos, m_numParticles, -newp.origin.y, newp.pin_d);
@@ -516,9 +516,9 @@ ParticleSystem::initGrid(uint3 size, float3 spacing, float3 jitter, uint numPart
         for(uint y=0; y<size.y-0; y++) {
             for(uint x=0; x<size.x-0; x++) {
                 if (i < numParticles) {
-                    m_hPos[i*4+0] = spacing.x*(x+0.5f) + m_params.worldOrigin.x + (frand()*2.0f-1.0f)*jitter.x;
-                    m_hPos[i*4+1] = spacing.y*(y+0.5f) + m_params.worldOrigin.y + (frand()*2.0f-1.0f)*jitter.y;
-                    m_hPos[i*4+2] = spacing.z*(z+0.5f) + m_params.worldOrigin.z + (frand()*2.0f-1.0f)*jitter.z;
+                    m_hPos[i*4+0] = spacing.x*(x+0.5f) + newp.origin.x + (frand()*2.0f-1.0f)*jitter.x;
+                    m_hPos[i*4+1] = spacing.y*(y+0.5f) + newp.origin.y + (frand()*2.0f-1.0f)*jitter.y;
+                    m_hPos[i*4+2] = spacing.z*(z+0.5f) + newp.origin.z + (frand()*2.0f-1.0f)*jitter.z;
 					m_hPos[i*4+3] = m_params.particleRadius[0];
                 }
 				i++;
@@ -526,10 +526,10 @@ ParticleSystem::initGrid(uint3 size, float3 spacing, float3 jitter, uint numPart
         }
     }
 	if(numParticles >= 2){
-		m_hPos[0*4+0] = (m_params.worldOrigin.x + m_params.particleRadius[0]);
+		m_hPos[0*4+0] = (newp.origin.x + m_params.particleRadius[0]);
 		m_hPos[0*4+1] = m_params.particleRadius[0];
 		m_hPos[0*4+2] = 0; m_hPos[0*4+3] = m_params.particleRadius[0];
-		m_hPos[1*4+0] = -(m_params.worldOrigin.x + 3*m_params.particleRadius[0]);
+		m_hPos[1*4+0] = -(newp.origin.x + 3*m_params.particleRadius[0]);
 		m_hPos[1*4+1] = -m_params.particleRadius[0];
 		m_hPos[1*4+2] = 0; m_hPos[1*4+3] = m_params.particleRadius[0];
 	}
@@ -553,9 +553,9 @@ ParticleSystem::reset(ParticleConfig config)
 					point[0] = frand();
 					point[1] = frand();
 					point[2] = frand();
-					m_hPos[4*(i+ti)+0] = 2.0f*m_params.worldOrigin.x * (frand() - 0.5f);
-					m_hPos[4*(i+ti)+1] = 2.0f*(m_params.worldOrigin.y+m_params.particleRadius[j]) * (frand() - 0.5f);
-					m_hPos[4*(i+ti)+2] = 2.0f*m_params.worldOrigin.z * (frand() - 0.5f);
+					m_hPos[4*(i+ti)+0] = 2.0f*newp.origin.x * (frand() - 0.5f);
+					m_hPos[4*(i+ti)+1] = 2.0f*(newp.origin.y+m_params.particleRadius[j]) * (frand() - 0.5f);
+					m_hPos[4*(i+ti)+2] = 2.0f*newp.origin.z * (frand() - 0.5f);
 					m_hPos[4*(i+ti)+3] = m_params.particleRadius[j]; // radius
 				}
 				ti+=i;

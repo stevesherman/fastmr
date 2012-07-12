@@ -5,6 +5,8 @@
 #include "connectedgraphs.h"
 #include <assert.h>
 #include <stack>
+#include <vector>
+#include <algorithm>
 using namespace std;
 
 uint adjConGraphs(uint* nlist, uint* num_neigh, uint numParticles)
@@ -15,6 +17,7 @@ uint adjConGraphs(uint* nlist, uint* num_neigh, uint numParticles)
 	uint numGraphs = 0;
 	uint curr = 0;
 	uint chainl = 0;
+	vector<uint> length_list;
 
 	for(uint i=0; i < numParticles; i++){
 		//if we haven't visited, prime the stack, and add to chain counter
@@ -38,7 +41,13 @@ uint adjConGraphs(uint* nlist, uint* num_neigh, uint numParticles)
 				}
 			}
 		}
+		if(chainl > 0){
+		//	printf("chain %d has length %d\n", i, chainl);
+			length_list.push_back(chainl);
+		}
 	}
+	nth_element(length_list.begin(), length_list.begin()+numGraphs/2, length_list.end());
+	//printf("median chain length: %d\n", length_list[numGraphs/2]);
 	delete visited;
 	return numGraphs;
 }	
