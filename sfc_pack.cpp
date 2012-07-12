@@ -1,7 +1,11 @@
+#include <cstdlib>
+#include <cstdio>
 #include <vector>
 #include <assert.h>
-#include "particles_kernel.cuh"
 #include "sfc_pack.h"
+#include "vector_types.h"
+
+//totally copied from HOOMD
 
 //! x walking table for the hilbert curve
 static int istep[] = {0, 0, 0, 0, 1, 1, 1, 1};
@@ -198,11 +202,11 @@ void permute(unsigned int result[8], const unsigned int in[8], int p)
 }
 
 
-void getSortedOrder3D( unsigned int* m_hCellHash, const SimParams* params)
+void getSortedOrder3D( unsigned int* m_hCellHash, const uint3 gridSize)
 {
     // start by checking the saneness of some member variables
-    assert(params->gridSize.x == params->gridSize.y && params->gridSize.y == params->gridSize.z);
-	unsigned int m_grid = params->gridSize.x;
+    assert(gridSize.x == gridSize.y && gridSize.y == gridSize.z);
+	unsigned int m_grid = gridSize.x;
 	//check if gridsize is power of two
 	assert((m_grid != 0) && !(m_grid & (m_grid-1)));
 

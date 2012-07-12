@@ -32,7 +32,7 @@ public:
         VELOCITY,
     };
     float update(float deltaTime, float maxdxpct);
-    void reset(ParticleConfig config);
+    void reset(ParticleConfig config, uint numiter);
 
     int    getNumParticles() const { return m_numParticles; }
 
@@ -81,7 +81,7 @@ protected: // methods
     ParticleSystem() {}
     uint createVBO(uint size);
 
-    void _initialize(int numParticles);
+    void _initialize();
     void _finalize();
 
     void initGrid(uint3 size, float3 spacing, float3 jitter, uint numParticles);

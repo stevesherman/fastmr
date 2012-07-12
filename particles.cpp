@@ -462,11 +462,11 @@ void key(unsigned char key, int /*x*/, int /*y*/)
         displayEnabled = !displayEnabled;
         break;
     case '1':
-        psystem->reset(ParticleSystem::CONFIG_GRID);
+        psystem->reset(ParticleSystem::CONFIG_GRID, 100);
 		frameCount = 0; simtime = 0; resolved = 0;
         break;
     case '2':
-        psystem->reset(ParticleSystem::CONFIG_RANDOM);
+        psystem->reset(ParticleSystem::CONFIG_RANDOM, 200);
 		frameCount=0; simtime = 0; resolved = 0;
 		break;
     case '3':
@@ -634,8 +634,6 @@ main(int argc, char** argv)
 
 	cutGetCmdLineArgumentf(argc, (const char**)argc, "contact_dist", (float*)&contact_dist);
 	cutGetCmdLineArgumentf(argc, (const char**)argc, "maxdx",(float*)&maxdxpct); 
-	params.randSetIter = 200;
-	cutGetCmdLineArgumenti(argc, (const char**)argc, "randit", (int*)&params.randSetIter);
 		
 	params.mutDipIter = 0;
 	cutGetCmdLineArgumenti(argc, (const char**)argc, "dipit", (int*) &params.mutDipIter);
@@ -751,7 +749,7 @@ main(int argc, char** argv)
 
 	initParamList();
 	setParams();
-	psystem->reset(ParticleSystem::CONFIG_RANDOM);
+	psystem->reset(ParticleSystem::CONFIG_RANDOM, 200);
     if (g_useGL) 
         initMenus();
 
