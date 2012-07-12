@@ -20,13 +20,13 @@ struct NewParams {
 	float max_fdr_sq;
 
 	float spring;
-	float uf;
+//	float uf;
 	float visc;
 	float shear;
 
 	float pin_d;
 
 	float3 extH;
-	float mup;	
+	float Cpol;	
 };
 #endif

@@ -16,10 +16,11 @@
 #include <algorithm>
 #include <GL/glew.h>
 
-#ifndef CUDART_PI_F
-#define CUDART_PI_F   3.141592653589793f 
+#define PI_F   3.141592653589793f 
+#define MU_0 4e-7f*PI_F
+#ifndef MU_C
+#define MU_C 1
 #endif
-
 
 ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize):
 	m_bInitialized(false),
@@ -29,8 +30,9 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize):
 	m_params = params;
 	m_numGridCells = m_params.gridSize.x*m_params.gridSize.y*m_params.gridSize.z;	
 	
-	m_params.uf = 1.257e-6;
-	m_params.mup = 4.0f*CUDART_PI_F*pow(m_params.particleRadius[0],3)*(m_params.xi[0]-1.0f)/(m_params.xi[0]+2.0f);	
+	m_params.uf = MU_C*MU_0;
+	m_params.Cpol = 4.0f*PI_F*pow(m_params.particleRadius[0],3)*
+		(m_params.mu_p[0] - MU_C)/(m_params.mu_p[0]+2.0f*MU_C);	
 	m_params.globalDamping = 0.8f; 
     m_params.cdamping = 0.03f;
 	m_params.boundaryDamping = -0.03f;
@@ -49,11 +51,11 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize):
 	newp.max_fdr_sq = 8.0f*m_params.particleRadius[0]*8.0f*m_params.particleRadius[0];
 	newp.numAdjCells = 27;
 	newp.spring = m_params.spring;
-	newp.uf = m_params.uf;
+	//newp.uf = m_params.uf;
 	newp.shear = m_params.shear;
 	newp.visc = m_params.viscosity;
 	newp.extH = m_params.externalH;
-	newp.mup = m_params.mup;
+	newp.Cpol = m_params.Cpol;
 	newp.pin_d = 1.5f;  //ybot < radius*pin_d
 
 	m_contact_dist = 1.05f;	
@@ -276,7 +278,7 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 	
 		bool solve = true;
 		double Cd, maxf, maxFdx;
-		Cd = 6*CUDART_PI_F*m_params.viscosity*m_params.particleRadius[0];
+		Cd = 6*PI_F*m_params.viscosity*m_params.particleRadius[0];
 
 		//if the particles are moving too much, half the timestep and resolve
 		while(solve) {
@@ -458,7 +460,7 @@ ParticleSystem::logParams(FILE* file)
 			m_params.volfr[0], m_params.volfr[1], m_params.volfr[2]);
 	fprintf(file, "ntotal: %d\t n0: %d  \t n1: %d  \t n2: %d\n", newp.N, m_params.numParticles[0],
 			m_params.numParticles[1], m_params.numParticles[2]);
-	fprintf(file, "\t\t xi0: %.1f \t xi1: %.1f \t xi2: %.1f \n", m_params.xi[0], m_params.xi[1], m_params.xi[2]);
+	fprintf(file, "\t\t mu_p0: %.1f \t mu_p1: %.1f \t mu_p2: %.1f \n", m_params.mu_p[0], m_params.mu_p[1], m_params.mu_p[2]);
 	fprintf(file, "\t\t a0: %.2g\t a1: %.2g\t a2: %.2g\n\n", m_params.particleRadius[0], m_params.particleRadius[1],
 			m_params.particleRadius[2]);
 
@@ -473,17 +475,20 @@ ParticleSystem::logParams(FILE* file)
 
 void ParticleSystem::zeroDevice()
 {
-	float xi;
+	float mu_p, radius, cpol;
 	int ti = 0;
 	for(int j = 0; j < 3; j++){
 		int i;
-		xi = m_params.xi[j];
+		mu_p = m_params.mu_p[j];
+		radius = m_params.particleRadius[j];
+		cpol = 4*PI_F*(mu_p - MU_C)/(mu_p+2.0f*MU_C) *radius*radius*radius; 
+
 		for ( i = 0; i < m_params.numParticles[j]; i++){
-			m_hMoments[4*(i+ti)+0] = 0;
-			m_hMoments[4*(i+ti)+1] = newp.extH.y*4.0/3.0*3.14159*
-					pow(m_params.particleRadius[j],3)* 3.0*(xi-1.0)/(xi+2.0);
-			m_hMoments[4*(i+ti)+2] = 0;
-			m_hMoments[4*(i+ti)+3] = xi;
+			
+			m_hMoments[4*(i+ti)+0] = cpol*newp.extH.x;
+			m_hMoments[4*(i+ti)+1] = cpol*newp.extH.y;
+			m_hMoments[4*(i+ti)+2] = cpol*newp.extH.z;
+			m_hMoments[4*(i+ti)+3] = cpol;
 		}
 		ti+=i;
 	}
@@ -580,7 +585,8 @@ ParticleSystem::reset(ParticleConfig config, uint numiter)
 			float3 spacing = newp.L/make_float3(gridSize.x,gridSize.y,gridSize.z);
 			float3 jitter = 1.2*(spacing - 2*m_params.particleRadius[0])/2;
 			printf("gs %d %d %d\n", gridSize.x, gridSize.y, gridSize.z);
-			printf("spacing: %.4g %.4g %.4g, particle radius: %g\n", spacing.x, spacing.y, spacing.z, m_params.particleRadius[0]);
+			printf("spacing: %.4g %.4g %.4g, particle radius: %g\n", spacing.x, 
+					spacing.y, spacing.z, m_params.particleRadius[0]);
 			printf("jitter: %.4g %.4g %.4g\n", jitter.x,jitter.y,jitter.z);
 			initGrid(gridSize, spacing, jitter, newp.N);
         }

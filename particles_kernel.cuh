@@ -21,11 +21,11 @@ struct SimParams {
 	
     float viscosity;
 	float uf;
-	float mup; //moment = mup*H
+	float Cpol; //moment = Cpol*H
 	
 	//set of arrays for initializing the particles
 	float particleRadius [3];
-	float xi [3];
+	float mu_p [3];
 	float volfr [3];	
 	int numParticles[3];
 

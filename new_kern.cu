@@ -2,7 +2,11 @@
 #define NEW_KERN_CU
 #endif
 
-#define PI 3.141592653589793f
+#define PI_F 3.141592653589793f
+#define MU_0 4e-7f*PI_F
+#ifndef MU_C
+#define MU_C 1
+#endif
 
 #include <cuda_runtime.h>
 #include "cutil_math.h"
@@ -117,12 +121,10 @@ __global__ void magForcesK( const float4* dSortedPos,	//i: pos we use to calcula
 	float4 mom1 = dMom[idx];
 	//float4 mom1 = tex1Dfetch(mom_tex,idx);
 	float3 m1 = make_float3(mom1);
-	float xi1 = mom1.w;
+	float Cpol1 = mom1.w;
 	
 	float3 force = make_float3(0,0,0);
 
-	uint edges = 0;
-	
 	for(uint i = 0; i < n_neigh; i++)
 	{
 		uint neighbor = nlist[i*nparams.N + idx];
@@ -133,7 +135,7 @@ __global__ void magForcesK( const float4* dSortedPos,	//i: pos we use to calcula
 		
 		float4 mom2 = tex1Dfetch(mom_tex, neighbor);
 		float3 m2 = make_float3(mom2);
-		float xi2 = mom2.w;
+		float Cpol2 = mom2.w;
 
 		float3 er = p1 - p2;//start it out as dr, then modify to get er
 		er.x = er.x - nparams.L.x*rintf(er.x*nparams.Linv.x);
@@ -146,25 +148,24 @@ __global__ void magForcesK( const float4* dSortedPos,	//i: pos we use to calcula
 			float dm1er = dot(m1,er);
 			float dm2er = dot(m2,er);
 			
-			force += 3.0f*nparams.uf/(4*PI*lsq*lsq) *( dm1m2*er + dm1er*m2
+			force += 3.0f*MU_0*MU_C/(4*PI_F*lsq*lsq) *( dm1m2*er + dm1er*m2
 					+ dm2er*m1 - 5.0f*dm1er*dm2er*er);
 			
 			//create a false moment for nonmagnetic particles
-			//note that here mup gives the wrong volume, so the magnitude of 
+			//note that here Cpol gives the wrong volume, so the magnitude of 
 			//the repulsion strength is wrong		
-			m1 = (xi1 == 1.0f) ? nparams.mup*nparams.extH : m1;
-			m2 = (xi2 == 1.0f) ? nparams.mup*nparams.extH : m2;
+			m1 = (Cpol1 == 0.0f) ? nparams.Cpol*nparams.extH : m1;
+			m2 = (Cpol2 == 0.0f) ? nparams.Cpol*nparams.extH : m2;
 			dm1m2 = dot(m1,m2);
 			
 			float sepdist = radius1 + radius2;
-			force += 3.0f*nparams.uf*dm1m2/(2.0f*PI*sepdist*sepdist*sepdist*sepdist)*
+			force += 3.0f*MU_0*MU_C*dm1m2/(2.0f*PI_F*sepdist*sepdist*sepdist*sepdist)*
 					expf(-nparams.spring*(sqrtf(lsq)/sepdist - 1.0f))*er;
-			
 		}
 			
 	}
-	dForce[idx] = make_float4(force, (float) edges);
-	float Cd = 6.0f*PI*radius1*nparams.visc;
+	dForce[idx] = make_float4(force,0.0f);
+	float Cd = 6.0f*PI_F*radius1*nparams.visc;
 	float ybot = p1.y - nparams.origin.y;
 	force.x += nparams.shear*ybot*Cd;
 	
@@ -209,7 +210,7 @@ __global__ void integrateRK4(const float4* oldPos,
 	float3 fcomp = (force1 + 2*force2 + 2*force3 + force4)/6.0f;//trapezoid rule	
 	forceA[index] = make_float4(fcomp, f1.w);//averaged force
 	
-	float Cd = 6*PI*nparams.visc*radius;
+	float Cd = 6*PI_F*nparams.visc*radius;
 
 	float ybot = pos.y - nparams.origin.y;
 	fcomp.x += nparams.shear*ybot*Cd;

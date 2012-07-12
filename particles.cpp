@@ -659,8 +659,8 @@ main(int argc, char** argv)
 	params.particleRadius[0] = radius*1e-6f;
 	params.volfr[0] = 0.30f;
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "vfr0", (float*) &params.volfr[0]);
-	params.xi[0] = 2000;
-	cutGetCmdLineArgumentf(argc, (const char**)argv, "xi0", (float*) &params.xi[0]);
+	params.mu_p[0] = 2000;
+	cutGetCmdLineArgumentf(argc, (const char**)argv, "xi0", (float*) &params.mu_p[0]);
 	params.numParticles[0] = (params.volfr[0] * volume) / (4.0f/3.0f*PI*pow(params.particleRadius[0],3)); 
 		
 	radius = 6.0f;
@@ -668,8 +668,8 @@ main(int argc, char** argv)
 	params.particleRadius[1] = radius*1e-6f;
 	params.volfr[1] = 0.0f;
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "vfr1", (float*) &params.volfr[1]);
-	params.xi[1] = 1;
-	cutGetCmdLineArgumentf(argc, (const char**)argv, "xi1", (float*) &params.xi[1]);
+	params.mu_p[1] = 1;
+	cutGetCmdLineArgumentf(argc, (const char**)argv, "xi1", (float*) &params.mu_p[1]);
 	params.numParticles[1] = (params.volfr[1] * volume) / (4.0f/3.0f*PI*pow(params.particleRadius[1],3)); 
 	
 	radius = 3.5f;
@@ -677,8 +677,8 @@ main(int argc, char** argv)
 	params.particleRadius[2] = radius*1e-6f;
 	params.volfr[2] = 0.0f;
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "vfr2", (float*) &params.volfr[2]);
-	params.xi[2] = 2000;
-	cutGetCmdLineArgumentf(argc, (const char**)argv, "xi2", (float*) &params.xi[2]);
+	params.mu_p[2] = 2000;
+	cutGetCmdLineArgumentf(argc, (const char**)argv, "xi2", (float*) &params.mu_p[2]);
 	params.numParticles[2] = (params.volfr[2] * volume) / (4.0f/3.0f*PI*pow(params.particleRadius[2],3)); 
 
 	params.numBodies = params.numParticles[0] + params.numParticles[1] + params.numParticles[2];
@@ -699,7 +699,7 @@ main(int argc, char** argv)
 					&params.volfr[1], &params.volfr[2]);
 			a = fscanf(crashlog, "ntotal: %d\t n0: %d  \t n1: %d  \t n2: %d\n", &params.numBodies, &params.numParticles[0],
 					&params.numParticles[1], &params.numParticles[2]);
-			a = fscanf(crashlog, "\t\t xi0: %f \t xi1: %f \t xi2 %f \n", &params.xi[0], &params.xi[1], &params.xi[2]);
+			a = fscanf(crashlog, "\t\t xi0: %f \t xi1: %f \t xi2 %f \n", &params.mu_p[0], &params.mu_p[1], &params.mu_p[2]);
 			//printf("xis read: %d\n", a);
 			a = fscanf(crashlog, "\t\t a0: %g\t a1: %g\t a2: %g\n\n", &params.particleRadius[0], &params.particleRadius[1],
 					&params.particleRadius[2]);
