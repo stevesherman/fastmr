@@ -11,7 +11,7 @@
 #include <math.h>
 #include "cutil_math.h"
 #include "math_constants.h"
-#include "particles_kernel.cuh"
+#include "particles_kernel.h"
 
 __constant__ SimParams params;
 

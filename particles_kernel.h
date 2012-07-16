@@ -24,10 +24,11 @@ struct SimParams {
 	float Cpol; //moment = Cpol*H
 	
 	//set of arrays for initializing the particles
-	float particleRadius [3];
+	float pRadius [3];
 	float mu_p [3];
 	float volfr [3];	
-	int numParticles[3];
+	int nump[3];
+	float pRad_std[3];
 
 	uint3 gridSize;
 	uint numCells;
@@ -36,8 +37,8 @@ struct SimParams {
 	float3 worldSize;
 
  	//total number of particles
-   uint numBodies;    
-   uint maxParticlesPerCell;
+	uint numBodies;    
+	uint maxParticlesPerCell;
 	
 	float3 externalH;
 	int interactionr;

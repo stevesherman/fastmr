@@ -1,4 +1,4 @@
-#define PI 3.141592653589793f
+#define PI_F 3.141592653589793f
 
 // Graphics includes
 #include <GL/glew.h>
@@ -20,6 +20,8 @@
 #include "particleSystem.h"
 #include "render_particles.h"
 #include "paramgl.h"
+#include "particles_kernel.h"
+#include "new_kern.h"
 
 //shared library test functions
 #include <shrUtils.h>
@@ -656,32 +658,36 @@ main(int argc, char** argv)
 
 	float radius = 3.5f;
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "rad0", (float*) &radius);
-	params.particleRadius[0] = radius*1e-6f;
+	params.pRadius[0] = radius*1e-6f;
 	params.volfr[0] = 0.30f;
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "vfr0", (float*) &params.volfr[0]);
 	params.mu_p[0] = 2000;
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "xi0", (float*) &params.mu_p[0]);
-	params.numParticles[0] = (params.volfr[0] * volume) / (4.0f/3.0f*PI*pow(params.particleRadius[0],3)); 
-		
+	params.nump[0] = (params.volfr[0] * volume) / (4.0f/3.0f*PI_F*pow(params.pRadius[0],3)); 
+	params.pRad_std[0] = 5e-7f;
+	
 	radius = 6.0f;
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "rad1", (float*) &radius);
-	params.particleRadius[1] = radius*1e-6f;
+	params.pRadius[1] = radius*1e-6f;
 	params.volfr[1] = 0.0f;
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "vfr1", (float*) &params.volfr[1]);
 	params.mu_p[1] = 1;
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "xi1", (float*) &params.mu_p[1]);
-	params.numParticles[1] = (params.volfr[1] * volume) / (4.0f/3.0f*PI*pow(params.particleRadius[1],3)); 
-	
+	params.nump[1] = (params.volfr[1] * volume) / (4.0f/3.0f*PI_F*pow(params.pRadius[1],3)); 
+	params.pRad_std[1] = 0;
+
 	radius = 3.5f;
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "rad2", (float*) &radius);
-	params.particleRadius[2] = radius*1e-6f;
+	params.pRadius[2] = radius*1e-6f;
 	params.volfr[2] = 0.0f;
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "vfr2", (float*) &params.volfr[2]);
 	params.mu_p[2] = 2000;
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "xi2", (float*) &params.mu_p[2]);
-	params.numParticles[2] = (params.volfr[2] * volume) / (4.0f/3.0f*PI*pow(params.particleRadius[2],3)); 
+	params.nump[2] = (params.volfr[2] * volume) / (4.0f/3.0f*PI_F*pow(params.pRadius[2],3)); 
+	params.pRad_std[2] = 0;
 
-	params.numBodies = params.numParticles[0] + params.numParticles[1] + params.numParticles[2];
+
+	params.numBodies = params.nump[0] + params.nump[1] + params.nump[2];
 	bool benchmark = cutCheckCmdLineFlag(argc, (const char**) argv, "benchmark") != 0;
 
 
@@ -697,12 +703,12 @@ main(int argc, char** argv)
 			if( a == 0) rewind(crashlog);	
 			a = fscanf(crashlog, "vfrtot: %*f\t v0: %f\t v1: %f\t v2: %f\n", &params.volfr[0], 
 					&params.volfr[1], &params.volfr[2]);
-			a = fscanf(crashlog, "ntotal: %d\t n0: %d  \t n1: %d  \t n2: %d\n", &params.numBodies, &params.numParticles[0],
-					&params.numParticles[1], &params.numParticles[2]);
+			a = fscanf(crashlog, "ntotal: %d\t n0: %d  \t n1: %d  \t n2: %d\n", &params.numBodies, &params.nump[0],
+					&params.nump[1], &params.nump[2]);
 			a = fscanf(crashlog, "\t\t xi0: %f \t xi1: %f \t xi2 %f \n", &params.mu_p[0], &params.mu_p[1], &params.mu_p[2]);
 			//printf("xis read: %d\n", a);
-			a = fscanf(crashlog, "\t\t a0: %g\t a1: %g\t a2: %g\n\n", &params.particleRadius[0], &params.particleRadius[1],
-					&params.particleRadius[2]);
+			a = fscanf(crashlog, "\t\t a0: %g\t a1: %g\t a2: %g\n\n", &params.pRadius[0], &params.pRadius[1],
+					&params.pRadius[2]);
 			printf("rads read: %d\n", a);
 			//a = fscanf(crashlog, "grid: %d x %d x %d = %*d cells\n", &gridSize.x, &gridSize.y, &gridSize.z);
 			printf("grid read: %d grid: %d x %d x %d\n", a, params.gridSize.x, params.gridSize.y, params.gridSize.z);
@@ -718,7 +724,7 @@ main(int argc, char** argv)
 */
 
 	params.worldOrigin = worldSize*-0.5f;
-	float cellSize_des = 8.0f*params.particleRadius[0];
+	float cellSize_des = 8.0f*params.pRadius[0];
  
 	//gridSize.x = gridSize.y = gridSize.z = GRID_SIZE;
 	params.gridSize.x = floor(worldSize.x/cellSize_des);

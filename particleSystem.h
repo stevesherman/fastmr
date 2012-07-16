@@ -5,8 +5,8 @@
 #define DEBUG_GRID 0
 #define DO_TIMING 0
 
-#include "particles_kernel.cuh"
-#include "new_kern.cuh"
+#include "particles_kernel.h"
+#include "new_kern.h"
 #include "vector_functions.h"
 #include <cstdio>
 #include <cstdlib>
@@ -67,7 +67,7 @@ public:
 	void setPinDist(float x) { newp.pin_d = x;}
 	void setContactDist(float x) {m_contact_dist = x;}
 
-	float getParticleRadius() { return m_params.particleRadius[0]; }
+	float getParticleRadius() { return m_params.pRadius[0]; }
     uint3 getGridSize() { return m_params.gridSize; }
     float3 getWorldOrigin() { return m_params.worldOrigin; }
     float3 getCellSize() { return m_params.cellSize; }

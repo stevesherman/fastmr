@@ -15,7 +15,6 @@
 
 // This file contains C wrappers around the some of the CUDA API and the
 // kernel functions so that they can be called from "particleSystem.cpp"
-
 #include <cutil_inline.h>
 #include "cutil_math.h"
 
@@ -38,7 +37,8 @@
 #include "thrust/extrema.h"
 #include "thrust/reduce.h"
 #include "thrust/inner_product.h"
-
+#include "particles_kernel.h"
+#include "particleSystem.cuh"
 #include "particles_kernel.cu"
 
 using namespace thrust;

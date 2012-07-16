@@ -1,3 +1,6 @@
+#ifndef particle_system_cuh
+#define particle_system_cuh
+
 /*
  * Copyright 1993-2010 NVIDIA Corporation.  All rights reserved.
  *
@@ -12,7 +15,9 @@
  * your use of this NVIDIA software.
  * 
  */
- 
+
+#include "particles_kernel.h"
+
  extern "C"
 {
 void cudaInit(int argc, char **argv);
@@ -55,3 +60,5 @@ void renderStuff(const float* post,
 				float colorFmax,
 				uint numParticles);
 }
+
+#endif
