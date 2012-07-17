@@ -543,22 +543,32 @@ ParticleSystem::reset(ParticleConfig config, uint numiter)
 	default:
 	case CONFIG_RANDOM:
 		{
-			int ti = 0;
+			int ti = 0; 			
 			for(int j=0; j < 3; j++) {
-				int i; float radius,u,v,mu_p,cpol;
+				float maxrad = 0, minrad = 1e8;
+				int i; double radius,u,v,mu_p,cpol,norm, vol;
+				double vtot = 0; 
+
 				for(i = 0; i < (int) m_params.nump[j]; i++){
-					if(m_params.pRad_std[j] == 0){
-						radius = m_params.pRadius[j]; // radius
+					if(m_params.rstd[j] > 0) {
+						u=frand(); v=frand();
+						norm = sqrt(-2.0*log(u))*cos(2.0*PI_F*v);
+						float med_diam = m_params.pRadius[0]*
+								expf(-0.5f*m_params.rstd[0]*m_params.rstd[0]);
+						radius = exp(norm*m_params.rstd[j])*med_diam;	
 					} else {
-						u = frand(); v=frand();
-						float norm = sqrtf(-2.0f*logf(u))*cosf(2.0f*PI_F*v);
-						radius = norm*m_params.pRad_std[j] + m_params.pRadius[j];
+						radius = m_params.pRadius[j];
 					}
+					maxrad = radius > maxrad ? radius : maxrad;
+					minrad = radius < minrad ? radius : minrad;
+
 					mu_p = m_params.mu_p[j];
-					cpol = 4*PI_F*(mu_p - MU_C)/(mu_p+2.0f*MU_C) *radius*radius*radius; 
+					vol = 4.0f/3.0f*PI_F*radius*radius*radius;
+					cpol = 3.0f*(mu_p - MU_C)/(mu_p+2.0f*MU_C)*vol;
+					vtot += vol;
 
 					m_hPos[4*(i+ti)+0] = 2.0f*newp.origin.x * (frand() - 0.5f);
-					m_hPos[4*(i+ti)+1] = 2.0f*(newp.origin.y+m_params.pRadius[j]) * (frand() - 0.5f);
+					m_hPos[4*(i+ti)+1] = 2.0f*(newp.origin.y+radius) * (frand() - 0.5f);
 					m_hPos[4*(i+ti)+2] = 2.0f*newp.origin.z * (frand() - 0.5f);
 					m_hPos[4*(i+ti)+3] = radius;
 					m_hMoments[4*(i+ti)+0] = cpol*newp.extH.x;
@@ -568,8 +578,13 @@ ParticleSystem::reset(ParticleConfig config, uint numiter)
 					
 				}
 				ti+=i;
+				printf("minrad: %g maxrad: %g\n", minrad/m_params.pRadius[j], 
+						maxrad/m_params.pRadius[j]);
+				printf("actual vfr = %g\n", vtot*newp.Linv.x*newp.Linv.y*newp.Linv.z);
+
 			}
-		}// move randSetIter as a parameter
+				}// move randSetIter as a parameter
+		
 		break;
 
     case CONFIG_GRID:

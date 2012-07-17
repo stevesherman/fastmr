@@ -8,6 +8,7 @@
 #include <cutil_inline.h>
 #include <cutil_gl_inline.h>
 #include <rendercheck_gl.h>
+#include <math.h>
 #include <cutil_math.h>
 //Includes
 #include <cstdlib>
@@ -68,7 +69,8 @@ const int idleDelay = 300;
 enum { M_VIEW = 0, M_MOVE };
 
 
-SimParams params;
+SimParams pdata;
+NewParams params;
 
 uint numParticles = 0;
 uint3 gridSize;
@@ -124,15 +126,15 @@ void cleanup()
     }
 }
 void setParams(){
-    psystem->setGlobalDamping(params.globalDamping);
-    psystem->setRepelSpring(params.spring);
-    psystem->setCollideDamping(params.cdamping);
-    psystem->setShear(params.shear);
-	psystem->setInteractionRadius(params.interactionr);
+    psystem->setGlobalDamping(pdata.globalDamping);
+    psystem->setRepelSpring(pdata.spring);
+    psystem->setCollideDamping(pdata.cdamping);
+    psystem->setShear(pdata.shear);
+	psystem->setInteractionRadius(pdata.interactionr);
     psystem->setExternalH(make_float3(0.0f, externalH*1e3, 0.0f));
 	psystem->setColorFmax(colorFmax*1e-7f);
-	psystem->setViscosity(params.viscosity);
-	psystem->setDipIt(params.mutDipIter);
+	psystem->setViscosity(pdata.viscosity);
+	psystem->setDipIt(pdata.mutDipIter);
 	psystem->setPinDist(pin_dist);
 	psystem->setContactDist(contact_dist);
 }
@@ -194,7 +196,7 @@ void initGL(int argc, char **argv)
 
 void runBenchmark()
 {
-    printf("Run %u particles simulation for %f us...\n\n", params.numBodies, maxtime);
+    printf("Run %u particles simulation for %f us...\n\n", pdata.numBodies, maxtime);
     cudaThreadSynchronize();
     cutilCheckError(cutStartTimer(timer));  
     //for (int ii = 0; ii < numIterations; ii++){
@@ -210,7 +212,7 @@ void runBenchmark()
     float fAvgSeconds = (1.0e-3 * cutGetTimerValue(timer))/numIterations;
 
     printf("particles, Throughput = %.4f KParticles/s, Time = %.5fs, Size = %u particles\n", 
-            (1.0e-3 * params.numBodies)/fAvgSeconds, fAvgSeconds*numIterations, params.numBodies);
+            (1.0e-3 * pdata.numBodies)/fAvgSeconds, fAvgSeconds*numIterations, pdata.numBodies);
 
 }
 
@@ -220,7 +222,7 @@ void computeFPS()
     if (fpsCount == fpsLimit) {
         char fps[256];
         float ifps = 1.f / (cutGetAverageTimerValue(timer) / 1000.f);
-        sprintf(fps, "CUDA MR Fluid Sim (%d particles): %3.1f fps Time: %.2f us",params.numBodies, ifps, simtime*1e-3);  
+        sprintf(fps, "CUDA MR Fluid Sim (%d particles): %3.1f fps Time: %.2f us",pdata.numBodies, ifps, simtime*1e-3);  
 
         glutSetWindowTitle(fps);
         fpsCount = 0; 
@@ -454,11 +456,11 @@ void key(unsigned char key, int /*x*/, int /*y*/)
         break;
 	case 'g':
 		psystem->getGraphData(ngraphs,nedges);
-		printf("numgraphs: %d, chainl: %f\n", ngraphs, (float)params.numBodies/(float) ngraphs);
-		printf("Edges = %d Mean edges = %f\n", nedges, (float)nedges/(float)params.numBodies);
+		printf("numgraphs: %d, chainl: %f\n", ngraphs, (float)pdata.numBodies/(float) ngraphs);
+		printf("Edges = %d Mean edges = %f\n", nedges, (float)nedges/(float)pdata.numBodies);
 		break;
     case 'u':
-        psystem->dumpParticles(0, params.numBodies);
+        psystem->dumpParticles(0, pdata.numBodies);
         break;
     case 'r':
         displayEnabled = !displayEnabled;
@@ -540,11 +542,11 @@ void initParamList()
         // create a new parameter list
 		paramlist = new ParamListGL("misc");
         paramlist->AddParam(new Param<float>("time step (ns)", timestep, 0.0, 1200, 5, &timestep));
-		paramlist->AddParam(new Param<float>("spring constant",params.spring, 0, 100, 1, &params.spring));
+		paramlist->AddParam(new Param<float>("spring constant",pdata.spring, 0, 100, 1, &pdata.spring));
 		paramlist->AddParam(new Param<float>("H (kA/m)", externalH, 0, 1e3, 5, &externalH));
-		paramlist->AddParam(new Param<float>("shear rate", params.shear, 0, 2000, 50, &params.shear));
+		paramlist->AddParam(new Param<float>("shear rate", pdata.shear, 0, 2000, 50, &pdata.shear));
 		paramlist->AddParam(new Param<float>("colorFmax", colorFmax, 0, 15, 0.1f, &colorFmax));
-    	paramlist->AddParam(new Param<float>("visc", params.viscosity, 0.001f, .25f, 0.001f, &params.viscosity));
+    	paramlist->AddParam(new Param<float>("visc", pdata.viscosity, 0.001f, .25f, 0.001f, &pdata.viscosity));
 		paramlist->AddParam(new Param<float>("max dx pct", maxdxpct, 0, .5f, 0.005f, &maxdxpct));
 		paramlist->AddParam(new Param<float>("pin dist", pin_dist, 1.0f, 2.0f, 0.005f, &pin_dist));
 		paramlist->AddParam(new Param<float>("contact_dist", contact_dist, 1.0f, 1.25f, 0.001f, &contact_dist));
@@ -606,39 +608,39 @@ main(int argc, char** argv)
 	float worldsize1d = .35;//units of mm
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "wsize", (float*) &worldsize1d);
 	worldSize = make_float3(worldsize1d*1e-3f, worldsize1d*1e-3f, worldsize1d*1e-3f);
-	params.worldSize = worldSize;
+	pdata.worldSize = worldSize;
 	float volume = worldSize.x*worldSize.y*worldSize.z; 
 
-	params.shear = 500;
-	cutGetCmdLineArgumentf(argc, (const char**)argv, "shear", (float*) &params.shear);
+	pdata.shear = 500;
+	cutGetCmdLineArgumentf(argc, (const char**)argv, "shear", (float*) &pdata.shear);
 	
-	params.spring = 50;	
-	cutGetCmdLineArgumentf(argc, (const char**)argv, "k", (float*) &params.spring);
+	pdata.spring = 50;	
+	cutGetCmdLineArgumentf(argc, (const char**)argv, "k", (float*) &pdata.spring);
 
 	externalH = 100;
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "H", (float*) &externalH);
-	params.externalH = make_float3(0, externalH*1e3f, 0);
+	pdata.externalH = make_float3(0, externalH*1e3f, 0);
 
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "dt", (float*) &timestep);//units of ns
 	cutGetCmdLineArgumenti(argc, (const char**) argv, "i", &numIterations);
 	maxtime =timestep*numIterations*1e-3;//maxtime has units of us for simplicity
 	cutGetCmdLineArgumentf(argc, (const char**) argv, "maxtime", &maxtime);//units of ns as well
 	numIterations = maxtime/timestep*1e3f;
-	params.viscosity = 0.1;
-	cutGetCmdLineArgumentf(argc, (const char**)argc, "visc", (float*) &params.viscosity);
+	pdata.viscosity = 0.1;
+	cutGetCmdLineArgumentf(argc, (const char**)argc, "visc", (float*) &pdata.viscosity);
 
-	params.colorFmax = colorFmax*1e-7;
-	params.globalDamping = 0.8f; 
-	params.cdamping = 0.03f;
-	params.cspring = 10;
-	cutGetCmdLineArgumentf(argc, (const char**)argc, "cspring", (float*)&params.cspring);
-	params.boundaryDamping = -0.03f;
+	pdata.colorFmax = colorFmax*1e-7;
+	pdata.globalDamping = 0.8f; 
+	pdata.cdamping = 0.03f;
+	pdata.cspring = 10;
+	cutGetCmdLineArgumentf(argc, (const char**)argc, "cspring", (float*)&pdata.cspring);
+	pdata.boundaryDamping = -0.03f;
 
 	cutGetCmdLineArgumentf(argc, (const char**)argc, "contact_dist", (float*)&contact_dist);
 	cutGetCmdLineArgumentf(argc, (const char**)argc, "maxdx",(float*)&maxdxpct); 
 		
-	params.mutDipIter = 0;
-	cutGetCmdLineArgumenti(argc, (const char**)argc, "dipit", (int*) &params.mutDipIter);
+	pdata.mutDipIter = 0;
+	cutGetCmdLineArgumenti(argc, (const char**)argc, "dipit", (int*) &pdata.mutDipIter);
 
 
 	char* title;	
@@ -649,45 +651,55 @@ main(int argc, char** argv)
    	sprintf(logfile, "/home/steve/Datasets/%s.dat", filename);
 	sprintf(crashname, "/home/steve/Datasets/%s.crash.dat", filename);
 
-	params.flowmode = false;
+	pdata.flowmode = false;
 	if(cutCheckCmdLineFlag(argc, (const char **)argv, "flowmode")) {	
-		params.flowmode = true;
+		pdata.flowmode = true;
 	}
-	params.flowvel = 2e7; 
-	params.nd_plug = .20;	
+	pdata.flowvel = 2e7; 
+	pdata.nd_plug = .20;	
 
 	float radius = 3.5f;
+	//haven't figured out a good way to do this in a nonunrolled loop
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "rad0", (float*) &radius);
-	params.pRadius[0] = radius*1e-6f;
-	params.volfr[0] = 0.30f;
-	cutGetCmdLineArgumentf(argc, (const char**)argv, "vfr0", (float*) &params.volfr[0]);
-	params.mu_p[0] = 2000;
-	cutGetCmdLineArgumentf(argc, (const char**)argv, "xi0", (float*) &params.mu_p[0]);
-	params.nump[0] = (params.volfr[0] * volume) / (4.0f/3.0f*PI_F*pow(params.pRadius[0],3)); 
-	params.pRad_std[0] = 5e-7f;
-	
+	pdata.pRadius[0] = radius*1e-6f;
+	pdata.volfr[0] = 0.30f;
+	cutGetCmdLineArgumentf(argc, (const char**)argv, "vfr0", (float*) &pdata.volfr[0]);
+	pdata.mu_p[0] = 2000;
+	cutGetCmdLineArgumentf(argc, (const char**)argv, "xi0", (float*) &pdata.mu_p[0]);
+	pdata.nump[0] = (pdata.volfr[0] * volume) / (4.0f/3.0f*PI_F*pow(pdata.pRadius[0],3)); 
+	pdata.rstd[0] = 0;
+	cutGetCmdLineArgumentf(argc, (const char**)argv, "std0", (float*) &pdata.rstd[0]);	
+//	pdata.rstd[0] *= 1e-6f;
+	//rad0 is mean diameter
+	float med_diam = pdata.pRadius[0]*expf(-0.5f*pdata.rstd[0]*pdata.rstd[0]);
+	if(pdata.rstd[0] > 0){
+		pdata.nump[0] = (pdata.volfr[0]*volume) / (4.0f/3.0f*PI_F*pow(med_diam,3)
+					*exp(4.5f*pdata.rstd[0]*pdata.rstd[0]));
+	}
+
 	radius = 6.0f;
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "rad1", (float*) &radius);
-	params.pRadius[1] = radius*1e-6f;
-	params.volfr[1] = 0.0f;
-	cutGetCmdLineArgumentf(argc, (const char**)argv, "vfr1", (float*) &params.volfr[1]);
-	params.mu_p[1] = 1;
-	cutGetCmdLineArgumentf(argc, (const char**)argv, "xi1", (float*) &params.mu_p[1]);
-	params.nump[1] = (params.volfr[1] * volume) / (4.0f/3.0f*PI_F*pow(params.pRadius[1],3)); 
-	params.pRad_std[1] = 0;
-
+	pdata.pRadius[1] = radius*1e-6f;
+	pdata.volfr[1] = 0.0f;
+	cutGetCmdLineArgumentf(argc, (const char**)argv, "vfr1", (float*) &pdata.volfr[1]);
+	pdata.mu_p[1] = 1;
+	cutGetCmdLineArgumentf(argc, (const char**)argv, "xi1", (float*) &pdata.mu_p[1]);
+	pdata.nump[1] = (pdata.volfr[1] * volume) / (4.0f/3.0f*PI_F*pow(pdata.pRadius[1],3)); 
+	pdata.rstd[1] = 0;
+	cutGetCmdLineArgumentf(argc, (const char**)argv, "std1", (float*) &pdata.rstd[1]);
+	
 	radius = 3.5f;
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "rad2", (float*) &radius);
-	params.pRadius[2] = radius*1e-6f;
-	params.volfr[2] = 0.0f;
-	cutGetCmdLineArgumentf(argc, (const char**)argv, "vfr2", (float*) &params.volfr[2]);
-	params.mu_p[2] = 2000;
-	cutGetCmdLineArgumentf(argc, (const char**)argv, "xi2", (float*) &params.mu_p[2]);
-	params.nump[2] = (params.volfr[2] * volume) / (4.0f/3.0f*PI_F*pow(params.pRadius[2],3)); 
-	params.pRad_std[2] = 0;
+	pdata.pRadius[2] = radius*1e-6f;
+	pdata.volfr[2] = 0.0f;
+	cutGetCmdLineArgumentf(argc, (const char**)argv, "vfr2", (float*) &pdata.volfr[2]);
+	pdata.mu_p[2] = 2000;
+	cutGetCmdLineArgumentf(argc, (const char**)argv, "xi2", (float*) &pdata.mu_p[2]);
+	pdata.nump[2] = (pdata.volfr[2] * volume) / (4.0f/3.0f*PI_F*pow(pdata.pRadius[2],3)); 
+	pdata.rstd[2] = 0;
+	cutGetCmdLineArgumentf(argc, (const char**)argv, "std2", (float*) &pdata.rstd[2]);
 
-
-	params.numBodies = params.nump[0] + params.nump[1] + params.nump[2];
+	pdata.numBodies = pdata.nump[0] + pdata.nump[1] + pdata.nump[2];
 	bool benchmark = cutCheckCmdLineFlag(argc, (const char**) argv, "benchmark") != 0;
 
 
@@ -701,39 +713,39 @@ main(int argc, char** argv)
 		} else {
 			int a = fscanf(crashlog, "Time: %lg ns\n", &simtime);
 			if( a == 0) rewind(crashlog);	
-			a = fscanf(crashlog, "vfrtot: %*f\t v0: %f\t v1: %f\t v2: %f\n", &params.volfr[0], 
-					&params.volfr[1], &params.volfr[2]);
-			a = fscanf(crashlog, "ntotal: %d\t n0: %d  \t n1: %d  \t n2: %d\n", &params.numBodies, &params.nump[0],
-					&params.nump[1], &params.nump[2]);
-			a = fscanf(crashlog, "\t\t xi0: %f \t xi1: %f \t xi2 %f \n", &params.mu_p[0], &params.mu_p[1], &params.mu_p[2]);
+			a = fscanf(crashlog, "vfrtot: %*f\t v0: %f\t v1: %f\t v2: %f\n", &pdata.volfr[0], 
+					&pdata.volfr[1], &pdata.volfr[2]);
+			a = fscanf(crashlog, "ntotal: %d\t n0: %d  \t n1: %d  \t n2: %d\n", &pdata.numBodies, &pdata.nump[0],
+					&pdata.nump[1], &pdata.nump[2]);
+			a = fscanf(crashlog, "\t\t xi0: %f \t xi1: %f \t xi2 %f \n", &pdata.mu_p[0], &pdata.mu_p[1], &pdata.mu_p[2]);
 			//printf("xis read: %d\n", a);
-			a = fscanf(crashlog, "\t\t a0: %g\t a1: %g\t a2: %g\n\n", &params.pRadius[0], &params.pRadius[1],
-					&params.pRadius[2]);
+			a = fscanf(crashlog, "\t\t a0: %g\t a1: %g\t a2: %g\n\n", &pdata.pRadius[0], &pdata.pRadius[1],
+					&pdata.pRadius[2]);
 			printf("rads read: %d\n", a);
 			//a = fscanf(crashlog, "grid: %d x %d x %d = %*d cells\n", &gridSize.x, &gridSize.y, &gridSize.z);
-			printf("grid read: %d grid: %d x %d x %d\n", a, params.gridSize.x, params.gridSize.y, params.gridSize.z);
+			printf("grid read: %d grid: %d x %d x %d\n", a, pdata.gridSize.x, pdata.gridSize.y, pdata.gridSize.z);
 			//a = fscanf(crashlog, "worldsize: %fmm x %*fmm x %*fmm\n", &worldsize1d);
 			printf("wsize read: %d, wsize: %.3f\n", a, worldsize1d);
-			//a = fscanf(crashlog, "\nspring: %f\tvisc: %f\tdipit: %d\n", &params.spring, &params.viscosity, &params.mutDipIter);
-			printf("params read: %d\n", a);
-			//a = fscanf(crashlog, "H.x: %g\tH.y: %g\tH.z: %g\n", &params.externalH.x, &params.externalH.y, &params.externalH.z);
+			//a = fscanf(crashlog, "\nspring: %f\tvisc: %f\tdipit: %d\n", &pdata.spring, &pdata.viscosity, &pdata.mutDipIter);
+			printf("pdata read: %d\n", a);
+			//a = fscanf(crashlog, "H.x: %g\tH.y: %g\tH.z: %g\n", &pdata.externalH.x, &pdata.externalH.y, &pdata.externalH.z);
 			printf("H read: %d\n", a);
 			fclose(crashlog);
 		}
 	}
 */
 
-	params.worldOrigin = worldSize*-0.5f;
-	float cellSize_des = 8.0f*params.pRadius[0];
+	pdata.worldOrigin = worldSize*-0.5f;
+	float cellSize_des = 8.0f*pdata.pRadius[0];
  
 	//gridSize.x = gridSize.y = gridSize.z = GRID_SIZE;
-	params.gridSize.x = floor(worldSize.x/cellSize_des);
-	params.gridSize.y = floor(worldSize.y/cellSize_des);
-	params.gridSize.z = floor(worldSize.z/cellSize_des);
+	pdata.gridSize.x = floor(worldSize.x/cellSize_des);
+	pdata.gridSize.y = floor(worldSize.y/cellSize_des);
+	pdata.gridSize.z = floor(worldSize.z/cellSize_des);
 
-	params.cellSize.x = params.worldSize.x/params.gridSize.x;
-	params.cellSize.y = params.worldSize.y/params.gridSize.y;
-	params.cellSize.z = params.worldSize.z/params.gridSize.z;
+	pdata.cellSize.x = pdata.worldSize.x/pdata.gridSize.x;
+	pdata.cellSize.y = pdata.worldSize.y/pdata.gridSize.y;
+	pdata.cellSize.z = pdata.worldSize.z/pdata.gridSize.z;
 
 	//INITIALIZE THE DATA STRUCTURES
 
@@ -743,7 +755,7 @@ main(int argc, char** argv)
         initGL(argc, argv);
         cudaGLInit(argc, argv);
     }
-	psystem = new ParticleSystem(params, g_useGL, worldSize);
+	psystem = new ParticleSystem(pdata, g_useGL, worldSize);
 	psystem->logParams(stdout); 
 	if (g_useGL) {
         renderer = new ParticleRenderer;

@@ -28,7 +28,7 @@ struct SimParams {
 	float mu_p [3];
 	float volfr [3];	
 	int nump[3];
-	float pRad_std[3];
+	float rstd[3];
 
 	uint3 gridSize;
 	uint numCells;
@@ -38,7 +38,6 @@ struct SimParams {
 
  	//total number of particles
 	uint numBodies;    
-	uint maxParticlesPerCell;
 	
 	float3 externalH;
 	int interactionr;
@@ -49,7 +48,6 @@ struct SimParams {
     float spring;
     float cdamping;
     float boundaryDamping;
-	int randSetIter;
 
 	int mutDipIter;
 
