@@ -5,7 +5,7 @@
 #ifndef _PARTICLES_KERNEL_H_
 #define _PARTICLES_KERNEL_H_
 
-#define PI 3.141592653589793f
+#define PI_F 3.141592653589793f
 
 #include <stdio.h>
 #include <math.h>

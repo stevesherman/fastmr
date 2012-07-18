@@ -65,6 +65,7 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize):
 
 
 
+
 ParticleSystem::~ParticleSystem()
 {
     _finalize();
@@ -277,8 +278,6 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 
 	
 		bool solve = true;
-		double Cd, maxf, maxFdx;
-		Cd = 6*PI_F*m_params.viscosity*m_params.pRadius[0];
 
 		//if the particles are moving too much, half the timestep and resolve
 		while(solve) {
@@ -317,10 +316,12 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 			
 			//find max force
 			//printf("callmax\n");
-			maxf = maxforce( (float4*) m_dForces1, newp.N);
-			maxFdx = maxdxpct*Cd*m_params.pRadius[0]/deltaTime; //force to cause a dx
-
-			if(maxf > maxFdx){
+			//maxf = maxforce( (float4*) m_dForces1, newp.N);
+			//maxFdx = maxdxpct*Cd*m_params.pRadius[0]/deltaTime; //force to cause a dx
+			float maxDx = maxvel((float4*)m_dForces1,(float4*)m_dPos,newp)*deltaTime;
+			float limDx = maxdxpct*m_params.pRadius[0];
+			
+			if(maxDx > limDx){
 				solve = true;
 			} /*else { //if not excess force, check for out of bounds
 				solve = isOutofBounds((float4*)m_dPos, -newp.origin.x, newp.N);
@@ -328,7 +329,7 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 			if(solve){
 				deltaTime *=.5f;
 				assert(deltaTime != 0);
-				printf("force excess ratio %.3g\treducing timestep %.3g\n", maxf/maxFdx, deltaTime);
+				printf("force excess ratio %.3g\treducing timestep %.3g\n", maxDx/limDx, deltaTime);
 				//getBadP();	
 			}
 		}
@@ -424,7 +425,7 @@ void ParticleSystem::logStuff(FILE* file, float simtime)
 	float tf = calcTopForce( (float4*) m_dForces1, (float4*) m_dPos, newp.N, -newp.origin.y, newp.pin_d);
 	float bf = calcBotForce( (float4*) m_dForces1, (float4*) m_dPos, newp.N, -newp.origin.y, newp.pin_d);
 	float gs = calcGlForce(  (float4*) m_dForces1, (float4*) m_dPos, newp.N)*newp.Linv.x*newp.Linv.y*newp.Linv.z;
-	float kinen = calcKinEn( (float4*) m_dForces1, (float4*) m_dPos, newp.visc, newp.N);
+	float kinen = calcKinEn( (float4*) m_dForces1, (float4*) m_dPos, newp);
 	
 	fprintf(file, "%.5g\t%.5g\t%.5g\t%.5g\t%d\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\n", simtime, newp.shear, 
 			newp.extH.y, (float)newp.N/graphs, edges, tf, bf, gs, kinen, M.x, M.y, M.z);

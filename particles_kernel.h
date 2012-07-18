@@ -34,7 +34,6 @@ struct SimParams {
 	uint numCells;
     float3 worldOrigin;
 	float3 cellSize;
-	float3 worldSize;
 
  	//total number of particles
 	uint numBodies;    

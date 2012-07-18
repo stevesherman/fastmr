@@ -17,7 +17,7 @@
  */
 
 #include "particles_kernel.h"
-
+#include "new_kern.h"
  extern "C"
 {
 void cudaInit(int argc, char **argv);
@@ -45,8 +45,9 @@ uint edgeCount(float4* forces, uint numParticles);
 float calcTopForce(float4* forces, float4* position, uint numParticles, float ws, float cut);
 float calcBotForce(float4* forces, float4* position, uint numParticles, float ws, float cut);
 float calcGlForce(float4* forces, float4* position, uint numParticles);
-float calcKinEn(float4* forces, float4* position, float visc, uint numParticles);
+float calcKinEn(float4* forces, float4* position, NewParams& params); 
 uint numInteractions(uint* m_hNeighList, uint numParticles);
+float maxvel(float4* forces, float4* positions, NewParams& params);
 
 
 

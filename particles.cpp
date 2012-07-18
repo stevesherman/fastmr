@@ -68,15 +68,7 @@ const int idleDelay = 300;
 
 enum { M_VIEW = 0, M_MOVE };
 
-
 SimParams pdata;
-NewParams params;
-
-uint numParticles = 0;
-uint3 gridSize;
-float3 worldSize;
-int numIterations = 0; // run until exit
-float maxtime = 0;
 
 // simulation parameters
 float timestep = 500; //in units of nanoseconds
@@ -86,6 +78,11 @@ float colorFmax = 3.5;
 float maxdxpct = 0.05;
 float contact_dist = 1.05f;
 float pin_dist = 1.5f;
+float3 worldSize;
+int numIterations = 0; // run until exit
+float maxtime = 0;
+
+
 
 int resolved = 0;//number of times the integrator had to resolve a step
 
@@ -128,9 +125,9 @@ void cleanup()
 void setParams(){
     psystem->setGlobalDamping(pdata.globalDamping);
     psystem->setRepelSpring(pdata.spring);
-    psystem->setCollideDamping(pdata.cdamping);
+//    psystem->setCollideDamping(pdata.cdamping);
     psystem->setShear(pdata.shear);
-	psystem->setInteractionRadius(pdata.interactionr);
+//	psystem->setInteractionRadius(pdata.interactionr);
     psystem->setExternalH(make_float3(0.0f, externalH*1e3, 0.0f));
 	psystem->setColorFmax(colorFmax*1e-7f);
 	psystem->setViscosity(pdata.viscosity);
@@ -608,7 +605,6 @@ main(int argc, char** argv)
 	float worldsize1d = .35;//units of mm
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "wsize", (float*) &worldsize1d);
 	worldSize = make_float3(worldsize1d*1e-3f, worldsize1d*1e-3f, worldsize1d*1e-3f);
-	pdata.worldSize = worldSize;
 	float volume = worldSize.x*worldSize.y*worldSize.z; 
 
 	pdata.shear = 500;
@@ -636,12 +632,13 @@ main(int argc, char** argv)
 	cutGetCmdLineArgumentf(argc, (const char**)argc, "cspring", (float*)&pdata.cspring);
 	pdata.boundaryDamping = -0.03f;
 
+	pin_dist = 1.5f;
 	cutGetCmdLineArgumentf(argc, (const char**)argc, "contact_dist", (float*)&contact_dist);
 	cutGetCmdLineArgumentf(argc, (const char**)argc, "maxdx",(float*)&maxdxpct); 
 		
 	pdata.mutDipIter = 0;
 	cutGetCmdLineArgumenti(argc, (const char**)argc, "dipit", (int*) &pdata.mutDipIter);
-
+		
 
 	char* title;	
 	if(cutGetCmdLineArgumentstr( argc, (const char**) argv, "logt", &title)){
@@ -703,38 +700,6 @@ main(int argc, char** argv)
 	bool benchmark = cutCheckCmdLineFlag(argc, (const char**) argv, "benchmark") != 0;
 
 
-/*	if(cutGetCmdLineArgumentstr( argc, (const char**)argv, "crash", &title )){//some of crash flag
-		char xyz[256];
-	   	sprintf(xyz, "/home/steve/Datasets/%s", title);
-		printf("reading crash file:  %s\n",xyz);
-		crashlog = fopen(xyz, "r");
-		if(crashlog == NULL){	
-			printf("Crash file failed to open!");
-		} else {
-			int a = fscanf(crashlog, "Time: %lg ns\n", &simtime);
-			if( a == 0) rewind(crashlog);	
-			a = fscanf(crashlog, "vfrtot: %*f\t v0: %f\t v1: %f\t v2: %f\n", &pdata.volfr[0], 
-					&pdata.volfr[1], &pdata.volfr[2]);
-			a = fscanf(crashlog, "ntotal: %d\t n0: %d  \t n1: %d  \t n2: %d\n", &pdata.numBodies, &pdata.nump[0],
-					&pdata.nump[1], &pdata.nump[2]);
-			a = fscanf(crashlog, "\t\t xi0: %f \t xi1: %f \t xi2 %f \n", &pdata.mu_p[0], &pdata.mu_p[1], &pdata.mu_p[2]);
-			//printf("xis read: %d\n", a);
-			a = fscanf(crashlog, "\t\t a0: %g\t a1: %g\t a2: %g\n\n", &pdata.pRadius[0], &pdata.pRadius[1],
-					&pdata.pRadius[2]);
-			printf("rads read: %d\n", a);
-			//a = fscanf(crashlog, "grid: %d x %d x %d = %*d cells\n", &gridSize.x, &gridSize.y, &gridSize.z);
-			printf("grid read: %d grid: %d x %d x %d\n", a, pdata.gridSize.x, pdata.gridSize.y, pdata.gridSize.z);
-			//a = fscanf(crashlog, "worldsize: %fmm x %*fmm x %*fmm\n", &worldsize1d);
-			printf("wsize read: %d, wsize: %.3f\n", a, worldsize1d);
-			//a = fscanf(crashlog, "\nspring: %f\tvisc: %f\tdipit: %d\n", &pdata.spring, &pdata.viscosity, &pdata.mutDipIter);
-			printf("pdata read: %d\n", a);
-			//a = fscanf(crashlog, "H.x: %g\tH.y: %g\tH.z: %g\n", &pdata.externalH.x, &pdata.externalH.y, &pdata.externalH.z);
-			printf("H read: %d\n", a);
-			fclose(crashlog);
-		}
-	}
-*/
-
 	pdata.worldOrigin = worldSize*-0.5f;
 	float cellSize_des = 8.0f*pdata.pRadius[0];
  
@@ -743,9 +708,9 @@ main(int argc, char** argv)
 	pdata.gridSize.y = floor(worldSize.y/cellSize_des);
 	pdata.gridSize.z = floor(worldSize.z/cellSize_des);
 
-	pdata.cellSize.x = pdata.worldSize.x/pdata.gridSize.x;
-	pdata.cellSize.y = pdata.worldSize.y/pdata.gridSize.y;
-	pdata.cellSize.z = pdata.worldSize.z/pdata.gridSize.z;
+	pdata.cellSize.x = worldSize.x/pdata.gridSize.x;
+	pdata.cellSize.y = worldSize.y/pdata.gridSize.y;
+	pdata.cellSize.z = worldSize.z/pdata.gridSize.z;
 
 	//INITIALIZE THE DATA STRUCTURES
 
