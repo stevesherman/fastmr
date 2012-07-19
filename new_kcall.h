@@ -35,4 +35,16 @@ void RK4integrate(float* oldPos,
 				float deltaTime,
 				uint numParticles);
 
+void integrateRK4Proper(
+							const float* oldPos,
+							float* PosA,
+							const float* PosB,
+							const float* PosC,
+							const float* PosD,
+							float* forceA,
+							const float* forceB,
+							const float* forceC,
+							const float* forceD,
+							const float deltaTime,
+							const uint numParticles);
 }

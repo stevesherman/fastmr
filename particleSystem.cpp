@@ -128,9 +128,11 @@ ParticleSystem::_initialize()
 	cudaMalloc((void**)&m_dForces3, memSize);
 	cudaMalloc((void**)&m_dForces4, memSize);
 
-	cudaMalloc((void**)&m_dPos, memSize);
     cudaMalloc((void**)&m_dSortedPos, memSize);
-	cudaMalloc((void**)&m_dMidPos, memSize);
+	cudaMalloc((void**)&m_dPos1, memSize);
+	cudaMalloc((void**)&m_dPos2, memSize);
+	cudaMalloc((void**)&m_dPos3, memSize);
+	cudaMalloc((void**)&m_dPos4, memSize);
 
 	cudaMalloc((void**)&m_dGridParticleHash, newp.N*sizeof(uint));
     cudaMalloc((void**)&m_dGridParticleIndex, newp.N*sizeof(uint));
@@ -203,9 +205,11 @@ ParticleSystem::_finalize()
 	cudaFree(m_dForces4);
 	
 	cudaFree(m_dSortedPos);
-	cudaFree(m_dPos);
-	cudaFree(m_dMidPos);
-    
+	cudaFree(m_dPos1);
+	cudaFree(m_dPos2);
+	cudaFree(m_dPos3);
+	cudaFree(m_dPos4);
+
 	cudaFree(m_dGridParticleHash);
     cudaFree(m_dGridParticleIndex);
     cudaFree(m_dCellStart);
@@ -232,7 +236,7 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
         dRendPos = (float *) mapGLBufferObject(&m_cuda_posvbo_resource);
     	dRendColor = (float *) mapGLBufferObject(&m_cuda_colorvbo_resource);
 		
-		renderStuff(m_dPos, m_dMomentsA, m_dForces1, dRendPos, dRendColor, m_colorFmax, newp.N);
+		renderStuff(m_dPos1, m_dMomentsA, m_dForces1, dRendPos, dRendColor, m_colorFmax, newp.N);
 		
 		unmapGLBufferObject(m_cuda_posvbo_resource);
 		unmapGLBufferObject(m_cuda_colorvbo_resource);
@@ -245,15 +249,15 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 	setParameters(&m_params);
 	setNParameters(&newp);
 
-	//isOutofBounds((float4*) m_dPos, newp.origin.x, newp.N);
-	comp_phash(m_dPos, m_dGridParticleHash, m_dGridParticleIndex, m_dCellHash, newp.N, m_numGridCells);
+	//isOutofBounds((float4*) m_dPos1, newp.origin.x, newp.N);
+	comp_phash(m_dPos1, m_dGridParticleHash, m_dGridParticleIndex, m_dCellHash, newp.N, m_numGridCells);
 	// sort particles based on hash
 	sortParticles(m_dGridParticleHash, m_dGridParticleIndex, newp.N);
 	// reorder particle arrays into sorted order and
 	// find start and end of each cell - also sets the fixed moment
 	find_cellStart(m_dCellStart, m_dCellEnd, m_dGridParticleHash, newp.N, m_numGridCells);
 	cutilCheckMsg("Cstart");
-	reorder(m_dGridParticleIndex, m_dSortedPos, m_dMomentsB, m_dPos, m_dMomentsA, newp.N);	
+	reorder(m_dGridParticleIndex, m_dSortedPos, m_dMomentsB, m_dPos1, m_dMomentsA, newp.N);	
 	cutilCheckMsg("Reorder");
 	float* temp = m_dMomentsB;
 	m_dMomentsB = m_dMomentsA;
@@ -269,7 +273,7 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 		NListFixed(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
 				m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, 3.1f*m_params.pRadius[0]);
 
-		collision_new(m_dSortedPos, m_dForces2, m_dNeighList, m_dNumNeigh, m_dForces1, m_dPos, newp.N, 0.01f);
+		collision_new(m_dSortedPos, m_dForces2, m_dNeighList, m_dNumNeigh, m_dForces1, m_dPos1, newp.N, 0.01f);
 		deltaTime = 0;
 		m_randSet--;
 	} else {
@@ -284,31 +288,33 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 			
 			magForces(	m_dSortedPos,	//yin: yn 
 						m_dSortedPos,	//yn
-						m_dMidPos,   	//yn + 1/2*k1
+						m_dPos1,   	//yn + 1/2*k1
 						m_dForces1,   	//k1
 						m_dMomentsA, m_dNeighList, m_dNumNeigh, newp.N, deltaTime/2);
 			cutilCheckMsg("magForces");
-			magForces(	m_dMidPos, 		//yin: yn + 1/2*k1
+			magForces(	m_dPos1, 		//yin: yn + 1/2*k1
 						m_dSortedPos, 	//yn
-						m_dPos, 		//yn + 1/2*k2
+						m_dPos2, 		//yn + 1/2*k2
 						m_dForces2,		//k2
 						m_dMomentsA, m_dNeighList, m_dNumNeigh, newp.N, deltaTime/2);
-			magForces(	m_dPos, 		//yin: yn + 1/2*k2
+			magForces(	m_dPos2, 		//yin: yn + 1/2*k2
 						m_dSortedPos, 	//yn
-						m_dMidPos, 		//yn + k3
+						m_dPos3, 		//yn + k3
 						m_dForces3,		//k3
 						m_dMomentsA, m_dNeighList, m_dNumNeigh, newp.N, deltaTime);
-			magForces(	m_dMidPos, 		//yin: yn + k3
+			magForces(	m_dPos3, 		//yin: yn + k3
 						m_dSortedPos, 	//yn
-						m_dPos, 		// doesn't matter
+						m_dPos4, 		// doesn't matter
 						m_dForces4,		//k4
 						m_dMomentsA, m_dNeighList, m_dNumNeigh, newp.N, deltaTime/2);
 
-			RK4integrate(m_dSortedPos,//yn 
-						m_dPos, //yn+1
+			/*RK4integrate(m_dSortedPos,//yn 
+						m_dPos1, //yn+1
 						m_dForces1, //1/6*(k1 + 2*k2 + 2*k3 + k4) 
 						m_dForces2, m_dForces3, m_dForces4, deltaTime, newp.N);
-	
+	*/
+			integrateRK4Proper(m_dSortedPos, m_dPos1, m_dPos2, m_dPos3, m_dPos4,
+					m_dForces1, m_dForces2, m_dForces3, m_dForces4, deltaTime, newp.N);
 			solve = false;	
 		
 					
@@ -318,14 +324,14 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 			//printf("callmax\n");
 			//maxf = maxforce( (float4*) m_dForces1, newp.N);
 			//maxFdx = maxdxpct*Cd*m_params.pRadius[0]/deltaTime; //force to cause a dx
-			float maxDx = maxvel((float4*)m_dForces1,(float4*)m_dPos,newp)*deltaTime;
+			float maxDx = maxvel((float4*)m_dForces1,(float4*)m_dPos1,newp)*deltaTime;
 			float limDx = maxdxpct*m_params.pRadius[0];
 			
 			if(maxDx > limDx){
 				solve = true;
-			} /*else { //if not excess force, check for out of bounds
-				solve = isOutofBounds((float4*)m_dPos, -newp.origin.x, newp.N);
-			}*/
+			} else { //if not excess force, check for out of bounds
+				solve = isOutofBounds((float4*)m_dPos1, -newp.origin.x, newp.N);
+			}
 			if(solve){
 				deltaTime *=.5f;
 				assert(deltaTime != 0);
@@ -359,7 +365,7 @@ ParticleSystem::dumpGrid()
 void ParticleSystem::getBadP()
 {
 	int nans = 0, outbounds = 0;
-	copyArrayFromDevice(m_hPos, m_dPos, 0, sizeof(float)*4*newp.N);
+	copyArrayFromDevice(m_hPos, m_dPos1, 0, sizeof(float)*4*newp.N);
 	for(int i = 0; i < (int) newp.N; i++){
 		if( isnan(m_hPos[4*i]) || isnan(m_hPos[4*i+1]) || isnan(m_hPos[4*i+2]) )
 			nans++;
@@ -400,7 +406,7 @@ void
 ParticleSystem::dumpParticles(uint start, uint count)
 {
     // debug
-    copyArrayFromDevice(m_hPos, m_dPos, 0, sizeof(float)*4*count);
+    copyArrayFromDevice(m_hPos, m_dPos1, 0, sizeof(float)*4*count);
 	copyArrayFromDevice(m_hForces, m_dForces1,0, sizeof(float)*4*count);
 	copyArrayFromDevice(m_hMoments, m_dMomentsA, 0, sizeof(float)*4*count);
 	for(uint i=start; i<start+count; i++) {
@@ -422,10 +428,10 @@ void ParticleSystem::logStuff(FILE* file, float simtime)
 	float3 M = magnetization((float4*) m_dMomentsA, newp.N, newp.L.x*newp.L.y*newp.L.z);
 
 	//cuda calls for faster computation 
-	float tf = calcTopForce( (float4*) m_dForces1, (float4*) m_dPos, newp.N, -newp.origin.y, newp.pin_d);
-	float bf = calcBotForce( (float4*) m_dForces1, (float4*) m_dPos, newp.N, -newp.origin.y, newp.pin_d);
-	float gs = calcGlForce(  (float4*) m_dForces1, (float4*) m_dPos, newp.N)*newp.Linv.x*newp.Linv.y*newp.Linv.z;
-	float kinen = calcKinEn( (float4*) m_dForces1, (float4*) m_dPos, newp);
+	float tf = calcTopForce( (float4*) m_dForces1, (float4*) m_dPos1, newp.N, -newp.origin.y, newp.pin_d);
+	float bf = calcBotForce( (float4*) m_dForces1, (float4*) m_dPos1, newp.N, -newp.origin.y, newp.pin_d);
+	float gs = calcGlForce(  (float4*) m_dForces1, (float4*) m_dPos1, newp.N)*newp.Linv.x*newp.Linv.y*newp.Linv.z;
+	float kinen = calcKinEn( (float4*) m_dForces1, (float4*) m_dPos1, newp);
 	
 	fprintf(file, "%.5g\t%.5g\t%.5g\t%.5g\t%d\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\n", simtime, newp.shear, 
 			newp.extH.y, (float)newp.N/graphs, edges, tf, bf, gs, kinen, M.x, M.y, M.z);
@@ -434,9 +440,9 @@ void ParticleSystem::logStuff(FILE* file, float simtime)
 
 void ParticleSystem::printStress()
 {
-	float tf = calcTopForce( (float4*) m_dForces1, (float4*) m_dPos, newp.N, -newp.origin.y, newp.pin_d);
-	float bf = calcBotForce( (float4*) m_dForces1, (float4*) m_dPos, newp.N, -newp.origin.y, newp.pin_d);
-	float gs = calcGlForce(  (float4*) m_dForces1, (float4*) m_dPos, newp.N)*newp.Linv.x*newp.Linv.y*newp.Linv.z;
+	float tf = calcTopForce( (float4*) m_dForces1, (float4*) m_dPos1, newp.N, -newp.origin.y, newp.pin_d);
+	float bf = calcBotForce( (float4*) m_dForces1, (float4*) m_dPos1, newp.N, -newp.origin.y, newp.pin_d);
+	float gs = calcGlForce(  (float4*) m_dForces1, (float4*) m_dPos1, newp.N)*newp.Linv.x*newp.Linv.y*newp.Linv.z;
 	printf("stress top: %g bot: %g mom: %g\n", tf*newp.Linv.x*newp.Linv.z, bf*newp.Linv.x*newp.Linv.z, gs);
 }
 
@@ -444,7 +450,7 @@ void
 ParticleSystem::logParticles(FILE* file)
 {
     // debug
-    copyArrayFromDevice(m_hPos, m_dPos, 0, sizeof(float)*4*newp.N);
+    copyArrayFromDevice(m_hPos, m_dPos1, 0, sizeof(float)*4*newp.N);
 	copyArrayFromDevice(m_hForces, m_dForces1,0, sizeof(float)*4*newp.N);
 	copyArrayFromDevice(m_hMoments, m_dMomentsA, 0, sizeof(float)*4*newp.N);
     for(uint i=0; i<newp.N; i++) {
@@ -491,8 +497,10 @@ void ParticleSystem::zeroDevice()
 	cudaMemset(m_dForces1, 0, 4*newp.N*sizeof(float));
 	cudaMemset(m_dForces2, 0, 4*newp.N*sizeof(float));
 	cudaMemset(m_dSortedPos, 0, 4*newp.N*sizeof(float));
-	cudaMemset(m_dMidPos, 0, 4*newp.N*sizeof(float));
-	cudaMemset(m_dPos, 0, 4*newp.N*sizeof(float));
+	cudaMemset(m_dPos4, 0, 4*newp.N*sizeof(float));
+	cudaMemset(m_dPos3, 0, 4*newp.N*sizeof(float));
+	cudaMemset(m_dPos2, 0, 4*newp.N*sizeof(float));
+	cudaMemset(m_dPos1, 0, 4*newp.N*sizeof(float));
 	cudaMemset(m_dNumNeigh, 0, newp.N*sizeof(uint));
 	cudaMemset(m_dNeighList, 0, newp.N*m_maxNeigh*sizeof(uint));
 	cudaMemset(m_dGridParticleHash, 0, newp.N*sizeof(uint));
@@ -679,7 +687,7 @@ ParticleSystem::reset(ParticleConfig config, uint numiter)
 	copyArrayToDevice(m_dCellHash, m_hCellHash, 0, m_numGridCells*sizeof(uint));
 	copyArrayToDevice(m_dMomentsA, m_hMoments, 0, 4*newp.N*sizeof(float));
 	copyArrayToDevice(m_dMomentsB, m_hMoments, 0, 4*newp.N*sizeof(float));
-	copyArrayToDevice(m_dPos, m_hPos, 0, 4*newp.N*sizeof(float));
+	copyArrayToDevice(m_dPos1, m_hPos, 0, 4*newp.N*sizeof(float));
 
 }
 

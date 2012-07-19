@@ -117,8 +117,10 @@ protected: // data
 	uint* m_hNumNeigh;
 	uint* m_hNeighList;
     // GPU data
-    float* m_dPos;
-    float* m_dMidPos;
+    float* m_dPos1;
+    float* m_dPos2;
+	float* m_dPos3;
+	float* m_dPos4;
 	float* m_dVel;
 	float* m_dMomentsA;
 	float* m_dMomentsB;

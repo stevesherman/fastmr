@@ -234,7 +234,7 @@ __global__ void integrateRK4(const float4* oldPos,
 	newPos[index] = make_float4(pos, radius);
 }
 
-__global__ void integrateRK4Proper(
+__global__ void integrateRK4ProperK(
 							const float4* oldPos,
 							float4* PosA,
 							const float4* PosB,
@@ -256,11 +256,20 @@ __global__ void integrateRK4Proper(
 	float3 oldp = make_float3(old);
 	float radius = old.w;
 
-    float3 p1 = make_float3(PosA[index]);
-	float3 p2 = make_float3(PosB[index]);
-	float3 p3 = make_float3(PosC[index]);
-	float3 p4 = make_float3(PosD[index]);
+    float3 k1 = 2.0f*(make_float3(PosA[index]) - oldp);
+	float3 k2 = 2.0f*(make_float3(PosB[index]) - oldp);
+	float3 k3 = make_float3(PosC[index]) - oldp;
+	float3 k4 = make_float3(PosD[index]) - oldp;
 	
+	oldp += (1.0f/6.0f)*(k1 + 2.0f*k2 + 2.0f*k3 + k4);
+
+	oldp.x -= nparams.L.x*rintf(oldp.x*nparams.Linv.x);
+	oldp.z -= nparams.L.z*rintf(oldp.z*nparams.Linv.z);
+//	if (oldp.y > -1.0f*nparams.origin.y ) { oldp.y = -1.0f*nparams.origin.z;}
+//  if (oldp.y < nparams.origin.y ) { oldp.y = 1.0f*nparams.origin.z; }
+
+	PosA[index] = make_float4(oldp, radius);
+
 	float4 f1 = forceA[index];
 	float nothin = f1.w;//doesn't actually hold any value, but might someday
 	float3 force1 = make_float3(f1);
@@ -270,32 +279,8 @@ __global__ void integrateRK4Proper(
 
 	float3 fcomp = (force1 + 2*force2 + 2*force3 + force4)/6.0f;//trapezoid rule	
 	forceA[index] = make_float4(fcomp, nothin);//averaged force
-	
-	float Cd = 6*PI_F*nparams.visc*radius;
 
-	float ybot = oldp.y - nparams.origin.y;
-	fcomp.x += nparams.shear*ybot*Cd;
-	
-	//apply flow BCs
-	if(ybot < nparams.pin_d*radius)
-		fcomp = make_float3(0,0,0);
-	if(ybot > nparams.L.y - nparams.pin_d*radius)
-		fcomp = make_float3(nparams.shear*nparams.L.y*Cd,0,0);
 
-		
-	//integrate	
-	oldp += fcomp*deltaTime/Cd;
-
-	//periodic boundary conditions
-	//note that it has issues if it's on the border, 
-	//but the resolver handles it (b/c rintf(0.5f)=0)
-   	oldp.x -= nparams.L.x*rintf(oldp.x*nparams.Linv.x);
-	oldp.z -= nparams.L.z*rintf(oldp.z*nparams.Linv.z);
-	
-	if (oldp.y > -1.0f*nparams.origin.y ) { oldp.y = -1.0f*nparams.origin.z;}
-    if (oldp.y < nparams.origin.y ) { oldp.y = 1.0f*nparams.origin.z; }
-
-	PosA[index] = make_float4(oldp, radius);
 }
 
 __global__ void NListFixedK(uint* nlist,	//	o:neighbor list

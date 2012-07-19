@@ -166,6 +166,40 @@ void RK4integrate(	float* oldPos,
 												numParticles);
 }
 
+void integrateRK4Proper(
+							const float* oldPos,
+							float* PosA,
+							const float* PosB,
+							const float* PosC,
+							const float* PosD,
+							float* forceA,
+							const float* forceB,
+							const float* forceC,
+							const float* forceD,
+							const float deltaTime,
+							const uint numParticles)
+{
+	uint numThreads = 256; 
+	uint numBlocks = iDivUp2(numParticles, numThreads);
+	integrateRK4ProperK<<<numBlocks, numThreads>>>(
+							 (float4*) oldPos,
+							(float4*) PosA,
+							 (float4*) PosB,
+							 (float4*) PosC,
+							 (float4*) PosD,
+							(float4*) forceA,
+							 (float4*) forceB,
+							 (float4*) forceC,
+							 (float4*) forceD,
+							 deltaTime,
+							 numParticles);
+}
+
+
+
+
+
+
 void collision_new(	const float* dSortedPos, const float* dOldVel, const uint* nlist, 
 		const uint* num_neigh, float* dNewVel, float* dNewPos, uint numParticles, float deltaTime)
 {
