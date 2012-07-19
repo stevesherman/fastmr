@@ -49,6 +49,7 @@ public:
 	void logStuff(FILE* file, float simtime);
 	void getBadP();
 	void getMagnetization();
+	void printStress();
 
 	void zeroDevice();
    

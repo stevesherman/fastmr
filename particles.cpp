@@ -451,6 +451,9 @@ void key(unsigned char key, int /*x*/, int /*y*/)
 	case 'd':
         psystem->dumpGrid();
         break;
+	case 's': 
+		psystem->printStress();
+		break;
 	case 'g':
 		psystem->getGraphData(ngraphs,nedges);
 		printf("numgraphs: %d, chainl: %f\n", ngraphs, (float)pdata.numBodies/(float) ngraphs);

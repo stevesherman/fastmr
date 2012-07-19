@@ -157,7 +157,7 @@ struct isOut
 			return true;
 		if(fabsf(p.x) > bmax )
 			return true;
-		if(fabsf(p.y) > bmax)//>= due to pinning BCs? not true anymore i think
+		if(fabsf(p.y)-p.w > bmax)//>= due to pinning BCs? not true anymore i think
 			return true;
 		if(fabsf(p.z) > bmax )
 			return true;

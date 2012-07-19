@@ -432,6 +432,14 @@ void ParticleSystem::logStuff(FILE* file, float simtime)
 	
 }
 
+void ParticleSystem::printStress()
+{
+	float tf = calcTopForce( (float4*) m_dForces1, (float4*) m_dPos, newp.N, -newp.origin.y, newp.pin_d);
+	float bf = calcBotForce( (float4*) m_dForces1, (float4*) m_dPos, newp.N, -newp.origin.y, newp.pin_d);
+	float gs = calcGlForce(  (float4*) m_dForces1, (float4*) m_dPos, newp.N)*newp.Linv.x*newp.Linv.y*newp.Linv.z;
+	printf("stress top: %g bot: %g mom: %g\n", tf*newp.Linv.x*newp.Linv.z, bf*newp.Linv.x*newp.Linv.z, gs);
+}
+
 void
 ParticleSystem::logParticles(FILE* file)
 {
