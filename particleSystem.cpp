@@ -464,14 +464,15 @@ ParticleSystem::logParams(FILE* file)
 			m_params.nump[1], m_params.nump[2]);
 	fprintf(file, "\t\t mu_p0: %.1f \t mu_p1: %.1f \t mu_p2: %.1f \n", m_params.mu_p[0], 
 			m_params.mu_p[1], m_params.mu_p[2]);
-	fprintf(file, "\t\t a0: %.2g\t a1: %.2g\t a2: %.2g\n\n", m_params.pRadius[0], 
+	fprintf(file, "\t\t a0: %.2g\t a1: %.2g\t a2: %.2g\n", m_params.pRadius[0], 
 			m_params.pRadius[1],m_params.pRadius[2]);
+	fprintf(file, "\t\t std0: %2.g\t std1: %.25g\t std2: %.2g\n", m_params.rstd[0], m_params.rstd[1], m_params.rstd[2]);
 	fprintf(file, "grid: %d x %d x %d = %d cells\n", newp.gridSize.x, newp.gridSize.y, 
 			newp.gridSize.z, newp.numCells);
 	fprintf(file, "worldsize: %.4gmm x %.4gmm x %.4gmm\n", newp.L.x*1e3f, 
 			newp.L.y*1e3f, newp.L.z*1e3f);
-	fprintf(file, "spring: %.2f\tvisc: %.4f\n", m_params.spring, m_params.viscosity);
-	fprintf(file, "Pin distance: %f\tContact distance: %f\n", newp.pin_d, m_contact_dist);
+	fprintf(file, "spring: %.2f visc: %.3f  ", m_params.spring, m_params.viscosity);
+	fprintf(file, "Pin_d: %.4f Contact_d: %.4f\n", newp.pin_d, m_contact_dist);
 	fprintf(file, "H.x: %.3g\tH.y: %.3g\tH.z: %.3g\n", newp.extH.x, newp.extH.y, newp.extH.z);
 
 }
