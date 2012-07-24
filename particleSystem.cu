@@ -192,26 +192,26 @@ uint edgeCount(float4* forces, uint numParticles){
 }
 //functors for finding the top and bottom particles
 struct isTop  : public binary_function<float4, float4, float3> {
-	isTop(float wsize, float cut) : rcut(cut), wsize(wsize) {}
+	isTop(float wsize, float cut) : pin_d(cut), wsize(wsize) {}
 	__host__ __device__ float3 operator()(const float4& force, const float4& pos){
-		if(pos.y > wsize - rcut*pos.w)
+		if(pos.y > wsize - pin_d*pos.w)
 			return make_float3(force);
 		else 
 			return make_float3(0,0,0);
 	}
 	const float wsize;//half the worldisze
-	const float rcut;
+	const float pin_d;
 };
 
 struct isBot : public binary_function<float4, float4, float3> {
-	isBot(float size, float cut) : rcut(cut), wsize(size) {}
+	isBot(float size, float cut) : pin_d(cut), wsize(size) {}
 	__host__ __device__ float3 operator()(const float4& force, const float4& pos){
-		if(pos.y < -wsize + rcut*pos.w)
+		if(pos.y < -wsize + pin_d*pos.w)
 			return make_float3(force);
 		else 
 			return make_float3(0,0,0);
 	}
-	const float rcut;
+	const float pin_d;
 	const float wsize;
 };
 //the functions
@@ -230,16 +230,22 @@ float calcBotForce(float4* forces, float4* position, uint numParticles, float ws
 }
 //global stress functor
 struct stressThing : public binary_function<float4, float4, float3>{
+	stressThing(float ws, float pd) : wsize(ws), pin_d(pd) {}
 	__host__ __device__ float3 operator()(const float4& force, const float4& pos){
-		return make_float3(force.x, force.y, force.z)*pos.y;
+		if(fabsf(pos.y) < wsize - pin_d*pos.w)
+			return make_float3(force.x, force.y, force.z)*pos.y;
+		else
+			return make_float3(0,0,0);
 	}
+	const float pin_d;
+	const float wsize;
 };
 
-float calcGlForce(float4* forces, float4* position, uint numParticles){
+float calcGlForce(float4* forces, float4* position, uint numParticles, float wsize, float cut){
 
 	float3 glf = inner_product(device_ptr<float4>(forces), 
 			device_ptr<float4>(forces+numParticles), device_ptr<float4>(position), 
-			make_float3(0,0,0), plus<float3>(), stressThing()); 
+			make_float3(0,0,0), plus<float3>(), stressThing(wsize, cut)); 
 	return glf.x;
 }
 
@@ -247,6 +253,7 @@ uint numInteractions(uint* neighList, uint numParticles){
 	return reduce(device_ptr<uint>(neighList), device_ptr<uint>(neighList+numParticles),
 			0, plus<uint>() );
 }
+
 //computes v^2 - should probably add a m term lol
 struct kinen : public binary_function<float4, float4, float>{
 	kinen(float v, float ws, float pd): visc(v), wsize(ws), pin_d(pd) {}	

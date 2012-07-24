@@ -71,7 +71,7 @@ enum { M_VIEW = 0, M_MOVE };
 SimParams pdata;
 
 // simulation parameters
-float timestep = 500; //in units of nanoseconds
+float timestep = 650; //in units of nanoseconds
 double simtime = 0.0f;
 float externalH = 100; //kA/m
 float colorFmax = 3.5;
@@ -232,7 +232,7 @@ void display()
 {
   
   	cutilCheckError(cutStartTimer(timer));  
-
+	setParams();
     // update the simulation
     if (!bPause)
     {
@@ -470,7 +470,7 @@ void key(unsigned char key, int /*x*/, int /*y*/)
 		frameCount = 0; simtime = 0; resolved = 0;
         break;
     case '2':
-        psystem->reset(ParticleSystem::CONFIG_RANDOM, 200);
+        psystem->reset(ParticleSystem::CONFIG_RANDOM, 300);
 		frameCount=0; simtime = 0; resolved = 0;
 		break;
     case '3':
@@ -548,7 +548,7 @@ void initParamList()
 		paramlist->AddParam(new Param<float>("colorFmax", colorFmax, 0, 15, 0.1f, &colorFmax));
     	paramlist->AddParam(new Param<float>("visc", pdata.viscosity, 0.001f, .25f, 0.001f, &pdata.viscosity));
 		paramlist->AddParam(new Param<float>("max dx pct", maxdxpct, 0, .5f, 0.005f, &maxdxpct));
-		paramlist->AddParam(new Param<float>("pin dist", pin_dist, 1.0f, 2.0f, 0.005f, &pin_dist));
+		paramlist->AddParam(new Param<float>("pin dist", pin_dist, 0.995f, 2.0f, 0.005f, &pin_dist));
 		paramlist->AddParam(new Param<float>("contact_dist", contact_dist, 1.0f, 1.25f, 0.001f, &contact_dist));
 	}
 }

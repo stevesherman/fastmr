@@ -228,8 +228,10 @@ __global__ void integrateRK4(const float4* oldPos,
    	pos.x -= nparams.L.x*rintf(pos.x*nparams.Linv.x);
 	pos.z -= nparams.L.z*rintf(pos.z*nparams.Linv.z);
 	
-	if (pos.y > -1.0f*nparams.origin.y ) { pos.y = -1.0f*nparams.origin.z;}
-    if (pos.y < nparams.origin.y ) { pos.y = 1.0f*nparams.origin.z; }
+	//if (pos.y > -1.0f*nparams.origin.y ) { pos.y = -1.0f*nparams.origin.z;}
+    //if (pos.y < nparams.origin.y ) { pos.y = 1.0f*nparams.origin.z; }
+	if (pos.y > -1.0f*nparams.origin.y - radius ) { pos.y = -1.0f*nparams.origin.z - radius;}
+	if (pos.y < nparams.origin.y + radius ) { pos.y = nparams.origin.z + radius; }
 
 	newPos[index] = make_float4(pos, radius);
 }
@@ -265,8 +267,8 @@ __global__ void integrateRK4ProperK(
 
 	oldp.x -= nparams.L.x*rintf(oldp.x*nparams.Linv.x);
 	oldp.z -= nparams.L.z*rintf(oldp.z*nparams.Linv.z);
-//	if (oldp.y > -1.0f*nparams.origin.y ) { oldp.y = -1.0f*nparams.origin.z;}
-//  if (oldp.y < nparams.origin.y ) { oldp.y = 1.0f*nparams.origin.z; }
+	if (oldp.y > -1.0f*nparams.origin.y - radius ) { oldp.y = -1.0f*nparams.origin.z - radius;}
+	if (oldp.y < nparams.origin.y + radius ) { oldp.y = nparams.origin.z + radius; }
 
 	PosA[index] = make_float4(oldp, radius);
 
@@ -307,30 +309,30 @@ __global__ void NListFixedK(uint* nlist,	//	o:neighbor list
 		//uint nhash = cellAdj[i*nparams.numCells + hash];
 		uint nhash = cellAdj[i + hash*nparams.numAdjCells];
 		uint cstart = cellStart[nhash];
-		if(cstart != 0xffffffff) {
-			uint cend = cellEnd[nhash];
-			for(uint idx2 = cstart; idx2 < cend; idx2++){
-				if(idx != idx2){
-					float4 pos2 = dpos[idx2];
-					//float4 pos2 = tex1Dfetch(pos_tex, idx2);
-					float3 p2 = make_float3(pos2);
-					//float rad2 = pos2.w;
-					float3 dr = p1 - p2;
+		if(cstart == 0xffffffff)//if empty, skip cell
+			continue;
+		uint cend = cellEnd[nhash];
+		for(uint idx2 = cstart; idx2 < cend; idx2++){
+			if(idx == idx2)
+				continue;
+			float4 pos2 = dpos[idx2];
+			//float4 pos2 = tex1Dfetch(pos_tex, idx2);
+			float3 p2 = make_float3(pos2);
+			//float rad2 = pos2.w;
+			float3 dr = p1 - p2;
 
-					dr.x = dr.x - nparams.L.x*rintf(dr.x*nparams.Linv.x);
-					dr.z = dr.z - nparams.L.z*rintf(dr.z*nparams.Linv.z);
+			dr.x = dr.x - nparams.L.x*rintf(dr.x*nparams.Linv.x);
+			dr.z = dr.z - nparams.L.z*rintf(dr.z*nparams.Linv.z);
 
-					float lsq = dr.x*dr.x + dr.y*dr.y + dr.z*dr.z;
+			float lsq = dr.x*dr.x + dr.y*dr.y + dr.z*dr.z;
 
-					if(lsq <= max_dist_sq){
-						if(n_neigh < max_neigh){
-							nlist[nparams.N*n_neigh + idx] = idx2;
-						}
-						n_neigh++;
-					}
-				}
+			if(lsq <= max_dist_sq){
+				if(n_neigh < max_neigh)
+					nlist[nparams.N*n_neigh + idx] = idx2;
+				n_neigh++;
 			}
 		}
+		
 	}
 	num_neigh[idx] = n_neigh;
 }
@@ -361,28 +363,27 @@ __global__ void NListVarK(uint* nlist,	//	o:neighbor list
 		//uint nhash = cellAdj[i*nparams.numCells + hash];
 		uint nhash = cellAdj[i + hash*nparams.numAdjCells];
 		uint cstart = cellStart[nhash];
-		if(cstart != 0xffffffff) {
-			uint cend = cellEnd[nhash];
-			for(uint idx2 = cstart; idx2 < cend; idx2++){
-				if(idx != idx2){
-					float4 pos2 = dpos[idx2];
-					//float4 pos2 = tex1Dfetch(pos_tex, idx2);
-					float3 p2 = make_float3(pos2);
-					float rad2 = pos2.w;
-					float sepdist = rad1+rad2;
+		if(cstart == 0xffffffff)//if cell empty, skip cell 
+			continue;
+		uint cend = cellEnd[nhash];
+		for(uint idx2 = cstart; idx2 < cend; idx2++){
+			if(idx == idx2)//if self interacting, skip
+				continue;
+			float4 pos2 = dpos[idx2];
+			//float4 pos2 = tex1Dfetch(pos_tex, idx2);
+			float3 p2 = make_float3(pos2);
+			float rad2 = pos2.w;
+			float sepdist = rad1+rad2;
 
-					float3 dr = p1 - p2;
-					dr.x = dr.x - nparams.L.x*rintf(dr.x*nparams.Linv.x);
-					dr.z = dr.z - nparams.L.z*rintf(dr.z*nparams.Linv.z);
-					float lsq = dr.x*dr.x + dr.y*dr.y + dr.z*dr.z;
-					
-					if(lsq <= distm_sq*sepdist*sepdist){
-						if(n_neigh < max_neigh){
-							nlist[nparams.N*n_neigh + idx] = idx2;
-						}
-						n_neigh++;
-					}
-				}
+			float3 dr = p1 - p2;
+			dr.x = dr.x - nparams.L.x*rintf(dr.x*nparams.Linv.x);
+			dr.z = dr.z - nparams.L.z*rintf(dr.z*nparams.Linv.z);
+			float lsq = dr.x*dr.x + dr.y*dr.y + dr.z*dr.z;
+			
+			if(lsq <= distm_sq*sepdist*sepdist){
+				if(n_neigh < max_neigh)
+					nlist[nparams.N*n_neigh + idx] = idx2;
+				n_neigh++;
 			}
 		}
 	}
