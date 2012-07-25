@@ -399,6 +399,7 @@ void ParticleSystem::getGraphData(uint& graphs, uint& edges)
 }
 
 uint ParticleSystem::getInteractions(){
+	//assumes that a vanilla nlist was the last called, may fail wierdly
 	return numInteractions(m_dNumNeigh, newp.N);
 }
 
@@ -410,10 +411,13 @@ ParticleSystem::dumpParticles(uint start, uint count)
 	copyArrayFromDevice(m_hForces, m_dForces1,0, sizeof(float)*4*count);
 	copyArrayFromDevice(m_hMoments, m_dMomentsA, 0, sizeof(float)*4*count);
 	for(uint i=start; i<start+count; i++) {
-        printf("Position: (%.7g, %.7g, %.7g, %.7g)\n", m_hPos[i*4+0], m_hPos[i*4+1], m_hPos[i*4+2], m_hPos[i*4+3]);
-		printf("  Forces: (%.7g, %.7g, %.7g, %.7g)\n", m_hForces[i*4+0], m_hForces[i*4+1], m_hForces[i*4+2], m_hForces[i*4+3]);
-		printf("  Moments: (%.7g, %.7g, %.7g, %.7g)\n", m_hMoments[i*4+0], m_hMoments[i*4+1], m_hMoments[i*4+2], m_hMoments[i*4+3]);
-    }
+		if(sqrt(m_hForces[i*4]*m_hForces[i*4] + m_hForces[i*4+1]*m_hForces[i*4+1] + m_hForces[i*4+2]*m_hForces[i*4+2]) > 1e-5f) {
+    
+			printf("Position: (%.7g, %.7g, %.7g, %.7g)\n", m_hPos[i*4+0], m_hPos[i*4+1], m_hPos[i*4+2], m_hPos[i*4+3]);
+			printf("  Forces: (%.7g, %.7g, %.7g, %.7g)\n", m_hForces[i*4+0], m_hForces[i*4+1], m_hForces[i*4+2], m_hForces[i*4+3]);
+			printf("  Moments: (%.7g, %.7g, %.7g, %.7g)\n", m_hMoments[i*4+0], m_hMoments[i*4+1], m_hMoments[i*4+2], m_hMoments[i*4+3]);
+		}
+	}
 	printf("Force cut = %g\n", sqrtf(newp.max_fdr_sq));
 }
 
@@ -466,10 +470,10 @@ ParticleSystem::logParticles(FILE* file)
 	copyArrayFromDevice(m_hForces, m_dForces1,0, sizeof(float)*4*newp.N);
 	copyArrayFromDevice(m_hMoments, m_dMomentsA, 0, sizeof(float)*4*newp.N);
     for(uint i=0; i<newp.N; i++) {
-        fprintf(file, "%.6g\t%.6g\t%.6g\t%.6g\t", m_hPos[i*4+0], m_hPos[i*4+1], m_hPos[i*4+2], m_hPos[i*4+3]);
+		fprintf(file, "%.6g\t%.6g\t%.6g\t%.6g\t", m_hPos[i*4+0], m_hPos[i*4+1], m_hPos[i*4+2], m_hPos[i*4+3]);
 		fprintf(file, "%.6g\t%.6g\t%.6g\t%.6g\t", m_hForces[i*4+0], m_hForces[i*4+1], m_hForces[i*4+2], m_hForces[i*4+3]);
 		fprintf(file, "%.6g\t%.6g\t%.6g\t%.6g\n", m_hMoments[i*4+0], m_hMoments[i*4+1], m_hMoments[i*4+2], m_hMoments[i*4+3]);
-    }
+	}
 	fprintf(file, "-1\t-1\t-1\t-1\t-1\t-1\t-1\t-1\t\n");
 }
 

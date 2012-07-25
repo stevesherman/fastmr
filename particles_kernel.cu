@@ -26,8 +26,7 @@ __global__ void writeRender(const float4* pos,
 	uint index = blockIdx.x*blockDim.x + threadIdx.x;
 	if(index >= numParticles) return;
 	
-	rendPos[index] = pos[index];
-	//float4 rpos = pos[index];
+	float4 rpos = pos[index];
 	float xi = moments[index].w;
 	//rpos.w = (xi == 1.0f) ? 0.0 : rpos.w;
 	//rendPos[index] = rpos;
@@ -43,6 +42,8 @@ __global__ void writeRender(const float4* pos,
 	fmag = (fmag > colorFmax) ? colorFmax : fmag;
 	fmag = (fmag < 0) ? 0 : fmag;
 	
+//	rpos.w = length(force) > 1e-5f ? rpos.w : 0;
+
 	const int ncolors = 3;
 	float3 c[ncolors+1] = {
 		make_float3(1.0, 0.0, 0.0),
@@ -57,7 +58,8 @@ __global__ void writeRender(const float4* pos,
 	colorOut = c[base] + mix*(c[base+1]-c[base]);
 		
 	if(xi == 1.0f) colorOut = make_float3(0.25f, 0.25f, 0.25f);
-
+	
+	rendPos[index] = rpos;
 	rendColor[index] = make_float4(colorOut,0.0f);
 }
 

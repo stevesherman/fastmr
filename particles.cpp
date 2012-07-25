@@ -77,7 +77,7 @@ float externalH = 100; //kA/m
 float colorFmax = 3.5;
 float maxdxpct = 0.05;
 float contact_dist = 1.05f;
-float pin_dist = 1.5f;
+float pin_dist = 1.05f;
 float3 worldSize;
 int numIterations = 0; // run until exit
 float maxtime = 0;
@@ -635,7 +635,7 @@ main(int argc, char** argv)
 	cutGetCmdLineArgumentf(argc, (const char**)argc, "cspring", (float*)&pdata.cspring);
 	pdata.boundaryDamping = -0.03f;
 
-	pin_dist = 1.5f;
+	cutGetCmdLineArgumentf(argc, (const char**)argc, "pin_d", (float*)&pin_dist);
 	cutGetCmdLineArgumentf(argc, (const char**)argc, "contact_dist", (float*)&contact_dist);
 	cutGetCmdLineArgumentf(argc, (const char**)argc, "maxdx",(float*)&maxdxpct); 
 		
@@ -724,8 +724,7 @@ main(int argc, char** argv)
         cudaGLInit(argc, argv);
     }
 	psystem = new ParticleSystem(pdata, g_useGL, worldSize);
-	psystem->logParams(stdout); 
-	if (g_useGL) {
+		if (g_useGL) {
         renderer = new ParticleRenderer;
         renderer->setParticleRadius(psystem->getParticleRadius());
         renderer->setColorBuffer(psystem->getColorBuffer());
@@ -745,7 +744,7 @@ main(int argc, char** argv)
         g_CheckRender->setExecPath(argv[0]);
         g_CheckRender->EnableQAReadback(true);
     }
-
+	psystem->logParams(stdout); 
 	if(logInterval != 0){
 		printf("saving: %s\n",logfile);
 		datalog = fopen(logfile, "a");
