@@ -75,7 +75,7 @@ float timestep = 650; //in units of nanoseconds
 double simtime = 0.0f;
 float externalH = 100; //kA/m
 float colorFmax = 3.5;
-float maxdxpct = 0.05;
+float maxdxpct = 0.03;
 float contact_dist = 1.05f;
 float pin_dist = 1.05f;
 float3 worldSize;
@@ -140,10 +140,12 @@ void setParams(){
 void qupdate()
 {
  	setParams();
+	//this crude hack makes pinned particles at start unpinned so they can space and unfuck each other
+	if(simtime < timestep)	psystem->setPinDist(0.8f);
+
 	float dtout = 1e9*psystem->update(timestep*1e-9f, maxdxpct);
 	if(fabs(dtout - timestep) > .01f*dtout)
 		resolved++;
-
 	if(logInterval != 0 && frameCount % logInterval == 0){
 		printf("iter %d at %.2f/%.1f us\n", frameCount, simtime*1e-3f, maxtime);
 		psystem->logStuff(datalog, simtime*1e-3);	
@@ -547,9 +549,9 @@ void initParamList()
 		paramlist->AddParam(new Param<float>("shear rate", pdata.shear, 0, 2000, 50, &pdata.shear));
 		paramlist->AddParam(new Param<float>("colorFmax", colorFmax, 0, 15, 0.1f, &colorFmax));
     	paramlist->AddParam(new Param<float>("visc", pdata.viscosity, 0.001f, .25f, 0.001f, &pdata.viscosity));
-		paramlist->AddParam(new Param<float>("max dx pct", maxdxpct, 0, .5f, 0.005f, &maxdxpct));
-		paramlist->AddParam(new Param<float>("pin dist", pin_dist, 0.995f, 2.0f, 0.005f, &pin_dist));
-		paramlist->AddParam(new Param<float>("contact_dist", contact_dist, 1.0f, 1.25f, 0.001f, &contact_dist));
+		paramlist->AddParam(new Param<float>("max dx pct", maxdxpct, 0, .2f, 0.002f, &maxdxpct));
+		paramlist->AddParam(new Param<float>("pin dist", pin_dist, 0.995f, 1.5f, 0.005f, &pin_dist));
+		paramlist->AddParam(new Param<float>("contact_dist", contact_dist, .95f, 1.25f, 0.001f, &contact_dist));
 	}
 }
 

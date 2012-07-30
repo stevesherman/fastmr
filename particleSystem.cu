@@ -194,7 +194,7 @@ uint edgeCount(float4* forces, uint numParticles){
 struct isTop  : public binary_function<float4, float4, float3> {
 	isTop(float wsize, float cut) : pin_d(cut), wsize(wsize) {}
 	__host__ __device__ float3 operator()(const float4& force, const float4& pos){
-		if(pos.y > wsize - pin_d*pos.w)
+		if(pos.y >= wsize - pin_d*pos.w)
 			return make_float3(force);
 		else 
 			return make_float3(0,0,0);
@@ -206,7 +206,7 @@ struct isTop  : public binary_function<float4, float4, float3> {
 struct isBot : public binary_function<float4, float4, float3> {
 	isBot(float size, float cut) : pin_d(cut), wsize(size) {}
 	__host__ __device__ float3 operator()(const float4& force, const float4& pos){
-		if(pos.y < -wsize + pin_d*pos.w)
+		if(pos.y <= -wsize + pin_d*pos.w)
 			return make_float3(force);
 		else 
 			return make_float3(0,0,0);
@@ -232,7 +232,7 @@ float calcBotForce(float4* forces, float4* position, uint numParticles, float ws
 struct stressThing : public binary_function<float4, float4, float3>{
 	stressThing(float ws, float pd) : wsize(ws), pin_d(pd) {}
 	__host__ __device__ float3 operator()(const float4& force, const float4& pos){
-		if(fabsf(pos.y) < wsize - pin_d*pos.w)
+		if(fabsf(pos.y) <= wsize - pin_d*pos.w)
 			return make_float3(force.x, force.y, force.z)*pos.y;
 		else
 			return make_float3(0,0,0);
@@ -333,7 +333,19 @@ bool  excessForce(float4* forces, float maxforce, uint numParticles){
 
 }
 
+struct mom_reset
+{
+	mom_reset(float3 H) : extH(H) {}
+	__host__ __device__ float4 operator()(const float4& m){
+		return make_float4(extH*m.w, m.w);
+	}
+	const float3 extH;
+};
 
+void resetMom(float4* moments, float3 extH, uint numParticles){
+	transform(device_ptr<float4>(moments), device_ptr<float4>(moments+numParticles),
+			device_ptr<float4>(moments), mom_reset(extH));
+}
 
 
 

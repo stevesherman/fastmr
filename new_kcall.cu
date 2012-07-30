@@ -144,6 +144,22 @@ void magForces(	float* dSortedPos, float* dIntPos, float* newPos, float* dForce,
 	cutilCheckMsg("Magforces error");
 }
 
+void mutualMagn(const float* pos, const float* oldMag, float* newMag, const uint* nlist, const uint* numNeigh, uint numParticles)
+{
+	uint numThreads = 128;
+	uint numBlocks = iDivUp2(numParticles, numThreads);
+	cudaFuncSetCacheConfig(magForcesK, cudaFuncCachePreferL1);
+	
+	cudaBindTexture(0, pos_tex, pos, numParticles*sizeof(float4));
+	cudaBindTexture(0, mom_tex, oldMag, numParticles*sizeof(float4));
+
+	mutualMagnK<<<numBlocks, numThreads>>>( (float4*) pos, (float4*) oldMag, (float4*) newMag, nlist, numNeigh);
+
+	cudaUnbindTexture(pos_tex);
+	cudaUnbindTexture(mom_tex);
+	cutilCheckMsg("Mutual Magn error");
+}
+
 void RK4integrate(	float* oldPos,
 					float* newPos,
 					float* force1,

@@ -121,7 +121,7 @@ __global__ void magForcesK( const float4* dSortedPos,	//i: pos we use to calcula
 	float4 mom1 = dMom[idx];
 	//float4 mom1 = tex1Dfetch(mom_tex,idx);
 	float3 m1 = make_float3(mom1);
-	float Cpol1 = mom1.w;
+	float Cp1 = mom1.w;
 	
 	float3 force = make_float3(0,0,0);
 
@@ -135,7 +135,7 @@ __global__ void magForcesK( const float4* dSortedPos,	//i: pos we use to calcula
 		
 		float4 mom2 = tex1Dfetch(mom_tex, neighbor);
 		float3 m2 = make_float3(mom2);
-		float Cpol2 = mom2.w;
+		float Cp2 = mom2.w;
 
 		float3 er = p1 - p2;//start it out as dr, then modify to get er
 		er.x = er.x - nparams.L.x*rintf(er.x*nparams.Linv.x);
@@ -152,10 +152,10 @@ __global__ void magForcesK( const float4* dSortedPos,	//i: pos we use to calcula
 					+ dm2er*m1 - 5.0f*dm1er*dm2er*er);
 			
 			//create a false moment for nonmagnetic particles
-			//note that here Cpol gives the wrong volume, so the magnitude of 
+			//note that here Cp gives the wrong volume, so the magnitude of 
 			//the repulsion strength is wrong		
-			m1 = (Cpol1 == 0.0f) ? nparams.Cpol*nparams.extH : m1;
-			m2 = (Cpol2 == 0.0f) ? nparams.Cpol*nparams.extH : m2;
+			m1 = (Cp1 == 0.0f) ? nparams.Cpol*nparams.extH : m1;
+			m2 = (Cp2 == 0.0f) ? nparams.Cpol*nparams.extH : m2;
 			dm1m2 = dot(m1,m2);
 			
 			float sepdist = radius1 + radius2;
@@ -170,14 +170,57 @@ __global__ void magForcesK( const float4* dSortedPos,	//i: pos we use to calcula
 	force.x += nparams.shear*ybot*Cd;
 	
 	//apply flow BCs
-	if(ybot < nparams.pin_d*radius1)
+	if(ybot <= nparams.pin_d*radius1)
 		force = make_float3(0,0,0);
-	if(ybot > nparams.L.y - nparams.pin_d*radius1)
+	if(ybot >= nparams.L.y - nparams.pin_d*radius1)
 		force = make_float3(nparams.shear*nparams.L.y*Cd,0,0);
 
 	float3 ipos = make_float3(integrPos[idx]);
 	newPos[idx] = make_float4(ipos + force/Cd*deltaTime, radius1);
 
+}
+
+__global__ void mutualMagnK(const float4* pos,
+							const float4* oldMag,
+							float4* newMag,
+							const uint* nlist,
+							const uint* numNeigh)
+{
+	uint idx = blockIdx.x*blockDim.x + threadIdx.x;
+	if(idx >= nparams.N) return;
+	uint n_neigh = numNeigh[idx];
+	float4 pos1 = pos[idx];
+	float3 p1 = make_float3(pos1);
+	//float radius1 = pos1.w;
+
+	float4 omag = oldMag[idx];
+	float3 mom1 = make_float3(omag);
+	float Cp1 = omag.w;
+	if(Cp1 == 0) return;//if nonmagnetic
+	float3 H = nparams.extH;
+	for(uint i = 0; i < n_neigh; i++) {
+		
+		uint neighbor = nlist[i*nparams.N + idx];
+		
+		float4 pos2 = tex1Dfetch(pos_tex, neighbor);
+		float3 p2 = make_float3(pos2);
+		//float radius2 = pos2.w;
+		
+		float4 mom2 = tex1Dfetch(mom_tex, neighbor);
+		float3 m2 = make_float3(mom2);
+		//float Cp2 = mom2.w;
+
+		float3 er = p1 - p2;//start it out as dr, then modify to get er
+		er.x = er.x - nparams.L.x*rintf(er.x*nparams.Linv.x);
+		er.z = er.z - nparams.L.x*rintf(er.z*nparams.Linv.z);
+		float lsq = er.x*er.x + er.y*er.y + er.z*er.z;
+		if(lsq < nparams.max_fdr_sq) {
+			float invdist = rsqrtf(lsq);
+			er = er*invdist;
+			H += 1.0f/(4.0f*PI_F)*(3.0f*dot(m2,er)*er - m2)*invdist*invdist*invdist;
+		}
+	}
+	newMag[idx] = make_float4(Cp1*H, Cp1);
 }
 __global__ void integrateRK4(const float4* oldPos,
 							float4* newPos,
@@ -190,7 +233,7 @@ __global__ void integrateRK4(const float4* oldPos,
 {
    
 
-	uint index = __umul24(blockIdx.x,blockDim.x) + threadIdx.x;
+	uint index = (blockIdx.x*blockDim.x) + threadIdx.x;
     if (index >= numParticles) return;          // handle case when no. of particles not multiple of block size
 
 	float4 posData = oldPos[index];
@@ -213,9 +256,9 @@ __global__ void integrateRK4(const float4* oldPos,
 	fcomp.x += nparams.shear*ybot*Cd;
 	
 	//apply flow BCs
-	if(ybot < nparams.pin_d*radius)
+	if(ybot <= nparams.pin_d*radius)
 		fcomp = make_float3(0,0,0);
-	if(ybot > nparams.L.y - nparams.pin_d*radius)
+	if(ybot >= nparams.L.y - nparams.pin_d*radius)
 		fcomp = make_float3(nparams.shear*nparams.L.y*Cd,0,0);
 
 		
@@ -251,7 +294,7 @@ __global__ void integrateRK4ProperK(
 {
    
 
-	uint index = __umul24(blockIdx.x,blockDim.x) + threadIdx.x;
+	uint index = blockIdx.x*blockDim.x + threadIdx.x;
     if (index >= numParticles) return;          // handle case when no. of particles not multiple of block size
 	
 	float4 old = oldPos[index];

@@ -280,11 +280,19 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 		NListFixed(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
 				m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, 8.1f*m_params.pRadius[0]);
 
-	
+		resetMom((float4*) m_dMomentsA, newp.extH, newp.N);	
+		for(int i = 0; i < 0; i++) {
+			mutualMagn(m_dSortedPos,m_dMomentsA, m_dMomentsB, m_dNeighList, m_dNumNeigh, newp.N);
+			float* temp = m_dMomentsA;
+			m_dMomentsA = m_dMomentsB;
+			m_dMomentsB = temp;
+		}
+
 		bool solve = true;
 
 		//if the particles are moving too much, half the timestep and resolve
 		while(solve) {
+		
 			
 			magForces(	m_dSortedPos,	//yin: yn 
 						m_dSortedPos,	//yn
@@ -334,9 +342,14 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 			}
 			if(solve){
 				deltaTime *=.5f;
-				assert(deltaTime != 0);
 				printf("force excess ratio %.3g\treducing timestep %.3g\n", maxDx/limDx, deltaTime);
 				//getBadP();	
+			}
+			if(deltaTime == 0.0f) {
+				printf("timestep fail!");
+				getBadP();
+				getMagnetization();
+				assert(false);
 			}
 		}
 	}
@@ -437,7 +450,7 @@ void ParticleSystem::logStuff(FILE* file, float simtime)
 	float bf = calcBotForce( (float4*) m_dForces1, (float4*) m_dPos1, newp.N, 
 			-newp.origin.y, newp.pin_d);
 	float gs = calcGlForce(  (float4*) m_dForces1, (float4*) m_dPos1, newp.N,
-			-newp.origin.y, newp.pin_d)*newp.Linv.x*newp.Linv.y*newp.Linv.z;
+			-newp.origin.y, 1e3f)*newp.Linv.x*newp.Linv.y*newp.Linv.z;
 	float kinen = calcKinEn( (float4*) m_dForces1, (float4*) m_dPos1, newp);
 	
 	fprintf(file, "%.5g\t%.5g\t%.5g\t%.5g\t%d\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\n", 
@@ -454,12 +467,12 @@ void ParticleSystem::printStress()
 	float bf = calcBotForce( (float4*) m_dForces1, (float4*) m_dPos1, newp.N, 
 			-newp.origin.y, newp.pin_d);
 	float gs = calcGlForce(  (float4*) m_dForces1, (float4*) m_dPos1, newp.N, 
-			-newp.origin.y, newp.pin_d)*newp.Linv.x*newp.Linv.y*newp.Linv.z;
-	float gs2 = calcGlForce(  (float4*) m_dForces1, (float4*) m_dPos1, newp.N, 
 			1e3f, newp.pin_d)*newp.Linv.x*newp.Linv.y*newp.Linv.z;//so all particles get counted
+	float gsnew = calcGlForce( (float4*) m_dForces1, (float4*) m_dPos1, newp.N, 
+			-newp.origin.y, newp.pin_d)*newp.Linv.x*newp.Linv.y*newp.Linv.z;
 
 	printf("stress top: %g\tbot: %g\tmom old: %g\t mom new: %g\n", tf*newp.Linv.x*newp.Linv.z, 
-			bf*newp.Linv.x*newp.Linv.z, gs2, gs);
+			bf*newp.Linv.x*newp.Linv.z, gs, gsnew);
 }
 
 void
