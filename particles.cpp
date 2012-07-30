@@ -71,7 +71,7 @@ enum { M_VIEW = 0, M_MOVE };
 SimParams pdata;
 
 // simulation parameters
-float timestep = 650; //in units of nanoseconds
+float timestep = 500; //in units of nanoseconds
 double simtime = 0.0f;
 float externalH = 100; //kA/m
 float colorFmax = 3.5;
@@ -549,7 +549,7 @@ void initParamList()
 		paramlist->AddParam(new Param<float>("shear rate", pdata.shear, 0, 2000, 50, &pdata.shear));
 		paramlist->AddParam(new Param<float>("colorFmax", colorFmax, 0, 15, 0.1f, &colorFmax));
     	paramlist->AddParam(new Param<float>("visc", pdata.viscosity, 0.001f, .25f, 0.001f, &pdata.viscosity));
-		paramlist->AddParam(new Param<float>("max dx pct", maxdxpct, 0, .2f, 0.002f, &maxdxpct));
+		paramlist->AddParam(new Param<float>("max dx pct", maxdxpct, 0, .1f, 0.001f, &maxdxpct));
 		paramlist->AddParam(new Param<float>("pin dist", pin_dist, 0.995f, 1.5f, 0.005f, &pin_dist));
 		paramlist->AddParam(new Param<float>("contact_dist", contact_dist, .95f, 1.25f, 0.001f, &contact_dist));
 	}

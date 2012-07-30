@@ -22,21 +22,12 @@ uint NListVar(uint*& nlist, uint* num_neigh, float* dpos,
 
 void magForces(	float* dSortedPos, float* dIntPos, float* newPos, float* dForce, float* dMom, uint* nlist, uint* num_neigh, uint numParticles, float deltaTime);
 
-void collision_new(	const float* dSortedPos, const float* dOldVel, 
-					const uint* nlist, const uint* num_neigh, float* dNewVel, float* dNewPos, 
-					uint numParticles, float deltaTime);
+void relax_new(	const float* dSortedPos, const float* dOldVel, 
+				const uint* nlist, const uint* num_neigh, float* dNewVel, float* dNewPos, 
+				uint numParticles, float deltaTime);
 void mutualMagn(const float* pos, const float* oldMag, float* newMag, const uint* nlist, const uint* numNeigh, uint numParticles);
 
-void RK4integrate(float* oldPos,
-				float* newPos,
-				float* force1,
-				float* force2,
-				float* force3,
-				float* force4,
-				float deltaTime,
-				uint numParticles);
-
-void integrateRK4Proper(
+void integrateRK4(
 							const float* oldPos,
 							float* PosA,
 							const float* PosB,

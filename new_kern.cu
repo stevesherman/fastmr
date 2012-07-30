@@ -180,6 +180,81 @@ __global__ void magForcesK( const float4* dSortedPos,	//i: pos we use to calcula
 
 }
 
+__global__ void collForcesK(const float4* dSortedPos,	//i: pos we use to calculate forces
+							const float4* dMom,		//i: the moment
+							const float4* oldForce, //i: the force we use for velocity
+							const float4* integrPos,	//i: pos we use as base to integrate from
+							const uint* nlist,		//i: the neighbor list
+							const uint* num_neigh,	//i: the number of inputs
+							float4* dForce,		//io: the magnetic force on a particle
+							float4* newPos,		//o: the integrated position
+							float deltaTime)	//o: the timestep
+{
+	uint idx = blockDim.x*blockIdx.x + threadIdx.x;
+	if(idx >= nparams.N)
+		return;
+	uint n_neigh = num_neigh[idx];
+	float4 pos1 = dSortedPos[idx];
+	//float4 pos1 = tex1Dfetch(pos_tex,idx);
+	float3 p1 = make_float3(pos1);
+	float radius1 = pos1.w;
+
+	float4 mom1 = dMom[idx];
+	//float4 mom1 = tex1Dfetch(mom_tex,idx);
+	float3 m1 = make_float3(mom1);
+	float Cp1 = mom1.w;
+	m1 = (Cp1 == 0.0f) ? nparams.Cpol*nparams.extH : m1;
+		
+	float3 force = make_float3(dForce[idx]);
+
+	for(uint i = 0; i < n_neigh; i++)
+	{
+		uint neighbor = nlist[i*nparams.N + idx];
+		
+		float4 pos2 = tex1Dfetch(pos_tex, neighbor);
+		float3 p2 = make_float3(pos2);
+		float radius2 = pos2.w;
+		
+		float4 mom2 = tex1Dfetch(mom_tex, neighbor);
+		float3 m2 = make_float3(mom2);
+		float Cp2 = mom2.w;
+		//create a false moment for nonmagnetic particles
+		//note cpol is based on the mean radius, could be incorrect for PSDs
+		m2 = (Cp2 == 0.0f) ? nparams.Cpol*nparams.extH : m2;
+
+		float3 er = p1 - p2;//start it out as dr, then modify to get er
+		er.x = er.x - nparams.L.x*rintf(er.x*nparams.Linv.x);
+		er.z = er.z - nparams.L.x*rintf(er.z*nparams.Linv.z);
+		float lsq = er.x*er.x + er.y*er.y + er.z*er.z;
+		er = er*rsqrtf(lsq);
+		float sepdist = radius1 + radius2;	
+		if(lsq <= 1.2f*sepdist*sepdist){
+			
+			float dm1m2 = dot(m1,m2);
+			
+			force += 3.0f*MU_0*MU_C*dm1m2/(2.0f*PI_F*sepdist*sepdist*sepdist*sepdist)*
+					expf(-nparams.spring*(sqrtf(lsq)/sepdist - 1.0f))*er;
+		}
+			
+	}
+	dForce[idx] = make_float4(force,0.0f);
+	float Cd = 6.0f*PI_F*radius1*nparams.visc;
+	float ybot = p1.y - nparams.origin.y;
+	force.x += nparams.shear*ybot*Cd;
+	
+	//apply flow BCs
+	if(ybot <= nparams.pin_d*radius1)
+		force = make_float3(0,0,0);
+	if(ybot >= nparams.L.y - nparams.pin_d*radius1)
+		force = make_float3(nparams.shear*nparams.L.y*Cd,0,0);
+
+	float3 ipos = make_float3(integrPos[idx]);
+	newPos[idx] = make_float4(ipos + force/Cd*deltaTime, radius1);
+
+}
+
+
+
 __global__ void mutualMagnK(const float4* pos,
 							const float4* oldMag,
 							float4* newMag,
@@ -222,64 +297,9 @@ __global__ void mutualMagnK(const float4* pos,
 	}
 	newMag[idx] = make_float4(Cp1*H, Cp1);
 }
-__global__ void integrateRK4(const float4* oldPos,
-							float4* newPos,
-							float4* forceA,
-							const float4* forceB,
-							const float4* forceC,
-							const float4* forceD,
-							const float deltaTime,
-							const uint numParticles)
-{
-   
 
-	uint index = (blockIdx.x*blockDim.x) + threadIdx.x;
-    if (index >= numParticles) return;          // handle case when no. of particles not multiple of block size
 
-	float4 posData = oldPos[index];
-    float3 pos = make_float3(posData.x, posData.y, posData.z);
-	float radius = posData.w;
-	
-	float4 f1 = forceA[index];
-	float nothin = f1.w;//doesn't actually hold any value, but might someday
-	float3 force1 = make_float3(f1);
-	float3 force2 = make_float3(forceB[index]);
-	float3 force3 = make_float3(forceC[index]);
-	float3 force4 = make_float3(forceD[index]);
-	
-	float3 fcomp = (force1 + 2*force2 + 2*force3 + force4)/6.0f;//trapezoid rule	
-	forceA[index] = make_float4(fcomp, nothin);//averaged force
-	
-	float Cd = 6*PI_F*nparams.visc*radius;
-
-	float ybot = pos.y - nparams.origin.y;
-	fcomp.x += nparams.shear*ybot*Cd;
-	
-	//apply flow BCs
-	if(ybot <= nparams.pin_d*radius)
-		fcomp = make_float3(0,0,0);
-	if(ybot >= nparams.L.y - nparams.pin_d*radius)
-		fcomp = make_float3(nparams.shear*nparams.L.y*Cd,0,0);
-
-		
-	//integrate	
-	pos += fcomp*deltaTime/Cd;
-
-	//periodic boundary conditions
-	//note that it has issues if it's on the border, 
-	//but the resolver handles it (b/c rintf(0.5f)=0)
-   	pos.x -= nparams.L.x*rintf(pos.x*nparams.Linv.x);
-	pos.z -= nparams.L.z*rintf(pos.z*nparams.Linv.z);
-	
-	//if (pos.y > -1.0f*nparams.origin.y ) { pos.y = -1.0f*nparams.origin.z;}
-    //if (pos.y < nparams.origin.y ) { pos.y = 1.0f*nparams.origin.z; }
-	if (pos.y > -1.0f*nparams.origin.y - radius ) { pos.y = -1.0f*nparams.origin.z - radius;}
-	if (pos.y < nparams.origin.y + radius ) { pos.y = nparams.origin.z + radius; }
-
-	newPos[index] = make_float4(pos, radius);
-}
-
-__global__ void integrateRK4ProperK(
+__global__ void integrateRK4K(
 							const float4* oldPos,
 							float4* PosA,
 							const float4* PosB,
@@ -434,7 +454,7 @@ __global__ void NListVarK(uint* nlist,	//	o:neighbor list
 }
 
 
-__global__ void collisionK( const float4* sortedPos,	//i: pos we use to calculate forces
+__global__ void relaxK( const float4* sortedPos,	//i: pos we use to calculate forces
 							const float4* oldVel,
 							const uint* nlist,		//i: the neighbor list
 							const uint* num_neigh,	//i: the number of inputs
