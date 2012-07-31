@@ -160,7 +160,29 @@ void mutualMagn(const float* pos, const float* oldMag, float* newMag, const uint
 	cutilCheckMsg("Mutual Magn error");
 }
 
-void integrateRK4(
+void RK4integrate(	float* oldPos,
+					float* newPos,
+					float* force1,
+					float* force2,
+					float* force3, 
+					float* force4,
+					float deltaTime,
+					uint numParticles)
+{
+	uint numThreads = 256; 
+	uint numBlocks = iDivUp2(numParticles, numThreads);
+
+	integrateRK4 <<< numBlocks, numThreads >>> ((float4*) oldPos, 
+												(float4*) newPos,
+												(float4*) force1,
+												(float4*) force2,
+												(float4*) force3,
+												(float4*) force4,
+												deltaTime,
+												numParticles);
+}
+
+void integrateRK4Proper(
 							const float* oldPos,
 							float* PosA,
 							const float* PosB,
@@ -175,7 +197,7 @@ void integrateRK4(
 {
 	uint numThreads = 256; 
 	uint numBlocks = iDivUp2(numParticles, numThreads);
-	integrateRK4K<<<numBlocks, numThreads>>>(
+	integrateRK4ProperK<<<numBlocks, numThreads>>>(
 							 (float4*) oldPos,
 							(float4*) PosA,
 							 (float4*) PosB,
@@ -194,17 +216,17 @@ void integrateRK4(
 
 
 
-void relax_new(	const float* dSortedPos, const float* dOldVel, const uint* nlist, 
+void collision_new(	const float* dSortedPos, const float* dOldVel, const uint* nlist, 
 		const uint* num_neigh, float* dNewVel, float* dNewPos, uint numParticles, float deltaTime)
 {
 	uint numThreads = 128;
 	uint numBlocks = iDivUp2(numParticles, numThreads);
-	cudaFuncSetCacheConfig(relaxK, cudaFuncCachePreferL1);
+	cudaFuncSetCacheConfig(collisionK, cudaFuncCachePreferL1);
 	
 	cudaBindTexture(0, pos_tex, dSortedPos, numParticles*sizeof(float4));
 	cudaBindTexture(0, vel_tex, dOldVel, numParticles*sizeof(float4));
 
-	relaxK<<<numBlocks,numThreads>>>( 	(float4*)dSortedPos, (float4*) dOldVel,
+	collisionK<<<numBlocks,numThreads>>>( 	(float4*)dSortedPos, (float4*) dOldVel,
 											nlist, num_neigh, (float4*) dNewVel, (float4*) dNewPos, deltaTime);
 	
 	cudaUnbindTexture(pos_tex);
