@@ -159,30 +159,7 @@ void mutualMagn(const float* pos, const float* oldMag, float* newMag, const uint
 	cudaUnbindTexture(mom_tex);
 	cutilCheckMsg("Mutual Magn error");
 }
-
-void RK4integrate(	float* oldPos,
-					float* newPos,
-					float* force1,
-					float* force2,
-					float* force3, 
-					float* force4,
-					float deltaTime,
-					uint numParticles)
-{
-	uint numThreads = 256; 
-	uint numBlocks = iDivUp2(numParticles, numThreads);
-
-	integrateRK4 <<< numBlocks, numThreads >>> ((float4*) oldPos, 
-												(float4*) newPos,
-												(float4*) force1,
-												(float4*) force2,
-												(float4*) force3,
-												(float4*) force4,
-												deltaTime,
-												numParticles);
-}
-
-void integrateRK4Proper(
+void integrateRK4(
 							const float* oldPos,
 							float* PosA,
 							const float* PosB,
@@ -197,7 +174,7 @@ void integrateRK4Proper(
 {
 	uint numThreads = 256; 
 	uint numBlocks = iDivUp2(numParticles, numThreads);
-	integrateRK4ProperK<<<numBlocks, numThreads>>>(
+	integrateRK4K<<<numBlocks, numThreads>>>(
 							 (float4*) oldPos,
 							(float4*) PosA,
 							 (float4*) PosB,

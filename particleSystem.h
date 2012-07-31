@@ -122,8 +122,8 @@ protected: // data
 	float* m_dPos3;
 	float* m_dPos4;
 	float* m_dVel;
-	float* m_dMomentsA;
-	float* m_dMomentsB;
+	float* m_dMoments;
+	float* m_dTemp;
 	float* m_dForces1;
 	float* m_dForces2;
 	float* m_dForces3;

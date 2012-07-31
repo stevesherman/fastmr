@@ -196,7 +196,10 @@ __global__ void mutualMagnK(const float4* pos,
 	float4 omag = oldMag[idx];
 	float3 mom1 = make_float3(omag);
 	float Cp1 = omag.w;
-	if(Cp1 == 0) return;//if nonmagnetic
+	if(Cp1 == 0.0f) { //if nonmagnetic
+		newMag[idx] = make_float4(0.0f,0.0f,0.0f,Cp1);
+		return;	
+	}
 	float3 H = nparams.extH;
 	for(uint i = 0; i < n_neigh; i++) {
 		
@@ -222,64 +225,9 @@ __global__ void mutualMagnK(const float4* pos,
 	}
 	newMag[idx] = make_float4(Cp1*H, Cp1);
 }
-__global__ void integrateRK4(const float4* oldPos,
-							float4* newPos,
-							float4* forceA,
-							const float4* forceB,
-							const float4* forceC,
-							const float4* forceD,
-							const float deltaTime,
-							const uint numParticles)
-{
-   
 
-	uint index = (blockIdx.x*blockDim.x) + threadIdx.x;
-    if (index >= numParticles) return;          // handle case when no. of particles not multiple of block size
 
-	float4 posData = oldPos[index];
-    float3 pos = make_float3(posData.x, posData.y, posData.z);
-	float radius = posData.w;
-	
-	float4 f1 = forceA[index];
-	float nothin = f1.w;//doesn't actually hold any value, but might someday
-	float3 force1 = make_float3(f1);
-	float3 force2 = make_float3(forceB[index]);
-	float3 force3 = make_float3(forceC[index]);
-	float3 force4 = make_float3(forceD[index]);
-	
-	float3 fcomp = (force1 + 2*force2 + 2*force3 + force4)/6.0f;//trapezoid rule	
-	forceA[index] = make_float4(fcomp, nothin);//averaged force
-	
-	float Cd = 6*PI_F*nparams.visc*radius;
-
-	float ybot = pos.y - nparams.origin.y;
-	fcomp.x += nparams.shear*ybot*Cd;
-	
-	//apply flow BCs
-	if(ybot <= nparams.pin_d*radius)
-		fcomp = make_float3(0,0,0);
-	if(ybot >= nparams.L.y - nparams.pin_d*radius)
-		fcomp = make_float3(nparams.shear*nparams.L.y*Cd,0,0);
-
-		
-	//integrate	
-	pos += fcomp*deltaTime/Cd;
-
-	//periodic boundary conditions
-	//note that it has issues if it's on the border, 
-	//but the resolver handles it (b/c rintf(0.5f)=0)
-   	pos.x -= nparams.L.x*rintf(pos.x*nparams.Linv.x);
-	pos.z -= nparams.L.z*rintf(pos.z*nparams.Linv.z);
-	
-	//if (pos.y > -1.0f*nparams.origin.y ) { pos.y = -1.0f*nparams.origin.z;}
-    //if (pos.y < nparams.origin.y ) { pos.y = 1.0f*nparams.origin.z; }
-	if (pos.y > -1.0f*nparams.origin.y - radius ) { pos.y = -1.0f*nparams.origin.z - radius;}
-	if (pos.y < nparams.origin.y + radius ) { pos.y = nparams.origin.z + radius; }
-
-	newPos[index] = make_float4(pos, radius);
-}
-
-__global__ void integrateRK4ProperK(
+__global__ void integrateRK4K(
 							const float4* oldPos,
 							float4* PosA,
 							const float4* PosB,
@@ -300,7 +248,7 @@ __global__ void integrateRK4ProperK(
 	float4 old = oldPos[index];
 	float3 oldp = make_float3(old);
 	float radius = old.w;
-
+	//compite k1,k2, we use a factor of 2.0, because they're done with a timestep of 0.5*dt
     float3 k1 = 2.0f*(make_float3(PosA[index]) - oldp);
 	float3 k2 = 2.0f*(make_float3(PosB[index]) - oldp);
 	float3 k3 = make_float3(PosC[index]) - oldp;

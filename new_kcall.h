@@ -27,16 +27,7 @@ void collision_new(	const float* dSortedPos, const float* dOldVel,
 					uint numParticles, float deltaTime);
 void mutualMagn(const float* pos, const float* oldMag, float* newMag, const uint* nlist, const uint* numNeigh, uint numParticles);
 
-void RK4integrate(float* oldPos,
-				float* newPos,
-				float* force1,
-				float* force2,
-				float* force3,
-				float* force4,
-				float deltaTime,
-				uint numParticles);
-
-void integrateRK4Proper(
+void integrateRK4(
 							const float* oldPos,
 							float* PosA,
 							const float* PosB,
