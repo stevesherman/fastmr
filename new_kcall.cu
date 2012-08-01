@@ -144,6 +144,28 @@ void magForces(	float* dSortedPos, float* dIntPos, float* newPos, float* dForce,
 	cutilCheckMsg("Magforces error");
 }
 
+void magFricForces(	float* dSortedPos, float* dIntPos, float* newPos, float* dForceOut, float* dMom, float* dForceIn,
+		uint* nlist, uint* num_neigh, uint numParticles, float deltaTime)
+{
+	assert(newPos != dIntPos);
+	assert(newPos != dSortedPos);
+	uint numThreads = 128;
+	uint numBlocks = iDivUp2(numParticles, numThreads);
+	cudaFuncSetCacheConfig(magForcesK, cudaFuncCachePreferL1);
+	
+	cudaBindTexture(0, pos_tex, dSortedPos, numParticles*sizeof(float4));
+	cudaBindTexture(0, mom_tex, dMom, numParticles*sizeof(float4));
+
+	magFricForcesK<<<numBlocks,numThreads>>>( 	(float4*)dSortedPos, (float4*) dMom, (float4*) dForceIn, (float4*) dIntPos, 
+											nlist, num_neigh, (float4*) dForceOut, (float4*) newPos, deltaTime);
+	
+	cudaUnbindTexture(pos_tex);
+	cudaUnbindTexture(mom_tex);
+
+	cutilCheckMsg("Magforces error");
+}
+
+
 void mutualMagn(const float* pos, const float* oldMag, float* newMag, const uint* nlist, const uint* numNeigh, uint numParticles)
 {
 	uint numThreads = 128;

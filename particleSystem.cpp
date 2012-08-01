@@ -57,7 +57,7 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize):
 	newp.extH = m_params.externalH;
 	newp.Cpol = m_params.Cpol;
 	newp.pin_d = 1.5f;  //ybot < radius*pin_d
-
+	newp.tanfric = 4e-5f;
 	m_contact_dist = 1.05f;	
 	_initialize();
 
@@ -291,10 +291,10 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 		while(solve) {
 		
 			
-			magForces(	m_dSortedPos,	//yin: yn 
+			/*magForces(	m_dSortedPos,	//yin: yn 
 						m_dSortedPos,	//yn
 						m_dPos1,   	//yn + 1/2*k1
-						m_dForces1,   	//k1
+						m_dTemp,   	//k1
 						m_dMoments, m_dNeighList, m_dNumNeigh, newp.N, deltaTime/2);
 			cutilCheckMsg("magForces");
 			magForces(	m_dPos1, 		//yin: yn + 1/2*k1
@@ -312,8 +312,31 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 						m_dPos4, 		// doesn't matter
 						m_dForces4,		//k4
 						m_dMoments, m_dNeighList, m_dNumNeigh, newp.N, deltaTime);
+			*/
+			magFricForces(	m_dSortedPos,	//yin: yn 
+						m_dSortedPos,	//yn
+						m_dPos1,   	//yn + 1/2*k1
+						m_dTemp,   	//k1
+						m_dMoments, m_dForces1, m_dNeighList, m_dNumNeigh, newp.N, deltaTime/2);
+			cutilCheckMsg("magFricForces");
+			magFricForces(	m_dPos1, 		//yin: yn + 1/2*k1
+						m_dSortedPos, 	//yn
+						m_dPos2, 		//yn + 1/2*k2
+						m_dForces2,		//k2
+						m_dMoments, m_dTemp, m_dNeighList, m_dNumNeigh, newp.N, deltaTime/2);
+			magFricForces(	m_dPos2, 		//yin: yn + 1/2*k2
+						m_dSortedPos, 	//yn
+						m_dPos3, 		//yn + k3
+						m_dForces3,		//k3
+						m_dMoments, m_dForces2, m_dNeighList, m_dNumNeigh, newp.N, deltaTime);
+			magFricForces(	m_dPos3, 		//yin: yn + k3
+						m_dSortedPos, 	//yn
+						m_dPos4, 		// doesn't matter
+						m_dForces4,		//k4
+						m_dMoments, m_dForces3, m_dNeighList, m_dNumNeigh, newp.N, deltaTime);
 
-			integrateRK4(m_dSortedPos, m_dPos1, m_dPos2, m_dPos3, m_dPos4, m_dForces1, 
+
+			integrateRK4(m_dSortedPos, m_dPos1, m_dPos2, m_dPos3, m_dPos4, m_dTemp, 
 					m_dForces2, m_dForces3, m_dForces4, deltaTime, newp.N);
 			solve = false;	
 		
@@ -324,7 +347,7 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 			//printf("callmax\n");
 			//maxf = maxforce( (float4*) m_dForces1, newp.N);
 			//maxFdx = maxdxpct*Cd*m_params.pRadius[0]/deltaTime; //force to cause a dx
-			float maxDx = maxvel((float4*)m_dForces1,(float4*)m_dPos1,newp)*deltaTime;
+			float maxDx = maxvel((float4*)m_dTemp,(float4*)m_dPos1,newp)*deltaTime;
 			float limDx = maxdxpct*m_params.pRadius[0];
 			
 			if(maxDx > limDx){
@@ -344,6 +367,7 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 				assert(false);
 			}
 		}
+		pswap(m_dTemp, m_dForces1);
 	}
 		
 	return deltaTime;
@@ -460,11 +484,9 @@ void ParticleSystem::printStress()
 			-newp.origin.y, newp.pin_d);
 	float gs = calcGlForce(  (float4*) m_dForces1, (float4*) m_dPos1, newp.N, 
 			1e3f, newp.pin_d)*newp.Linv.x*newp.Linv.y*newp.Linv.z;//so all particles get counted
-	float gsnew = calcGlForce( (float4*) m_dForces1, (float4*) m_dPos1, newp.N, 
-			-newp.origin.y, newp.pin_d)*newp.Linv.x*newp.Linv.y*newp.Linv.z;
 
-	printf("stress top: %g\tbot: %g\tmom old: %g\t mom new: %g\n", tf*newp.Linv.x*newp.Linv.z, 
-			bf*newp.Linv.x*newp.Linv.z, gs, gsnew);
+	printf("stress top: %g\tbot: %g\tmom old: %g\n", tf*newp.Linv.x*newp.Linv.z, 
+			bf*newp.Linv.x*newp.Linv.z, gs);
 }
 
 void
@@ -566,8 +588,8 @@ ParticleSystem::initGrid(uint3 size, float3 spacing, float3 jitter, uint numPart
 		m_hPos[0*4+0] = (newp.origin.x + m_params.pRadius[0]);
 		m_hPos[0*4+1] = m_params.pRadius[0];
 		m_hPos[0*4+2] = 0; m_hPos[0*4+3] = m_params.pRadius[0];
-		m_hPos[1*4+0] = -(newp.origin.x + 3*m_params.pRadius[0]);
-		m_hPos[1*4+1] = -m_params.pRadius[0];
+		m_hPos[1*4+0] = -(newp.origin.x + 2*m_params.pRadius[0]);
+		m_hPos[1*4+1] = -1.5f*m_params.pRadius[0];
 		m_hPos[1*4+2] = 0; m_hPos[1*4+3] = m_params.pRadius[0];
 	}
 }

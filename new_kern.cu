@@ -180,6 +180,102 @@ __global__ void magForcesK( const float4* dSortedPos,	//i: pos we use to calcula
 
 }
 
+__global__ void magFricForcesK( const float4* dSortedPos,	//i: pos we use to calculate forces
+							const float4* dMom,		//i: the moment
+							const float4* dForceIn,  //i: the old force, used to find velocity		
+							const float4* integrPos,	//i: pos we use as base to integrate from
+							const uint* nlist,		//i: the neighbor list
+							const uint* num_neigh,	//i: the number of inputs
+							float4* dForceOut,		//o: the magnetic force on a particle
+							float4* newPos,		//o: the integrated position
+							float deltaTime)	//o: the timestep
+{
+	uint idx = blockDim.x*blockIdx.x + threadIdx.x;
+	if(idx >= nparams.N)
+		return;
+	uint n_neigh = num_neigh[idx];
+	float4 pos1 = dSortedPos[idx];
+	//float4 pos1 = tex1Dfetch(pos_tex,idx);
+	float3 p1 = make_float3(pos1);
+	float radius1 = pos1.w;
+	float Cd1 = 6.0f*PI_F*radius1*nparams.visc;
+
+	float4 mom1 = dMom[idx];
+	//float4 mom1 = tex1Dfetch(mom_tex,idx);
+	float3 m1 = make_float3(mom1);
+	float Cp1 = mom1.w;
+	
+	float3 f1 = make_float3(dForceIn[idx]);
+
+	float3 force = make_float3(0,0,0);
+
+	for(uint i = 0; i < n_neigh; i++)
+	{
+		uint neighbor = nlist[i*nparams.N + idx];
+		
+		float4 pos2 = tex1Dfetch(pos_tex, neighbor);
+		float3 p2 = make_float3(pos2);
+		float radius2 = pos2.w;
+		float Cd2 = 6.0f*PI_F*radius1*nparams.visc;
+		
+		float4 mom2 = tex1Dfetch(mom_tex, neighbor);
+		float3 m2 = make_float3(mom2);
+		float Cp2 = mom2.w;
+		
+		float3 f2 = make_float3(dForceIn[idx]);
+
+		float3 er = p1 - p2;//start it out as dr, then modify to get er
+		er.x = er.x - nparams.L.x*rintf(er.x*nparams.Linv.x);
+		er.z = er.z - nparams.L.x*rintf(er.z*nparams.Linv.z);
+		float lsq = er.x*er.x + er.y*er.y + er.z*er.z;
+		er = er*rsqrtf(lsq);
+
+		if(lsq <= nparams.max_fdr_sq){
+			float dm1m2 = dot(m1,m2);
+			float dm1er = dot(m1,er);
+			float dm2er = dot(m2,er);
+			
+			force += 3.0f*MU_0*MU_C/(4*PI_F*lsq*lsq) *( dm1m2*er + dm1er*m2
+					+ dm2er*m1 - 5.0f*dm1er*dm2er*er);
+			
+			//create a false moment for nonmagnetic particles
+			//note that here Cp gives the wrong volume, so the magnitude of 
+			//the repulsion strength is wrong		
+			m1 = (Cp1 == 0.0f) ? nparams.Cpol*nparams.extH : m1;
+			m2 = (Cp2 == 0.0f) ? nparams.Cpol*nparams.extH : m2;
+			dm1m2 = dot(m1,m2);
+			
+			float sepdist = radius1 + radius2;
+			force += 3.0f*MU_0*MU_C*dm1m2/(2.0f*PI_F*sepdist*sepdist*sepdist*sepdist)*
+					expf(-nparams.spring*(sqrtf(lsq)/sepdist - 1.0f))*er;
+			if(lsq <= sepdist*sepdist){
+				float3 v1 = f1/Cd1 + nparams.shear*p1.y;
+				v1 = (p1.y >= nparams.L.y - nparams.pin_d*radius1) ? 
+						make_float3(nparams.shear*nparams.L.y,0.0f,0.0f) : v1;
+				float3 v2 = f2/Cd2 + nparams.shear*p2.y;
+				v2 = (p2.y >= nparams.L.y - nparams.pin_d*radius2) ? 
+						make_float3(nparams.shear*nparams.L.y,0.0f,0.0f) : v2;
+				float3 relvel = v1 - v2;
+				float3 tanvel = relvel - dot(er,relvel)*er;
+				force -= tanvel*nparams.tanfric;
+			}
+		}
+			
+	}
+	dForceOut[idx] = make_float4(force,0.0f);
+		float ybot = p1.y - nparams.origin.y;
+	force.x += nparams.shear*ybot*Cd1;
+	
+	//apply flow BCs
+	if(ybot <= nparams.pin_d*radius1)
+		force = make_float3(0,0,0);
+	if(ybot >= nparams.L.y - nparams.pin_d*radius1)
+		force = make_float3(nparams.shear*nparams.L.y*Cd1,0,0);
+
+	float3 ipos = make_float3(integrPos[idx]);
+	newPos[idx] = make_float4(ipos + force/Cd1*deltaTime, radius1);
+
+}
 __global__ void mutualMagnK(const float4* pos,
 							const float4* oldMag,
 							float4* newMag,

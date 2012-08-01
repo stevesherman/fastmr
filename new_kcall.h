@@ -22,6 +22,10 @@ uint NListVar(uint*& nlist, uint* num_neigh, float* dpos,
 
 void magForces(	float* dSortedPos, float* dIntPos, float* newPos, float* dForce, float* dMom, uint* nlist, uint* num_neigh, uint numParticles, float deltaTime);
 
+void magFricForces(	float* dSortedPos, float* dIntPos, float* newPos, float* dForceOut, float* dMom, float* dForceIn,
+		uint* nlist, uint* num_neigh, uint numParticles, float deltaTime);
+
+
 void collision_new(	const float* dSortedPos, const float* dOldVel, 
 					const uint* nlist, const uint* num_neigh, float* dNewVel, float* dNewPos, 
 					uint numParticles, float deltaTime);

@@ -25,6 +25,8 @@ struct NewParams {
 	float shear;
 
 	float pin_d;
+	
+	float tanfric;
 
 	float3 extH;
 	float Cpol;	
