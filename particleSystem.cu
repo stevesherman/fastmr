@@ -241,7 +241,7 @@ struct stressThing : public binary_function<float4, float4, float3>{
 	const float wsize;
 };
 
-float calcGlForce(float4* forces, float4* position, uint numParticles, float wsize, float cut){
+float calcGlForce(float4* forces, float4* position, uint numParticles, float wsize, float cut = 0.0f){
 
 	float3 glf = inner_product(device_ptr<float4>(forces), 
 			device_ptr<float4>(forces+numParticles), device_ptr<float4>(position), 

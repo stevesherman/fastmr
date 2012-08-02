@@ -466,7 +466,7 @@ void ParticleSystem::logStuff(FILE* file, float simtime)
 	float bf = calcBotForce( (float4*) m_dForces1, (float4*) m_dPos1, newp.N, 
 			-newp.origin.y, newp.pin_d);
 	float gs = calcGlForce(  (float4*) m_dForces1, (float4*) m_dPos1, newp.N,
-			-newp.origin.y, 1e3f)*newp.Linv.x*newp.Linv.y*newp.Linv.z;
+			-newp.origin.y, 0.0f)*newp.Linv.x*newp.Linv.y*newp.Linv.z;
 	float kinen = calcKinEn( (float4*) m_dForces1, (float4*) m_dPos1, newp);
 	
 	fprintf(file, "%.5g\t%.5g\t%.5g\t%.5g\t%d\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\n", 
@@ -483,7 +483,7 @@ void ParticleSystem::printStress()
 	float bf = calcBotForce( (float4*) m_dForces1, (float4*) m_dPos1, newp.N, 
 			-newp.origin.y, newp.pin_d);
 	float gs = calcGlForce(  (float4*) m_dForces1, (float4*) m_dPos1, newp.N, 
-			1e3f, newp.pin_d)*newp.Linv.x*newp.Linv.y*newp.Linv.z;//so all particles get counted
+			-newp.origin.y, 0.0f)*newp.Linv.x*newp.Linv.y*newp.Linv.z;//so all particles get counted
 
 	printf("stress top: %g\tbot: %g\tmom old: %g\n", tf*newp.Linv.x*newp.Linv.z, 
 			bf*newp.Linv.x*newp.Linv.z, gs);
