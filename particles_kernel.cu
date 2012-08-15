@@ -27,11 +27,11 @@ __global__ void writeRender(const float4* pos,
 	if(index >= numParticles) return;
 	
 	float4 rpos = pos[index];
-	float xi = moments[index].w;
-	//rpos.w = (xi == 1.0f) ? 0.0 : rpos.w;
+	float Cpol = moments[index].w;
+	//rpos.w = (Cpol == 1.0f) ? 0.0 : rpos.w;
 	//rendPos[index] = rpos;
 	
-	/*if(xi > 2.0f)
+	/*if(Cpol > 2.0f)
 		rendColor[index] = make_float4(0.1f, 1.0f, 0.1f, 0.0f);
 	else
 		rendColor[index] = make_float4(0.1f, 0.1f, 1.0f, 0.0f);
@@ -57,7 +57,7 @@ __global__ void writeRender(const float4* pos,
 	float mix = fcolor - (float) base;
 	colorOut = c[base] + mix*(c[base+1]-c[base]);
 		
-	if(xi == 1.0f) colorOut = make_float3(0.25f, 0.25f, 0.25f);
+	if(Cpol == 0.0f) colorOut = make_float3(0.25f, 0.25f, 0.25f);
 	
 	rendPos[index] = rpos;
 	rendColor[index] = make_float4(colorOut,0.0f);

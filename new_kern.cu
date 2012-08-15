@@ -256,8 +256,8 @@ __global__ void magFricForcesK( const float4* dSortedPos,	//i: pos we use to cal
 				v2 = (p2.y >= nparams.L.y - nparams.pin_d*radius2) ? 
 						make_float3(nparams.shear*nparams.L.y,0.0f,0.0f) : v2;
 				float3 relvel = v1 - v2;
-				float3 tanvel = relvel - dot(er,relvel)*er;
-				force -= tanvel*nparams.tanfric;
+				//float3 tanvel = relvel - dot(er,relvel)*er;
+				force -= relvel*nparams.tanfric;
 			}
 		}
 			

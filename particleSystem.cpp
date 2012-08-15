@@ -57,7 +57,7 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize):
 	newp.extH = m_params.externalH;
 	newp.Cpol = m_params.Cpol;
 	newp.pin_d = 1.5f;  //ybot < radius*pin_d
-	newp.tanfric = 4e-5f;
+	newp.tanfric = 1e-5f;
 	m_contact_dist = 1.05f;	
 	_initialize();
 
@@ -280,6 +280,7 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 				m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, 8.1f*m_params.pRadius[0]);
 
 		resetMom((float4*) m_dMoments, newp.extH, newp.N);	
+		//note that odd numbers of iterations prevent sheet formation
 		for(int i = 0; i < 0; i++) {
 			mutualMagn(m_dSortedPos,m_dMoments, m_dTemp, m_dNeighList, m_dNumNeigh, newp.N);
 			pswap(m_dMoments, m_dTemp);	
@@ -291,7 +292,7 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 		while(solve) {
 		
 			
-			/*magForces(	m_dSortedPos,	//yin: yn 
+			magForces(	m_dSortedPos,	//yin: yn 
 						m_dSortedPos,	//yn
 						m_dPos1,   	//yn + 1/2*k1
 						m_dTemp,   	//k1
@@ -312,8 +313,8 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 						m_dPos4, 		// doesn't matter
 						m_dForces4,		//k4
 						m_dMoments, m_dNeighList, m_dNumNeigh, newp.N, deltaTime);
-			*/
-			magFricForces(	m_dSortedPos,	//yin: yn 
+			
+/*			magFricForces(	m_dSortedPos,	//yin: yn 
 						m_dSortedPos,	//yn
 						m_dPos1,   	//yn + 1/2*k1
 						m_dTemp,   	//k1
@@ -334,7 +335,7 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 						m_dPos4, 		// doesn't matter
 						m_dForces4,		//k4
 						m_dMoments, m_dForces3, m_dNeighList, m_dNumNeigh, newp.N, deltaTime);
-
+*/
 
 			integrateRK4(m_dSortedPos, m_dPos1, m_dPos2, m_dPos3, m_dPos4, m_dTemp, 
 					m_dForces2, m_dForces3, m_dForces4, deltaTime, newp.N);
@@ -360,7 +361,7 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 				printf("force excess ratio %.3g\treducing timestep %.3g\n", maxDx/limDx, deltaTime);
 				//getBadP();	
 			}
-			if(deltaTime == 0.0f) {
+			if(deltaTime <= 1e-30f && deltaTime != 0) {
 				printf("timestep fail!");
 				getBadP();
 				getMagnetization();
@@ -614,8 +615,8 @@ ParticleSystem::reset(ParticleConfig config, uint numiter)
 					if(m_params.rstd[j] > 0) {
 						u=frand(); v=frand();
 						norm = sqrt(-2.0*log(u))*cos(2.0*PI_F*v);
-						float med_diam = m_params.pRadius[0]*
-								expf(-0.5f*m_params.rstd[0]*m_params.rstd[0]);
+						float med_diam = m_params.pRadius[j]*
+								expf(-0.5f*m_params.rstd[j]*m_params.rstd[j]);
 						radius = exp(norm*m_params.rstd[j])*med_diam;	
 					} else {
 						radius = m_params.pRadius[j];

@@ -188,7 +188,7 @@ void initGL(int argc, char **argv)
     }
 
     glEnable(GL_DEPTH_TEST);
-    glClearColor(0.3, 0.3, 0.3, 1.0);
+    glClearColor(1.0, 1.3, 1.3, 1.0);
 
     glutReportErrors();
 }
