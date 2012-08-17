@@ -57,7 +57,7 @@ public:
 	void setCollideDamping(float x) { m_params.cdamping = x; }
 	void setGlobalDamping(float x) { m_params.globalDamping = x; }
 	
-	void setRepelSpring(float x) { m_params.spring = x; newp.spring = x;}
+	void setRepelSpring(float x) { return; m_params.spring = x; newp.spring = x;}
     void setShear(float x) { m_params.shear = x; newp.shear = x;}
 	void setViscosity(float x) { m_params.viscosity = x; newp.visc = x;}
 	void setColorFmax(float x) { m_params.colorFmax=x; m_colorFmax = x;}

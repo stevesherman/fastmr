@@ -132,7 +132,8 @@ __global__ void magForcesK( const float4* dSortedPos,	//i: pos we use to calcula
 		float4 pos2 = tex1Dfetch(pos_tex, neighbor);
 		float3 p2 = make_float3(pos2);
 		float radius2 = pos2.w;
-		
+		float sepdist = radius1 + radius2;
+
 		float4 mom2 = tex1Dfetch(mom_tex, neighbor);
 		float3 m2 = make_float3(mom2);
 		float Cp2 = mom2.w;
@@ -143,7 +144,7 @@ __global__ void magForcesK( const float4* dSortedPos,	//i: pos we use to calcula
 		float lsq = er.x*er.x + er.y*er.y + er.z*er.z;
 		er = er*rsqrtf(lsq);
 
-		if(lsq <= nparams.max_fdr_sq){
+		if(lsq <= 4.0f*4.0f*sepdist*sepdist) { //nparams.max_fdr_sq){
 			float dm1m2 = dot(m1,m2);
 			float dm1er = dot(m1,er);
 			float dm2er = dot(m2,er);
@@ -158,9 +159,8 @@ __global__ void magForcesK( const float4* dSortedPos,	//i: pos we use to calcula
 			m2 = (Cp2 == 0.0f) ? nparams.Cpol*nparams.extH : m2;
 			dm1m2 = dot(m1,m2);
 			
-			float sepdist = radius1 + radius2;
 			force += 3.0f*MU_0*MU_C*dm1m2/(2.0f*PI_F*sepdist*sepdist*sepdist*sepdist)*
-					expf(-nparams.spring*(sqrtf(lsq)/sepdist - 1.0f))*er;
+					expf(-nparams.spring*(sqrtf(lsq)- sepdist))*er;
 		}
 			
 	}
@@ -442,6 +442,7 @@ __global__ void NListVarK(uint* nlist,	//	o:neighbor list
 	float4 pos1 = dpos[idx];
 	float3 p1 = make_float3(pos1);
 	float rad1 = pos1.w;
+	distm_sq = rad1 > 20e-6f ? 1.1f*1.1f : distm_sq;
 	uint hash = phash[idx];
 	uint n_neigh = 0;
 

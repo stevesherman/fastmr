@@ -49,8 +49,9 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize):
 	newp.origin = m_params.worldOrigin;
 	newp.Linv = 1/newp.L;
 	newp.max_fdr_sq = 8.0f*m_params.pRadius[0]*8.0f*m_params.pRadius[0];
-	newp.numAdjCells = 27;
-	newp.spring = m_params.spring;
+	newp.numAdjCells = 125;
+	//newp.spring = m_params.spring;
+	newp.spring = 1.0f/(.02f*2.0f*m_params.pRadius[0]);
 	//newp.uf = m_params.uf;
 	newp.shear = m_params.shear;
 	newp.visc = m_params.viscosity;
@@ -276,8 +277,8 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 		deltaTime = 0;
 		m_randSet--;
 	} else {
-		NListFixed(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
-				m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, 8.1f*m_params.pRadius[0]);
+		NListVar(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
+				m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, 4.05f);
 
 		resetMom((float4*) m_dMoments, newp.extH, newp.N);	
 		//note that odd numbers of iterations prevent sheet formation
@@ -313,30 +314,7 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 						m_dPos4, 		// doesn't matter
 						m_dForces4,		//k4
 						m_dMoments, m_dNeighList, m_dNumNeigh, newp.N, deltaTime);
-			
-/*			magFricForces(	m_dSortedPos,	//yin: yn 
-						m_dSortedPos,	//yn
-						m_dPos1,   	//yn + 1/2*k1
-						m_dTemp,   	//k1
-						m_dMoments, m_dForces1, m_dNeighList, m_dNumNeigh, newp.N, deltaTime/2);
-			cutilCheckMsg("magFricForces");
-			magFricForces(	m_dPos1, 		//yin: yn + 1/2*k1
-						m_dSortedPos, 	//yn
-						m_dPos2, 		//yn + 1/2*k2
-						m_dForces2,		//k2
-						m_dMoments, m_dTemp, m_dNeighList, m_dNumNeigh, newp.N, deltaTime/2);
-			magFricForces(	m_dPos2, 		//yin: yn + 1/2*k2
-						m_dSortedPos, 	//yn
-						m_dPos3, 		//yn + k3
-						m_dForces3,		//k3
-						m_dMoments, m_dForces2, m_dNeighList, m_dNumNeigh, newp.N, deltaTime);
-			magFricForces(	m_dPos3, 		//yin: yn + k3
-						m_dSortedPos, 	//yn
-						m_dPos4, 		// doesn't matter
-						m_dForces4,		//k4
-						m_dMoments, m_dForces3, m_dNeighList, m_dNumNeigh, newp.N, deltaTime);
-*/
-
+		
 			integrateRK4(m_dSortedPos, m_dPos1, m_dPos2, m_dPos3, m_dPos4, m_dTemp, 
 					m_dForces2, m_dForces3, m_dForces4, deltaTime, newp.N);
 			solve = false;	
@@ -696,9 +674,10 @@ ParticleSystem::reset(ParticleConfig config, uint numiter)
 				uint idc = i + j*newp.gridSize.x + k*newp.gridSize.y*newp.gridSize.x;
 				uint hash = m_hCellHash[idc];
 				uint cn = 0;
-				for(int kk=-1; kk<=1; kk++){
-					for(int jj=-1; jj<=1; jj++){
-						for(int ii=-1; ii<=1;ii++){
+				const int cdist = 2;
+				for(int kk=-cdist; kk<=cdist; kk++){
+					for(int jj=-cdist; jj<=cdist; jj++){
+						for(int ii=-cdist; ii<=cdist;ii++){
 							int ai = ii + i;
 							int aj = jj + j;
 							int ak = kk + k;
