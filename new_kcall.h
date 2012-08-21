@@ -3,11 +3,14 @@ extern "C" {
 
 void setNParameters(NewParams* hostParams);
 
-void comp_phash(float* dpos, uint* d_pHash, uint* d_pIndex, uint* d_cell_hash, uint numParticles, uint numGridCells);
+void comp_phash(float* dpos, uint* d_pHash, uint* d_pIndex, uint* d_cell_hash, 
+		uint numParticles, uint numGridCells);
 
-void find_cellStart(uint* cellStart, uint* cellEnd, uint* phash, uint numParticles,uint numCells);
+void find_cellStart(uint* cellStart, uint* cellEnd, uint* phash, uint numParticles,
+		uint numCells);
 
-void reorder(uint* sortedIndex, float* sortedPos, float* sortedMom, float* oldPos, float* oldMom, uint numParticles);
+void reorder(uint* sortedIndex, float* sortedPos, float* sortedMom, float* oldPos, 
+		float* oldMom, uint numParticles);
 
 uint NListFixed(uint*& nlist, uint* num_neigh, float* dpos, 
 		uint* phash, uint* cellStart, uint* cellEnd, 
@@ -15,32 +18,36 @@ uint NListFixed(uint*& nlist, uint* num_neigh, float* dpos,
 		uint& max_neigh, float max_dist);
 
 
-uint NListVar(uint*& nlist, uint* num_neigh, float* dpos, 
+uint NListVar(uint*& nlist, uint* num_neigh, float* dpos, float* dmom,
 		uint* phash, uint* cellStart, uint* cellEnd, 
 		uint* cellAdj, uint numParticles, 
 		uint& max_neigh, float max_dist);
 
-void magForces(	float* dSortedPos, float* dIntPos, float* newPos, float* dForce, float* dMom, uint* nlist, uint* num_neigh, uint numParticles, float deltaTime);
+void magForces(	float* dSortedPos, float* dIntPos, float* newPos, float* dForce, 
+		float* dMom, uint* nlist, uint* num_neigh, 
+		uint numParticles, float deltaTime);
 
-void magFricForces(	float* dSortedPos, float* dIntPos, float* newPos, float* dForceOut, float* dMom, float* dForceIn,
+void magFricForces(	float* dSortedPos, float* dIntPos, float* newPos, 
+		float* dForceOut, float* dMom, float* dForceIn,
 		uint* nlist, uint* num_neigh, uint numParticles, float deltaTime);
 
 
 void collision_new(	const float* dSortedPos, const float* dOldVel, 
-					const uint* nlist, const uint* num_neigh, float* dNewVel, float* dNewPos, 
-					uint numParticles, float deltaTime);
-void mutualMagn(const float* pos, const float* oldMag, float* newMag, const uint* nlist, const uint* numNeigh, uint numParticles);
+		const uint* nlist, const uint* num_neigh, float* dNewVel, 
+		float* dNewPos, uint numParticles, float deltaTime);
 
-void integrateRK4(
-							const float* oldPos,
-							float* PosA,
-							const float* PosB,
-							const float* PosC,
-							const float* PosD,
-							float* forceA,
-							const float* forceB,
-							const float* forceC,
-							const float* forceD,
-							const float deltaTime,
-							const uint numParticles);
+void mutualMagn(const float* pos, const float* oldMag, float* newMag, 
+		const uint* nlist, const uint* numNeigh, uint numParticles);
+
+void integrateRK4(	const float* oldPos,
+					float* PosA,
+					const float* PosB,
+					const float* PosC,
+					const float* PosD,
+					float* forceA,
+					const float* forceB,
+					const float* forceC,
+					const float* forceD,
+					const float deltaTime,
+					const uint numParticles);
 }

@@ -91,14 +91,14 @@ return maxn;
 
 //uses an adjacency definition based on max_dist_m*(rad1 + rad2)
 //Note: this func modifies nlist and max_neigh
-uint NListVar(uint*& nlist, uint* num_neigh, float* dpos, uint* phash, uint* cellStart, 
+uint NListVar(uint*& nlist, uint* num_neigh, float* dpos, float* dmom, uint* phash, uint* cellStart, 
 		uint* cellEnd, uint* cellAdj, uint numParticles, uint& max_neigh, float max_dist_m)
 {
 	uint numThreads = 128;
 	uint numBlocks = iDivUp2(numParticles, numThreads);
 	cudaFuncSetCacheConfig(NListVarK, cudaFuncCachePreferL1);	
 
-	NListVarK<<<numBlocks, numThreads>>>(nlist, num_neigh, (float4*) dpos, 
+	NListVarK<<<numBlocks, numThreads>>>(nlist, num_neigh, (float4*) dpos, (float4*) dmom,
 			phash, cellStart, cellEnd, cellAdj, max_neigh, max_dist_m*max_dist_m);
 	
 	//cudaDeviceSynchronize();
@@ -113,7 +113,7 @@ uint NListVar(uint*& nlist, uint* num_neigh, float* dpos, uint* phash, uint* cel
 		cudaFree(nlist);
 		assert(cudaMalloc((void**)&nlist, numParticles*maxn*sizeof(uint)) == cudaSuccess);
 		cudaMemset(nlist, 0, numParticles*maxn*sizeof(uint));
-		NListVarK<<<numBlocks, numThreads>>>(nlist, num_neigh, (float4*) dpos, 
+		NListVarK<<<numBlocks, numThreads>>>(nlist, num_neigh, (float4*) dpos, (float4*) dmom,
 			phash, cellStart, cellEnd, cellAdj, maxn, max_dist_m*max_dist_m);
 		cutilCheckMsg("after extension");
 		max_neigh = maxn;

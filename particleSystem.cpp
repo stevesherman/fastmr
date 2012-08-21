@@ -31,7 +31,7 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize):
 	m_numGridCells = m_params.gridSize.x*m_params.gridSize.y*m_params.gridSize.z;	
 	
 	m_params.uf = MU_C*MU_0;
-	m_params.Cpol = 4.0f*PI_F*pow(m_params.pRadius[0],3)*
+	m_params.Cpol = 4.0f*PI_F*pow(1.5*m_params.pRadius[0],3)*
 		(m_params.mu_p[0] - MU_C)/(m_params.mu_p[0]+2.0f*MU_C);	
 	m_params.globalDamping = 0.8f; 
     m_params.cdamping = 0.03f;
@@ -50,14 +50,14 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize):
 	newp.Linv = 1/newp.L;
 	newp.max_fdr_sq = 8.0f*m_params.pRadius[0]*8.0f*m_params.pRadius[0];
 	newp.numAdjCells = 125;
-	//newp.spring = m_params.spring;
-	newp.spring = 1.0f/(.02f*2.0f*m_params.pRadius[0]);
+	newp.spring = m_params.spring;
+	//newp.spring = 1.0f/(.02f*2.0f*m_params.pRadius[0]);
 	//newp.uf = m_params.uf;
 	newp.shear = m_params.shear;
 	newp.visc = m_params.viscosity;
 	newp.extH = m_params.externalH;
 	newp.Cpol = m_params.Cpol;
-	newp.pin_d = 1.5f;  //ybot < radius*pin_d
+	newp.pin_d = 1.05f;  //ybot < radius*pin_d
 	newp.tanfric = 1e-5f;
 	m_contact_dist = 1.05f;	
 	_initialize();
@@ -77,8 +77,7 @@ ParticleSystem::~ParticleSystem()
     newp.N = 0;
 }
 
-uint
-ParticleSystem::createVBO(uint size)
+uint ParticleSystem::createVBO(uint size)
 {
     GLuint vbo;
     glGenBuffers(1, &vbo);
@@ -269,15 +268,15 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 	if(m_randSet > 0)
 	{
 		
-		NListVar(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
-				m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, 1.5f);
+		NListVar(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dMoments, m_dGridParticleHash, 
+				m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, 1.3f);
 
 		collision_new(m_dSortedPos, m_dForces2, m_dNeighList, m_dNumNeigh, m_dForces1, m_dPos1, newp.N, 0.01f);
 		pswap(m_dForces1, m_dForces2);		
 		deltaTime = 0;
 		m_randSet--;
 	} else {
-		NListVar(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
+		NListVar(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dMoments, m_dGridParticleHash, 
 				m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, 4.05f);
 
 		resetMom((float4*) m_dMoments, newp.extH, newp.N);	
@@ -395,7 +394,7 @@ void ParticleSystem::getMagnetization()
 
 void ParticleSystem::getGraphData(uint& graphs, uint& edges)
 {
-	uint maxn = NListVar(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
+	uint maxn = NListVar(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dMoments, m_dGridParticleHash, 
 			m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, m_contact_dist);
 	edges = numInteractions(m_dNumNeigh, newp.N)/2;
 	
@@ -502,7 +501,7 @@ ParticleSystem::logParams(FILE* file)
 			m_params.mu_p[1], m_params.mu_p[2]);
 	fprintf(file, "\t\t a0: %.2g\t a1: %.2g\t a2: %.2g\n", m_params.pRadius[0], 
 			m_params.pRadius[1],m_params.pRadius[2]);
-	fprintf(file, "\t\t std0: %2.g\t std1: %.25g\t std2: %.2g\n", m_params.rstd[0], m_params.rstd[1], m_params.rstd[2]);
+	fprintf(file, "\t\t std0: %.3g\t std1: %.3g\t std2: %.3g\n", m_params.rstd[0], m_params.rstd[1], m_params.rstd[2]);
 	fprintf(file, "grid: %d x %d x %d = %d cells\n", newp.gridSize.x, newp.gridSize.y, 
 			newp.gridSize.z, newp.numCells);
 	fprintf(file, "worldsize: %.4gmm x %.4gmm x %.4gmm\n", newp.L.x*1e3f, 

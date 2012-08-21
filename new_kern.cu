@@ -43,12 +43,13 @@ __global__ void comp_phashK(const float4* d_pos, uint* d_pHash, uint* d_pIndex, 
 
 	float4 pos = d_pos[idx];
 	float3 p = make_float3(pos);
+	//float rad = pos.w;
 	uint3 gpos = calcGPos(p);
 	uint cell_id = gpos.x + gpos.y*nparams.gridSize.x + 
 		gpos.z*nparams.gridSize.y*nparams.gridSize.x;
 	
 	d_pIndex[idx] = idx;
-	d_pHash[idx] = d_CellHash[cell_id];
+	d_pHash[idx] = d_CellHash[cell_id] ;//+ (rad < 3e-6f ? nparams.numCells : 0 );
 }
 
 
@@ -160,7 +161,7 @@ __global__ void magForcesK( const float4* dSortedPos,	//i: pos we use to calcula
 			dm1m2 = dot(m1,m2);
 			
 			force += 3.0f*MU_0*MU_C*dm1m2/(2.0f*PI_F*sepdist*sepdist*sepdist*sepdist)*
-					expf(-nparams.spring*(sqrtf(lsq)- sepdist))*er;
+					expf(-nparams.spring*(sqrtf(lsq)/sepdist - 1))*er;
 		}
 			
 	}
@@ -429,6 +430,7 @@ __global__ void NListFixedK(uint* nlist,	//	o:neighbor list
 __global__ void NListVarK(uint* nlist,	//	o:neighbor list
 							uint* num_neigh,//	o:num neighbors
 							const float4* dpos,	// 	i: position
+							const float4* dmom, //  i: moments
 							const uint* phash,
 							const uint* cellStart,
 							const uint* cellEnd,
@@ -442,12 +444,14 @@ __global__ void NListVarK(uint* nlist,	//	o:neighbor list
 	float4 pos1 = dpos[idx];
 	float3 p1 = make_float3(pos1);
 	float rad1 = pos1.w;
-	distm_sq = rad1 > 20e-6f ? 1.1f*1.1f : distm_sq;
+	float Cp1 = (dmom[idx]).w;
+	float dist_sq;
 	uint hash = phash[idx];
 	uint n_neigh = 0;
 
 	for(uint i = 0; i < nparams.numAdjCells; i++)
 	{
+		dist_sq = (Cp1 == 0 ? 1.05f*1.05f : distm_sq);
 		//uint nhash = cellAdj[i*nparams.numCells + hash];
 		uint nhash = cellAdj[i + hash*nparams.numAdjCells];
 		uint cstart = cellStart[nhash];
@@ -461,6 +465,9 @@ __global__ void NListVarK(uint* nlist,	//	o:neighbor list
 			//float4 pos2 = tex1Dfetch(pos_tex, idx2);
 			float3 p2 = make_float3(pos2);
 			float rad2 = pos2.w;
+			float Cp2 = dmom[idx2].w;
+			dist_sq = (Cp2 == 0 ? 1.05f*1.05f : dist_sq);
+
 			float sepdist = rad1+rad2;
 
 			float3 dr = p1 - p2;
@@ -468,7 +475,7 @@ __global__ void NListVarK(uint* nlist,	//	o:neighbor list
 			dr.z = dr.z - nparams.L.z*rintf(dr.z*nparams.Linv.z);
 			float lsq = dr.x*dr.x + dr.y*dr.y + dr.z*dr.z;
 			
-			if(lsq <= distm_sq*sepdist*sepdist){
+			if(lsq <= dist_sq*sepdist*sepdist){
 				if(n_neigh < max_neigh)
 					nlist[nparams.N*n_neigh + idx] = idx2;
 				n_neigh++;
