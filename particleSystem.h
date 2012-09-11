@@ -93,7 +93,7 @@ protected: // data
 	uint m_numParticles;
 	uint m_maxNeigh;
 	int m_randSet;
-
+	float rand_scale;
     // params
     SimParams m_params;
     NewParams newp;

@@ -75,7 +75,7 @@ float timestep = 500; //in units of nanoseconds
 double simtime = 0.0f;
 float externalH = 100; //kA/m
 float colorFmax = 3.5;
-float maxdxpct = 0.03;
+float maxdxpct = 0.035;
 float contact_dist = 1.05f;
 float pin_dist = 1.05f;
 float3 worldSize;
@@ -472,7 +472,7 @@ void key(unsigned char key, int /*x*/, int /*y*/)
 		frameCount = 0; simtime = 0; resolved = 0;
         break;
     case '2':
-        psystem->reset(ParticleSystem::CONFIG_RANDOM, 300);
+        psystem->reset(ParticleSystem::CONFIG_RANDOM, 1100);
 		frameCount=0; simtime = 0; resolved = 0;
 		break;
     case '3':
@@ -660,8 +660,8 @@ main(int argc, char** argv)
 	pdata.flowvel = 2e7; 
 	pdata.nd_plug = .20;	
 
-	float radius = 3.5f;
-	//haven't figured out a good way to do this in a nonunrolled loop
+	float radius = 4.0f;
+	//haven't figured out a good way to do this in a loop
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "rad0", (float*) &radius);
 	pdata.pRadius[0] = radius*1e-6f;
 	pdata.volfr[0] = 0.30f;
@@ -673,7 +673,7 @@ main(int argc, char** argv)
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "std0", (float*) &pdata.rstd[0]);	
 //	pdata.rstd[0] *= 1e-6f;
 	//rad0 is mean diameter
-	float med_diam = pdata.pRadius[0]*expf(-0.5f*pdata.rstd[0]*pdata.rstd[0]);
+	float med_diam = pdata.pRadius[0];//*expf(-0.5f*pdata.rstd[0]*pdata.rstd[0]);
 	if(pdata.rstd[0] > 0){
 		pdata.nump[0] = (pdata.volfr[0]*volume) / (4.0f/3.0f*PI_F*pow(med_diam,3)
 					*exp(4.5f*pdata.rstd[0]*pdata.rstd[0]));
@@ -684,18 +684,18 @@ main(int argc, char** argv)
 	pdata.pRadius[1] = radius*1e-6f;
 	pdata.volfr[1] = 0.0f;
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "vfr1", (float*) &pdata.volfr[1]);
-	pdata.mu_p[1] = 1;
+	pdata.mu_p[1] = 2000;
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "xi1", (float*) &pdata.mu_p[1]);
 	pdata.nump[1] = (pdata.volfr[1] * volume) / (4.0f/3.0f*PI_F*pow(pdata.pRadius[1],3)); 
 	pdata.rstd[1] = 0;
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "std1", (float*) &pdata.rstd[1]);
 	
-	radius = 3.5f;
+	radius = 25.0f;
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "rad2", (float*) &radius);
 	pdata.pRadius[2] = radius*1e-6f;
 	pdata.volfr[2] = 0.0f;
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "vfr2", (float*) &pdata.volfr[2]);
-	pdata.mu_p[2] = 2000;
+	pdata.mu_p[2] = 1;
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "xi2", (float*) &pdata.mu_p[2]);
 	pdata.nump[2] = (pdata.volfr[2] * volume) / (4.0f/3.0f*PI_F*pow(pdata.pRadius[2],3)); 
 	pdata.rstd[2] = 0;
@@ -736,7 +736,7 @@ main(int argc, char** argv)
 
 	initParamList();
 	setParams();
-	psystem->reset(ParticleSystem::CONFIG_RANDOM, 200);
+	psystem->reset(ParticleSystem::CONFIG_RANDOM, 1100);
     if (g_useGL) 
         initMenus();
 

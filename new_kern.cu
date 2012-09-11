@@ -314,7 +314,7 @@ __global__ void mutualMagnK(const float4* pos,
 		er.x = er.x - nparams.L.x*rintf(er.x*nparams.Linv.x);
 		er.z = er.z - nparams.L.x*rintf(er.z*nparams.Linv.z);
 		float lsq = er.x*er.x + er.y*er.y + er.z*er.z;
-		if(lsq < nparams.max_fdr_sq) {
+		if(lsq <= nparams.max_fdr_sq) {
 			float invdist = rsqrtf(lsq);
 			er = er*invdist;
 			H += 1.0f/(4.0f*PI_F)*(3.0f*dot(m2,er)*er - m2)*invdist*invdist*invdist;
@@ -451,7 +451,7 @@ __global__ void NListVarK(uint* nlist,	//	o:neighbor list
 
 	for(uint i = 0; i < nparams.numAdjCells; i++)
 	{
-		dist_sq = (Cp1 == 0 ? 1.05f*1.05f : distm_sq);
+		dist_sq = (Cp1 == 0  && distm_sq > 2.0f) ? 1.05f*1.05f : distm_sq;
 		//uint nhash = cellAdj[i*nparams.numCells + hash];
 		uint nhash = cellAdj[i + hash*nparams.numAdjCells];
 		uint cstart = cellStart[nhash];
@@ -466,7 +466,7 @@ __global__ void NListVarK(uint* nlist,	//	o:neighbor list
 			float3 p2 = make_float3(pos2);
 			float rad2 = pos2.w;
 			float Cp2 = dmom[idx2].w;
-			dist_sq = (Cp2 == 0 ? 1.05f*1.05f : dist_sq);
+			dist_sq = (Cp2 == 0 && distm_sq > 2.0f) ? 1.05f*1.05f : dist_sq;
 
 			float sepdist = rad1+rad2;
 
@@ -485,6 +485,74 @@ __global__ void NListVarK(uint* nlist,	//	o:neighbor list
 	num_neigh[idx] = n_neigh;
 }
 
+__global__ void NListCutK(uint* nlist,	//	o:neighbor list
+							uint* num_neigh,//	o:num neighbors
+							const float4* dpos,	// 	i: position
+							const float4* dmom, //  i: moments
+							const uint* phash,
+							const uint* cellStart,
+							const uint* cellEnd,
+							const uint* cellAdj,
+							uint max_neigh, float cut)
+{
+	uint idx = blockIdx.x*blockDim.x + threadIdx.x;
+	if(idx >= nparams.N)
+		return;
+	float4 pos1 = dpos[idx];
+	float3 p1 = make_float3(pos1);
+	float rad1 = pos1.w;
+	float Cp1 = (dmom[idx]).w;
+	uint hash = phash[idx];
+	uint n_neigh = 0;
+
+	for(uint i = 0; i < nparams.numAdjCells; i++)
+	{
+		//uint nhash = cellAdj[i*nparams.numCells + hash];
+		uint nhash = cellAdj[i + hash*nparams.numAdjCells];
+		uint cstart = cellStart[nhash];
+		if(cstart == 0xffffffff)//if cell empty, skip cell 
+			continue;
+		uint cend = cellEnd[nhash];
+		for(uint idx2 = cstart; idx2 < cend; idx2++){
+			if(idx == idx2)//if self interacting, skip
+				continue;
+			float4 pos2 = dpos[idx2];
+			//float4 pos2 = tex1Dfetch(pos_tex, idx2);
+			float3 p2 = make_float3(pos2);
+			float rad2 = pos2.w;
+			float Cp2 = dmom[idx2].w;
+			
+			float bigrad, lilrad;
+			if(rad1 > rad2) {
+				bigrad = rad1;
+				lilrad = rad2;
+			} else {
+				bigrad = rad2;
+				lilrad = rad1;
+			}
+			
+			float sepdist;
+			if(Cp1 == 0 || Cp2 == 0.0f) {
+				sepdist = 1.05f*bigrad + 1.05f*lilrad;
+			} else {
+				sepdist = cut*bigrad + (8.1f-cut)*lilrad;
+			}
+
+
+			float3 dr = p1 - p2;
+			dr.x = dr.x - nparams.L.x*rintf(dr.x*nparams.Linv.x);
+			dr.z = dr.z - nparams.L.z*rintf(dr.z*nparams.Linv.z);
+			float lsq = dr.x*dr.x + dr.y*dr.y + dr.z*dr.z;
+			
+			if(lsq <= sepdist*sepdist){
+				if(n_neigh < max_neigh)
+					nlist[nparams.N*n_neigh + idx] = idx2;
+				n_neigh++;
+			}
+		}
+	}
+	num_neigh[idx] = n_neigh;
+}
 
 __global__ void collisionK( const float4* sortedPos,	//i: pos we use to calculate forces
 							const float4* oldVel,
@@ -492,7 +560,8 @@ __global__ void collisionK( const float4* sortedPos,	//i: pos we use to calculat
 							const uint* num_neigh,	//i: the number of inputs
 							float4* newVel,		//o: the magnetic force on a particle
 							float4* newPos,		//o: the integrated position
-							float deltaTime)	//o: the timestep
+							float radExp,
+							float deltaTime)	//i: the timestep
 {
 	uint idx = blockDim.x*blockIdx.x + threadIdx.x;
 	if(idx >= nparams.N)
@@ -521,19 +590,19 @@ __global__ void collisionK( const float4* sortedPos,	//i: pos we use to calculat
 		er.z = er.z - nparams.L.x*rintf(er.z*nparams.Linv.z);
 		float dist = sqrtf(er.x*er.x + er.y*er.y + er.z*er.z);
 	
-		float sepdist = 1.01f*(radius1 + radius2);
+		float sepdist = radExp*(radius1 + radius2);
 
 		//do a quicky spring	
 		if(dist  <= sepdist){
 			er = er/dist;
 			float3 relVel = v2-v1;  	
-			force += -10.0f*(dist - sepdist)*er;
-			force += .03f*relVel;
+			force += -1e7f*sepdist*(dist - sepdist)*er;
+			force += .08f*relVel;
 		}
 			
 	}
 	//yes this integration is totally busted, but it works, soooo
-	v1 = (v1 + force)*.8f;
+	v1 = (v1 + force*deltaTime/(2e3f*radius1))*.8f;
 	p1 = p1 + v1*deltaTime;
 
 	p1.x -= nparams.L.x * rintf(p1.x*nparams.Linv.x);

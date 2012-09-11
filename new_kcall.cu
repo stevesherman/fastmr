@@ -122,7 +122,40 @@ uint NListVar(uint*& nlist, uint* num_neigh, float* dpos, float* dmom, uint* pha
 return maxn;
 }
 
-		
+//uses an adjacency definition based on	2.0f*bigrad + 6.0f*lilrad 
+//Note: this func modifies nlist and max_neigh
+uint NListCut(uint*& nlist, uint* num_neigh, float* dpos, float* dmom, uint* phash, uint* cellStart, 
+		uint* cellEnd, uint* cellAdj, uint numParticles, uint& max_neigh, float cut)
+{
+	uint numThreads = 128;
+	uint numBlocks = iDivUp2(numParticles, numThreads);
+	cudaFuncSetCacheConfig(NListVarK, cudaFuncCachePreferL1);	
+
+	NListCutK<<<numBlocks, numThreads>>>(nlist, num_neigh, (float4*) dpos, (float4*) dmom,
+			phash, cellStart, cellEnd, cellAdj, max_neigh, cut);
+	
+	//cudaDeviceSynchronize();
+	cutilCheckMsg("NListCut");
+	thrust::maximum<uint> mx;
+	thrust::device_ptr<uint> numneigh_ptr(num_neigh);
+	uint maxn = thrust::reduce(numneigh_ptr, numneigh_ptr+numParticles, 0, mx);
+	cutilCheckMsg("max nneigh thrust call");	
+	
+	if(maxn > max_neigh){
+		printf("Extending CutNList from %u to %u\n", max_neigh, maxn);
+		cudaFree(nlist);
+		assert(cudaMalloc((void**)&nlist, numParticles*maxn*sizeof(uint)) == cudaSuccess);
+		cudaMemset(nlist, 0, numParticles*maxn*sizeof(uint));
+		NListCutK<<<numBlocks, numThreads>>>(nlist, num_neigh, (float4*) dpos, (float4*) dmom,
+			phash, cellStart, cellEnd, cellAdj, maxn, cut);
+		cutilCheckMsg("after extension");
+		max_neigh = maxn;
+	}
+
+return maxn;
+}
+
+
 void magForces(	float* dSortedPos, float* dIntPos, float* newPos, float* dForce, float* dMom, 
 		uint* nlist, uint* num_neigh, uint numParticles, float deltaTime)
 {
@@ -211,12 +244,9 @@ void integrateRK4(
 }
 
 
-
-
-
-
 void collision_new(	const float* dSortedPos, const float* dOldVel, const uint* nlist, 
-		const uint* num_neigh, float* dNewVel, float* dNewPos, uint numParticles, float deltaTime)
+		const uint* num_neigh, float* dNewVel, float* dNewPos, uint numParticles, 
+		float raxExp, float deltaTime)
 {
 	uint numThreads = 128;
 	uint numBlocks = iDivUp2(numParticles, numThreads);
@@ -225,8 +255,8 @@ void collision_new(	const float* dSortedPos, const float* dOldVel, const uint* n
 	cudaBindTexture(0, pos_tex, dSortedPos, numParticles*sizeof(float4));
 	cudaBindTexture(0, vel_tex, dOldVel, numParticles*sizeof(float4));
 
-	collisionK<<<numBlocks,numThreads>>>( 	(float4*)dSortedPos, (float4*) dOldVel,
-											nlist, num_neigh, (float4*) dNewVel, (float4*) dNewPos, deltaTime);
+	collisionK<<<numBlocks,numThreads>>>( 	(float4*)dSortedPos, (float4*) dOldVel, nlist, 
+			num_neigh, (float4*) dNewVel, (float4*) dNewPos, raxExp, deltaTime);
 	
 	cudaUnbindTexture(pos_tex);
 	cudaUnbindTexture(vel_tex);

@@ -61,7 +61,7 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize):
 	newp.tanfric = 1e-5f;
 	m_contact_dist = 1.05f;	
 	_initialize();
-
+	rand_scale = 0.1f;
 }
 
 void pswap(float*& a, float*& b) {
@@ -267,17 +267,23 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 
 	if(m_randSet > 0)
 	{
-		
+		const float rstep = .001f;
+		rand_scale = rand_scale+rstep >= 1.0f ? 1.0f : rand_scale + rstep;
+		rand_scale = rand_scale > .9f  && rand_scale < 1.0f ? 
+			rand_scale - 0.05f*rstep : rand_scale;
+		float rand_factor = 1.0f - 1.0f*powf(1.0f - rand_scale, 1.0f/1.0f);
+		//rand_scale = 1.0f;
+		//printf("rand_scale: %f\t rand_factor: %f\n", rand_scale, rand_factor);
 		NListVar(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dMoments, m_dGridParticleHash, 
-				m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, 1.3f);
-
-		collision_new(m_dSortedPos, m_dForces2, m_dNeighList, m_dNumNeigh, m_dForces1, m_dPos1, newp.N, 0.01f);
-		pswap(m_dForces1, m_dForces2);		
+				m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, rand_factor*1.03f);
+		collision_new(m_dSortedPos, m_dForces2, m_dNeighList, m_dNumNeigh, m_dForces1, 
+				m_dPos1, newp.N, rand_factor*1.01f, 2e-3f);
+		pswap(m_dForces1, m_dForces2);
 		deltaTime = 0;
 		m_randSet--;
 	} else {
-		NListVar(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dMoments, m_dGridParticleHash, 
-				m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, 4.05f);
+		NListCut(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dMoments, m_dGridParticleHash, 
+				m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, 2.05f);
 
 		resetMom((float4*) m_dMoments, newp.extH, newp.N);	
 		//note that odd numbers of iterations prevent sheet formation
@@ -582,6 +588,7 @@ ParticleSystem::reset(ParticleConfig config, uint numiter)
 	default:
 	case CONFIG_RANDOM:
 		{
+			rand_scale = 0.3f;
 			int ti = 0; 			
 			for(int j=0; j < 3; j++) {
 				float maxrad = 0, minrad = 1e8;
@@ -592,8 +599,8 @@ ParticleSystem::reset(ParticleConfig config, uint numiter)
 					if(m_params.rstd[j] > 0) {
 						u=frand(); v=frand();
 						norm = sqrt(-2.0*log(u))*cos(2.0*PI_F*v);
-						float med_diam = m_params.pRadius[j]*
-								expf(-0.5f*m_params.rstd[j]*m_params.rstd[j]);
+						float med_diam = m_params.pRadius[j];//*
+								//expf(-0.5f*m_params.rstd[j]*m_params.rstd[j]);
 						radius = exp(norm*m_params.rstd[j])*med_diam;	
 					} else {
 						radius = m_params.pRadius[j];
