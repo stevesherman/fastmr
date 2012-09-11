@@ -81,7 +81,7 @@ uint NListFixed(uint*& nlist, uint* num_neigh, float* dpos, uint* phash, uint* c
 		assert(cudaMalloc((void**)&nlist, numParticles*maxn*sizeof(uint)) == cudaSuccess);
 		cudaMemset(nlist, 0, numParticles*maxn*sizeof(uint));
 		NListFixedK<<<numBlocks, numThreads>>>(nlist, num_neigh, (float4*) dpos, 
-			phash, cellStart, cellEnd, cellAdj, maxn, max_dist*max_dist);
+				phash, cellStart, cellEnd, cellAdj, maxn, max_dist*max_dist);
 		cutilCheckMsg("after extension");
 		max_neigh = maxn;
 	}
@@ -113,8 +113,8 @@ uint NListVar(uint*& nlist, uint* num_neigh, float* dpos, float* dmom, uint* pha
 		cudaFree(nlist);
 		assert(cudaMalloc((void**)&nlist, numParticles*maxn*sizeof(uint)) == cudaSuccess);
 		cudaMemset(nlist, 0, numParticles*maxn*sizeof(uint));
-		NListVarK<<<numBlocks, numThreads>>>(nlist, num_neigh, (float4*) dpos, (float4*) dmom,
-			phash, cellStart, cellEnd, cellAdj, maxn, max_dist_m*max_dist_m);
+		NListVarK<<<numBlocks, numThreads>>>(nlist, num_neigh, (float4*) dpos, 
+				(float4*) dmom, phash, cellStart, cellEnd, cellAdj, maxn, max_dist_m*max_dist_m);
 		cutilCheckMsg("after extension");
 		max_neigh = maxn;
 	}
@@ -131,8 +131,8 @@ uint NListCut(uint*& nlist, uint* num_neigh, float* dpos, float* dmom, uint* pha
 	uint numBlocks = iDivUp2(numParticles, numThreads);
 	cudaFuncSetCacheConfig(NListVarK, cudaFuncCachePreferL1);	
 
-	NListCutK<<<numBlocks, numThreads>>>(nlist, num_neigh, (float4*) dpos, (float4*) dmom,
-			phash, cellStart, cellEnd, cellAdj, max_neigh, cut);
+	NListCutK<<<numBlocks, numThreads>>>(nlist, num_neigh, (float4*) dpos, 
+			(float4*) dmom, phash, cellStart, cellEnd, cellAdj, max_neigh, cut);
 	
 	//cudaDeviceSynchronize();
 	cutilCheckMsg("NListCut");
@@ -146,8 +146,8 @@ uint NListCut(uint*& nlist, uint* num_neigh, float* dpos, float* dmom, uint* pha
 		cudaFree(nlist);
 		assert(cudaMalloc((void**)&nlist, numParticles*maxn*sizeof(uint)) == cudaSuccess);
 		cudaMemset(nlist, 0, numParticles*maxn*sizeof(uint));
-		NListCutK<<<numBlocks, numThreads>>>(nlist, num_neigh, (float4*) dpos, (float4*) dmom,
-			phash, cellStart, cellEnd, cellAdj, maxn, cut);
+		NListCutK<<<numBlocks, numThreads>>>(nlist, num_neigh, (float4*) dpos, 
+				(float4*) dmom, phash, cellStart, cellEnd, cellAdj, maxn, cut);
 		cutilCheckMsg("after extension");
 		max_neigh = maxn;
 	}
@@ -156,8 +156,8 @@ return maxn;
 }
 
 
-void magForces(	float* dSortedPos, float* dIntPos, float* newPos, float* dForce, float* dMom, 
-		uint* nlist, uint* num_neigh, uint numParticles, float deltaTime)
+void magForces(	float* dSortedPos, float* dIntPos, float* newPos, float* dForce, 
+		float* dMom, uint* nlist, uint* num_neigh, uint numParticles, float deltaTime)
 {
 	assert(newPos != dIntPos);
 	assert(newPos != dSortedPos);
@@ -168,8 +168,9 @@ void magForces(	float* dSortedPos, float* dIntPos, float* newPos, float* dForce,
 	cudaBindTexture(0, pos_tex, dSortedPos, numParticles*sizeof(float4));
 	cudaBindTexture(0, mom_tex, dMom, numParticles*sizeof(float4));
 
-	magForcesK<<<numBlocks,numThreads>>>( 	(float4*)dSortedPos, (float4*) dMom, (float4*) dIntPos, 
-											nlist, num_neigh, (float4*) dForce, (float4*) newPos, deltaTime);
+	magForcesK<<<numBlocks,numThreads>>>( (float4*)dSortedPos, (float4*) dMom, 
+			(float4*) dIntPos, nlist, num_neigh, (float4*) dForce, 
+			(float4*) newPos, deltaTime);
 	
 	cudaUnbindTexture(pos_tex);
 	cudaUnbindTexture(mom_tex);
@@ -177,8 +178,9 @@ void magForces(	float* dSortedPos, float* dIntPos, float* newPos, float* dForce,
 	cutilCheckMsg("Magforces error");
 }
 
-void magFricForces(	float* dSortedPos, float* dIntPos, float* newPos, float* dForceOut, float* dMom, float* dForceIn,
-		uint* nlist, uint* num_neigh, uint numParticles, float deltaTime)
+void magFricForces(	float* dSortedPos, float* dIntPos, float* newPos, 
+		float* dForceOut, float* dMom, float* dForceIn, uint* nlist, 
+		uint* num_neigh, uint numParticles, float deltaTime)
 {
 	assert(newPos != dIntPos);
 	assert(newPos != dSortedPos);
@@ -189,8 +191,9 @@ void magFricForces(	float* dSortedPos, float* dIntPos, float* newPos, float* dFo
 	cudaBindTexture(0, pos_tex, dSortedPos, numParticles*sizeof(float4));
 	cudaBindTexture(0, mom_tex, dMom, numParticles*sizeof(float4));
 
-	magFricForcesK<<<numBlocks,numThreads>>>( 	(float4*)dSortedPos, (float4*) dMom, (float4*) dForceIn, (float4*) dIntPos, 
-											nlist, num_neigh, (float4*) dForceOut, (float4*) newPos, deltaTime);
+	magFricForcesK<<<numBlocks,numThreads>>>((float4*)dSortedPos, (float4*) dMom, 
+			(float4*) dForceIn, (float4*) dIntPos, nlist, num_neigh, 
+			(float4*) dForceOut, (float4*) newPos, deltaTime);
 	
 	cudaUnbindTexture(pos_tex);
 	cudaUnbindTexture(mom_tex);
@@ -199,7 +202,8 @@ void magFricForces(	float* dSortedPos, float* dIntPos, float* newPos, float* dFo
 }
 
 
-void mutualMagn(const float* pos, const float* oldMag, float* newMag, const uint* nlist, const uint* numNeigh, uint numParticles)
+void mutualMagn(const float* pos, const float* oldMag, float* newMag, 
+		const uint* nlist, const uint* numNeigh, uint numParticles)
 {
 	uint numThreads = 128;
 	uint numBlocks = iDivUp2(numParticles, numThreads);
@@ -208,24 +212,17 @@ void mutualMagn(const float* pos, const float* oldMag, float* newMag, const uint
 	cudaBindTexture(0, pos_tex, pos, numParticles*sizeof(float4));
 	cudaBindTexture(0, mom_tex, oldMag, numParticles*sizeof(float4));
 
-	mutualMagnK<<<numBlocks, numThreads>>>( (float4*) pos, (float4*) oldMag, (float4*) newMag, nlist, numNeigh);
+	mutualMagnK<<<numBlocks, numThreads>>>( (float4*) pos, (float4*) oldMag, 
+			(float4*) newMag, nlist, numNeigh);
 
 	cudaUnbindTexture(pos_tex);
 	cudaUnbindTexture(mom_tex);
 	cutilCheckMsg("Mutual Magn error");
 }
-void integrateRK4(
-							const float* oldPos,
-							float* PosA,
-							const float* PosB,
-							const float* PosC,
-							const float* PosD,
-							float* forceA,
-							const float* forceB,
-							const float* forceC,
-							const float* forceD,
-							const float deltaTime,
-							const uint numParticles)
+void integrateRK4(const float* oldPos, float* PosA, const float* PosB,
+		const float* PosC, const float* PosD, float* forceA, 
+		const float* forceB, const float* forceC, const float* forceD, 
+		float deltaTime, uint numParticles)
 {
 	uint numThreads = 256; 
 	uint numBlocks = iDivUp2(numParticles, numThreads);

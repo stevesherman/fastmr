@@ -663,19 +663,16 @@ main(int argc, char** argv)
 	float radius = 4.0f;
 	//haven't figured out a good way to do this in a loop
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "rad0", (float*) &radius);
-	pdata.pRadius[0] = radius*1e-6f;
+	pdata.pRadius[0] = radius*1e-6f; //median diameter
 	pdata.volfr[0] = 0.30f;
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "vfr0", (float*) &pdata.volfr[0]);
-	pdata.mu_p[0] = 2000;
+	pdata.mu_p[0] = 2000; //relative permeability
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "xi0", (float*) &pdata.mu_p[0]);
 	pdata.nump[0] = (pdata.volfr[0] * volume) / (4.0f/3.0f*PI_F*pow(pdata.pRadius[0],3)); 
-	pdata.rstd[0] = 0;
+	pdata.rstd[0] = 0; //sigma0 in log normal distribution
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "std0", (float*) &pdata.rstd[0]);	
-//	pdata.rstd[0] *= 1e-6f;
-	//rad0 is mean diameter
-	float med_diam = pdata.pRadius[0];//*expf(-0.5f*pdata.rstd[0]*pdata.rstd[0]);
-	if(pdata.rstd[0] > 0){
-		pdata.nump[0] = (pdata.volfr[0]*volume) / (4.0f/3.0f*PI_F*pow(med_diam,3)
+	if(pdata.rstd[0] > 0){//eq 3.24 crowe
+		pdata.nump[0] = (pdata.volfr[0]*volume) / (4.0f/3.0f*PI_F*pow(pdata.pRadius[0],3)
 					*exp(4.5f*pdata.rstd[0]*pdata.rstd[0]));
 	}
 
@@ -689,6 +686,10 @@ main(int argc, char** argv)
 	pdata.nump[1] = (pdata.volfr[1] * volume) / (4.0f/3.0f*PI_F*pow(pdata.pRadius[1],3)); 
 	pdata.rstd[1] = 0;
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "std1", (float*) &pdata.rstd[1]);
+	if(pdata.rstd[1] > 0){//eq 3.24 crowe
+		pdata.nump[1] = (pdata.volfr[1]*volume) / (4.0f/3.0f*PI_F*pow(pdata.pRadius[1],3)
+					*exp(4.5f*pdata.rstd[1]*pdata.rstd[1]));
+	}
 	
 	radius = 25.0f;
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "rad2", (float*) &radius);
@@ -700,6 +701,10 @@ main(int argc, char** argv)
 	pdata.nump[2] = (pdata.volfr[2] * volume) / (4.0f/3.0f*PI_F*pow(pdata.pRadius[2],3)); 
 	pdata.rstd[2] = 0;
 	cutGetCmdLineArgumentf(argc, (const char**)argv, "std2", (float*) &pdata.rstd[2]);
+	if(pdata.rstd[2] > 0){//eq 3.24 crowe
+		pdata.nump[2] = (pdata.volfr[2]*volume) / (4.0f/3.0f*PI_F*pow(pdata.pRadius[2],3)
+					*exp(4.5f*pdata.rstd[2]*pdata.rstd[2]));
+	}
 
 	pdata.numBodies = pdata.nump[0] + pdata.nump[1] + pdata.nump[2];
 	bool benchmark = cutCheckCmdLineFlag(argc, (const char**) argv, "benchmark") != 0;
