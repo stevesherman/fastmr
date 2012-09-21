@@ -61,6 +61,7 @@ void renderStuff(const float* post,
 				float* renderPos, 
 				float* renderColor,
 				float colorFmax,
+				float scale,
 				uint numParticles);
 }
 

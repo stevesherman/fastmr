@@ -49,7 +49,7 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize):
 	newp.origin = m_params.worldOrigin;
 	newp.Linv = 1/newp.L;
 	newp.max_fdr_sq = 8.0f*m_params.pRadius[0]*8.0f*m_params.pRadius[0];
-	newp.numAdjCells = 125;
+	newp.numAdjCells = 27;
 	newp.spring = m_params.spring;
 	//newp.spring = 1.0f/(.02f*2.0f*m_params.pRadius[0]);
 	//newp.uf = m_params.uf;
@@ -62,6 +62,9 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize):
 	m_contact_dist = 1.05f;	
 	_initialize();
 	rand_scale = 0.1f;
+	dx_since = 1e6f;
+	rebuildDist = 0.01;
+	it_since_sort = 0;
 }
 
 void pswap(float*& a, float*& b) {
@@ -231,7 +234,7 @@ ParticleSystem::_finalize()
 }
 
 // step the simulation
-float ParticleSystem::update(float deltaTime, float maxdxpct)
+float ParticleSystem::update(float deltaTime, float limdxpct)
 {
     assert(m_bInitialized);
     float *dRendPos, *dRendColor;
@@ -240,7 +243,7 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
         dRendPos = (float *) mapGLBufferObject(&m_cuda_posvbo_resource);
     	dRendColor = (float *) mapGLBufferObject(&m_cuda_colorvbo_resource);
 		
-		renderStuff(m_dPos1, m_dMoments, m_dForces1, dRendPos, dRendColor, m_colorFmax, newp.N);
+		renderStuff(m_dPos1, m_dMoments, m_dForces1, dRendPos, dRendColor, m_colorFmax, rand_scale, newp.N);
 		
 		unmapGLBufferObject(m_cuda_posvbo_resource);
 		unmapGLBufferObject(m_cuda_colorvbo_resource);
@@ -252,38 +255,43 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 	cutilCheckMsg("ohno");	
 	setParameters(&m_params);
 	setNParameters(&newp);
-
-	//isOutofBounds((float4*) m_dPos1, newp.origin.x, newp.N);
-	comp_phash(m_dPos1, m_dGridParticleHash, m_dGridParticleIndex, m_dCellHash, newp.N, m_numGridCells);
-	// sort particles based on hash
-	sortParticles(m_dGridParticleHash, m_dGridParticleIndex, newp.N);
-	// reorder particle arrays into sorted order and
-	// find start and end of each cell - also sets the fixed moment
-	find_cellStart(m_dCellStart, m_dCellEnd, m_dGridParticleHash, newp.N, m_numGridCells);
-	cutilCheckMsg("Cstart");
-	reorder(m_dGridParticleIndex, m_dSortedPos, m_dTemp, m_dPos1, m_dMoments, newp.N);	
-	cutilCheckMsg("Reorder");
-	pswap(m_dMoments, m_dTemp);			
-
+	bool rebuildNList = false;	
+	//printf("dx_since: %f\t cut: %f\n", dx_since, rebuildDist*m_params.pRadius[0]);
+	if(dx_since > rebuildDist*m_params.pRadius[0])
+	{
+		rebuildNList = true;
+		sort_and_reorder();
+	}
 	if(m_randSet > 0)
 	{
 		const float rstep = .001f;
 		rand_scale = rand_scale+rstep >= 1.0f ? 1.0f : rand_scale + rstep;
-		rand_scale = rand_scale > .9f  && rand_scale < 1.0f ? 
-			rand_scale - 0.05f*rstep : rand_scale;
-		float rand_factor = 1.0f - 1.0f*powf(1.0f - rand_scale, 1.0f/1.0f);
-		//rand_scale = 1.0f;
-		//printf("rand_scale: %f\t rand_factor: %f\n", rand_scale, rand_factor);
-		NListVar(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dMoments, m_dGridParticleHash, 
-				m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, rand_factor*1.03f);
-		collision_new(m_dSortedPos, m_dForces2, m_dNeighList, m_dNumNeigh, m_dForces1, 
-				m_dPos1, newp.N, rand_factor*1.01f, 2e-3f);
-		pswap(m_dForces1, m_dForces2);
+		rand_scale = rand_scale > .85f  && rand_scale < 1.0f ? rand_scale - 0.05f*rstep : rand_scale;
+		//printf("rand_scale: %f\n", rand_scale);
+		if(rebuildNList) {
+			NListVar(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dMoments, m_dGridParticleHash, 
+					m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, rand_scale*1.1f);
+			dx_since = 0.0f;
+		}
+		dx_since += 0.03f*m_params.pRadius[0];
+		//sorted pos and forces 1 are the old positions
+		collision_new(m_dSortedPos, m_dForces1, m_dNeighList, m_dNumNeigh, m_dForces2, 
+				m_dPos2, newp.N, rand_scale*1.01f, 1e-3f);
+		collision_new(m_dPos2, m_dForces2, m_dNeighList, m_dNumNeigh, m_dForces3, 
+				m_dPos3, newp.N, rand_scale*1.01f, 1e-3f);
+		
+		pswap(m_dForces1, m_dForces3);
+		pswap(m_dPos1, m_dPos3);
 		deltaTime = 0;
 		m_randSet--;
 	} else {
-		NListCut(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dMoments, m_dGridParticleHash, 
-				m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, 2.05f);
+		if (rebuildNList) {
+			NListCut(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dMoments, m_dGridParticleHash, 
+					m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, 2.05f);
+			dx_since = 0.0f;
+		} else {
+			pswap(m_dSortedPos, m_dPos1);//make sortespos have output from previous iter
+		}
 
 		resetMom((float4*) m_dMoments, newp.extH, newp.N);	
 		//note that odd numbers of iterations prevent sheet formation
@@ -294,6 +302,7 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 
 		bool solve = true;
 
+		float dx_moved = 0.0f;
 		//if the particles are moving too much, half the timestep and resolve
 		while(solve) {
 		
@@ -322,6 +331,7 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 		
 			integrateRK4(m_dSortedPos, m_dPos1, m_dPos2, m_dPos3, m_dPos4, m_dTemp, 
 					m_dForces2, m_dForces3, m_dForces4, deltaTime, newp.N);
+
 			solve = false;	
 		
 					
@@ -330,18 +340,18 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 			//find max force
 			//printf("callmax\n");
 			//maxf = maxforce( (float4*) m_dForces1, newp.N);
-			//maxFdx = maxdxpct*Cd*m_params.pRadius[0]/deltaTime; //force to cause a dx
-			float maxDx = maxvel((float4*)m_dTemp,(float4*)m_dPos1,newp)*deltaTime;
-			float limDx = maxdxpct*m_params.pRadius[0];
-			
-			if(maxDx > limDx){
+			//maxFdx = limdxpct*Cd*m_params.pRadius[0]/deltaTime; //force to cause a dx
+			dx_moved = maxvel((float4*)m_dTemp,(float4*)m_dPos1,newp)*deltaTime;
+			//limdx is limit allowed per iteration
+			float limDx = limdxpct*m_params.pRadius[0];
+			if(dx_moved > limDx){
 				solve = true;
 			} else { //if not excess force, check for out of bounds
 				solve = isOutofBounds((float4*)m_dPos1, -newp.origin.x, newp.N);
 			}
 			if(solve){
 				deltaTime *=.5f;
-				printf("force excess ratio %.3g\treducing timestep %.3g\n", maxDx/limDx, deltaTime);
+				printf("force excess ratio %.3g\treducing timestep %.3g\n", dx_moved/limDx, deltaTime);
 				//getBadP();	
 			}
 			if(deltaTime <= 1e-30f && deltaTime != 0) {
@@ -351,10 +361,28 @@ float ParticleSystem::update(float deltaTime, float maxdxpct)
 				assert(false);
 			}
 		}
+		dx_since += dx_moved + newp.shear*9.0f*m_params.pRadius[0]*deltaTime;	
 		pswap(m_dTemp, m_dForces1);
 	}
+	it_since_sort++;
 		
 	return deltaTime;
+}
+
+
+void ParticleSystem::sort_and_reorder() {
+		
+	// sort particles based on hash
+	comp_phash(m_dPos1, m_dGridParticleHash, m_dGridParticleIndex, m_dCellHash, newp.N, m_numGridCells);
+	// reorder particle arrays into sorted order and
+	sortParticles(m_dGridParticleHash, m_dGridParticleIndex, newp.N);
+	// find start and end of each cell - also sets the fixed moment
+	find_cellStart(m_dCellStart, m_dCellEnd, m_dGridParticleHash, newp.N, m_numGridCells);
+	//reorder
+	reorder(m_dGridParticleIndex, m_dSortedPos, m_dTemp, m_dPos1, m_dMoments, newp.N);	
+	pswap(m_dMoments, m_dTemp);
+	//printf("it since sort: %d\n", it_since_sort);	
+	it_since_sort = 0;
 }
 
 void
@@ -400,9 +428,11 @@ void ParticleSystem::getMagnetization()
 
 void ParticleSystem::getGraphData(uint& graphs, uint& edges)
 {
+	sort_and_reorder();//make sure the particles in good positions for computing graph data
 	uint maxn = NListVar(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dMoments, m_dGridParticleHash, 
 			m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, m_contact_dist);
 	edges = numInteractions(m_dNumNeigh, newp.N)/2;
+	dx_since = 1e6f;//set this to a really large number so that the nlist is regenerated
 	
 	m_hNeighList = new uint[newp.N*maxn];
 	copyArrayFromDevice(m_hNeighList, m_dNeighList, 0, sizeof(uint)*newp.N*maxn);
@@ -579,88 +609,57 @@ ParticleSystem::initGrid(uint3 size, float3 spacing, float3 jitter, uint numPart
 }
 
 void
-ParticleSystem::reset(ParticleConfig config, uint numiter)
+ParticleSystem::reset(uint numiter, float scale_start)
 {
 	zeroDevice();
-	m_randSet = numiter;
-	switch(config)
-	{
-	default:
-	case CONFIG_RANDOM:
-		{
-			rand_scale = 0.3f;
-			int ti = 0; 			
-			for(int j=0; j < 3; j++) {
-				float maxrad = 0, minrad = 1e8;
-				int i; double radius,u,v,mu_p,cpol,norm, vol;
-				double vtot = 0; 
+	dx_since = 1e6f;
+	it_since_sort = 0;
+	m_randSet = numiter;//how many iterations
+	rand_scale = scale_start;//how large we start them at
+	
+	int ti = 0;	
+	for(int j=0; j < 3; j++) {
+		float maxrad = 0, minrad = 1e8;
+		int i; double radius,u,v,mu_p,cpol,norm, vol;
+		double vtot = 0; 
 
-				for(i = 0; i < (int) m_params.nump[j]; i++){
-					if(m_params.rstd[j] > 0) {
-						u=frand(); v=frand();
-						norm = sqrt(-2.0*log(u))*cos(2.0*PI_F*v);
-						float med_diam = m_params.pRadius[j];//*
-								//expf(-0.5f*m_params.rstd[j]*m_params.rstd[j]);
-						radius = exp(norm*m_params.rstd[j])*med_diam;	
-					} else {
-						radius = m_params.pRadius[j];
-					}
-					maxrad = radius > maxrad ? radius : maxrad;
-					minrad = radius < minrad ? radius : minrad;
-
-					mu_p = m_params.mu_p[j];
-					vol = 4.0f/3.0f*PI_F*radius*radius*radius;
-					cpol = 3.0f*(mu_p - MU_C)/(mu_p+2.0f*MU_C)*vol;
-					vtot += vol;
-
-					m_hPos[4*(i+ti)+0] = 2.0f*newp.origin.x * (frand() - 0.5f);
-					m_hPos[4*(i+ti)+1] = 2.0f*(newp.origin.y+radius) * (frand() - 0.5f);
-					m_hPos[4*(i+ti)+2] = 2.0f*newp.origin.z * (frand() - 0.5f);
-					m_hPos[4*(i+ti)+3] = radius;
-					m_hMoments[4*(i+ti)+0] = cpol*newp.extH.x;
-					m_hMoments[4*(i+ti)+1] = cpol*newp.extH.y;
-					m_hMoments[4*(i+ti)+2] = cpol*newp.extH.z;
-					m_hMoments[4*(i+ti)+3] = cpol;
-					
-				}
-				ti+=i;
-				printf("minrad: %g maxrad: %g\n", minrad/m_params.pRadius[j], 
-						maxrad/m_params.pRadius[j]);
-				printf("actual vfr = %g\n", vtot*newp.Linv.x*newp.Linv.y*newp.Linv.z);
-
-			}
-				}// move randSetIter as a parameter
-		
-		break;
-
-    case CONFIG_GRID:
-        {
-            //uint s;
-			uint3 gridSize;
-			float spc;		
-			if(newp.L.z == 0){
-				spc = sqrt(newp.L.x*newp.L.y/newp.N);
-				gridSize.x=ceil(newp.L.x/spc);
-				gridSize.y=ceil(newp.L.y/spc);
-				gridSize.z=1;
+		for(i = 0; i < (int) m_params.nump[j]; i++){
+			if(m_params.rstd[j] > 0) {
+				u=frand(); v=frand();
+				norm = sqrt(-2.0*log(u))*cos(2.0*PI_F*v);
+				float med_diam = m_params.pRadius[j];//*
+						//expf(-0.5f*m_params.rstd[j]*m_params.rstd[j]);
+				radius = exp(norm*m_params.rstd[j])*med_diam;	
 			} else {
-				spc = pow(newp.L.x*newp.L.y*newp.L.z/newp.N, 1.0f/3.0f);
-				gridSize.x=ceil(newp.L.x/spc);
-				gridSize.y=ceil(newp.L.y/spc);
-				gridSize.z=ceil(newp.L.z/spc);
+				radius = m_params.pRadius[j];
 			}
-			float3 spacing = newp.L/make_float3(gridSize.x,gridSize.y,gridSize.z);
-			float3 jitter = 1.2*(spacing - 2*m_params.pRadius[0])/2;
-			printf("gs %d %d %d\n", gridSize.x, gridSize.y, gridSize.z);
-			printf("spacing: %.4g %.4g %.4g, particle radius: %g\n", spacing.x, 
-					spacing.y, spacing.z, m_params.pRadius[0]);
-			printf("jitter: %.4g %.4g %.4g\n", jitter.x,jitter.y,jitter.z);
-			initGrid(gridSize, spacing, jitter, newp.N);
-        }
-        break;
+			maxrad = radius > maxrad ? radius : maxrad;
+			minrad = radius < minrad ? radius : minrad;
 
+			mu_p = m_params.mu_p[j];
+			vol = 4.0f/3.0f*PI_F*radius*radius*radius;
+			cpol = 3.0f*(mu_p - MU_C)/(mu_p+2.0f*MU_C)*vol;
+			vtot += vol;
+
+			m_hPos[4*(i+ti)+0] = 2.0f*newp.origin.x * (frand() - 0.5f);
+			m_hPos[4*(i+ti)+1] = 2.0f*(newp.origin.y+radius) * (frand() - 0.5f);
+			m_hPos[4*(i+ti)+2] = 2.0f*newp.origin.z * (frand() - 0.5f);
+			m_hPos[4*(i+ti)+3] = radius;
+			m_hMoments[4*(i+ti)+0] = cpol*newp.extH.x;
+			m_hMoments[4*(i+ti)+1] = cpol*newp.extH.y;
+			m_hMoments[4*(i+ti)+2] = cpol*newp.extH.z;
+			m_hMoments[4*(i+ti)+3] = cpol;
+			
+		}
+		ti+=i;
+		printf("minrad: %g maxrad: %g\n", minrad/m_params.pRadius[j], 
+				maxrad/m_params.pRadius[j]);
+		printf("actual vfr = %g\n", vtot*newp.Linv.x*newp.Linv.y*newp.Linv.z);
 
 	}
+		
+
+    
 //	printf("gs: %d x%d x%d\n", newp.gridSize.x, newp.gridSize.y, newp.gridSize.z);
 //	printf("alloced: %d", m_numGridCells*newp.numAdjCells);
 	//place holder, allowing us to put in the hilbert ordered hashes
@@ -680,7 +679,7 @@ ParticleSystem::reset(ParticleConfig config, uint numiter)
 				uint idc = i + j*newp.gridSize.x + k*newp.gridSize.y*newp.gridSize.x;
 				uint hash = m_hCellHash[idc];
 				uint cn = 0;
-				const int cdist = 2;
+				const int cdist = 1;
 				for(int kk=-cdist; kk<=cdist; kk++){
 					for(int jj=-cdist; jj<=cdist; jj++){
 						for(int ii=-cdist; ii<=cdist;ii++){

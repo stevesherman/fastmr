@@ -21,12 +21,14 @@ __global__ void writeRender(const float4* pos,
 							float4* rendPos, 
 							float4* rendColor,
 							float colorFmax,
+							float scale,
 							uint numParticles)
 {
 	uint index = blockIdx.x*blockDim.x + threadIdx.x;
 	if(index >= numParticles) return;
 	
 	float4 rpos = pos[index];
+	rpos.w = rpos.w * scale;
 	float Cpol = moments[index].w;
 	//rpos.w = (Cpol == 1.0f) ? 0.0 : rpos.w;
 	//rendPos[index] = rpos;

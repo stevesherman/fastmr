@@ -19,20 +19,8 @@ public:
 	
 	ParticleSystem(SimParams params, bool useGL, float3 worldSize);
 
-    enum ParticleConfig
-    {
-	    CONFIG_RANDOM,
-	    CONFIG_GRID,
-	    _NUM_CONFIGS
-    };
-
-    enum ParticleArray
-    {
-        POSITION,
-        VELOCITY,
-    };
-    float update(float deltaTime, float maxdxpct);
-    void reset(ParticleConfig config, uint numiter);
+    float update(float deltaTime, float limdxpct);
+    void reset(uint numiter, float scale_start);
 
     int    getNumParticles() const { return m_numParticles; }
 
@@ -67,6 +55,8 @@ public:
 	void setExternalH(float3 x) { m_params.externalH = x; newp.extH = x;}
 	void setPinDist(float x) { newp.pin_d = x;}
 	void setContactDist(float x) {m_contact_dist = x;}
+	void setRebuildDist(float x) {rebuildDist = x;}
+
 
 	float getParticleRadius() { return m_params.pRadius[0]; }
     uint3 getGridSize() { return m_params.gridSize; }
@@ -75,8 +65,7 @@ public:
 	
 	void getGraphData(uint& graphs, uint& edges);
 	uint getInteractions();
-	int getInteractionRadius() { return m_params.interactionr;}	
-
+	int getInteractionRadius() { return m_params.interactionr;}
 
 protected: // methods
     ParticleSystem() {}
@@ -84,7 +73,8 @@ protected: // methods
 
     void _initialize();
     void _finalize();
-
+	void sort_and_reorder();
+	uint it_since_sort;
     void initGrid(uint3 size, float3 spacing, float3 jitter, uint numParticles);
 
 protected: // data
@@ -94,7 +84,9 @@ protected: // data
 	uint m_maxNeigh;
 	int m_randSet;
 	float rand_scale;
-    // params
+    float dx_since;
+	float rebuildDist;	//the distance in units of rad[0] traveled before we resolve
+	// params
     SimParams m_params;
     NewParams newp;
 	uint3 m_gridSize;

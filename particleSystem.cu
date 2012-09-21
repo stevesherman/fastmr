@@ -355,6 +355,7 @@ void renderStuff(const float* pos,
 				float* rendPos, 
 				float* rendColor,
 				float colorFmax,
+				float scale,
 				uint numParticles)
 {
 	uint numThreads, numBlocks;
@@ -365,6 +366,7 @@ void renderStuff(const float* pos,
 											(float4*)rendPos,
 											(float4*)rendColor,
 											colorFmax,
+											scale,
 											numParticles);
 	cutilCheckMsg("Render Kernel execution failed");
 }

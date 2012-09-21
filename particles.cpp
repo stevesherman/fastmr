@@ -75,7 +75,9 @@ float timestep = 500; //in units of nanoseconds
 double simtime = 0.0f;
 float externalH = 100; //kA/m
 float colorFmax = 3.5;
-float maxdxpct = 0.035;
+float iter_dxpct = 0.035;
+float rebuild_pct = 0.1;
+
 float contact_dist = 1.05f;
 float pin_dist = 1.05f;
 float3 worldSize;
@@ -125,15 +127,14 @@ void cleanup()
 void setParams(){
     psystem->setGlobalDamping(pdata.globalDamping);
     psystem->setRepelSpring(pdata.spring);
-//    psystem->setCollideDamping(pdata.cdamping);
     psystem->setShear(pdata.shear);
-//	psystem->setInteractionRadius(pdata.interactionr);
     psystem->setExternalH(make_float3(0.0f, externalH*1e3, 0.0f));
 	psystem->setColorFmax(colorFmax*1e-7f);
 	psystem->setViscosity(pdata.viscosity);
 	psystem->setDipIt(pdata.mutDipIter);
 	psystem->setPinDist(pin_dist);
 	psystem->setContactDist(contact_dist);
+	psystem->setRebuildDist(rebuild_pct);
 }
 
 
@@ -143,7 +144,7 @@ void qupdate()
 	//this crude hack makes pinned particles at start unpinned so they can space and unfuck each other
 	if(simtime < timestep)	psystem->setPinDist(0.8f);
 
-	float dtout = 1e9*psystem->update(timestep*1e-9f, maxdxpct);
+	float dtout = 1e9*psystem->update(timestep*1e-9f, iter_dxpct);
 	if(fabs(dtout - timestep) > .01f*dtout)
 		resolved++;
 	if(logInterval != 0 && frameCount % logInterval == 0){
@@ -467,12 +468,12 @@ void key(unsigned char key, int /*x*/, int /*y*/)
     case 'r':
         displayEnabled = !displayEnabled;
         break;
-    case '1':
-        psystem->reset(ParticleSystem::CONFIG_GRID, 100);
-		frameCount = 0; simtime = 0; resolved = 0;
-        break;
+	case '1':
+        psystem->reset(1100, 0.3f);
+		frameCount=0; simtime = 0; resolved = 0;
+		break;
     case '2':
-        psystem->reset(ParticleSystem::CONFIG_RANDOM, 1100);
+        psystem->reset(300, 1.0f);
 		frameCount=0; simtime = 0; resolved = 0;
 		break;
     case '3':
@@ -549,9 +550,10 @@ void initParamList()
 		paramlist->AddParam(new Param<float>("shear rate", pdata.shear, 0, 2000, 50, &pdata.shear));
 		paramlist->AddParam(new Param<float>("colorFmax", colorFmax, 0, 15, 0.1f, &colorFmax));
     	paramlist->AddParam(new Param<float>("visc", pdata.viscosity, 0.001f, .25f, 0.001f, &pdata.viscosity));
-		paramlist->AddParam(new Param<float>("max dx pct", maxdxpct, 0, .2f, 0.002f, &maxdxpct));
+		paramlist->AddParam(new Param<float>("max dx pct", iter_dxpct, 0, .2f, 0.002f, &iter_dxpct));
 		paramlist->AddParam(new Param<float>("pin dist", pin_dist, 0.995f, 1.5f, 0.005f, &pin_dist));
 		paramlist->AddParam(new Param<float>("contact_dist", contact_dist, .95f, 1.25f, 0.001f, &contact_dist));
+		paramlist->AddParam(new Param<float>("rebuild dist", rebuild_pct, 0.0f, 1.0f, 0.005f, &rebuild_pct));
 	}
 }
 
@@ -639,7 +641,7 @@ main(int argc, char** argv)
 
 	cutGetCmdLineArgumentf(argc, (const char**)argc, "pin_d", (float*)&pin_dist);
 	cutGetCmdLineArgumentf(argc, (const char**)argc, "contact_dist", (float*)&contact_dist);
-	cutGetCmdLineArgumentf(argc, (const char**)argc, "maxdx",(float*)&maxdxpct); 
+	cutGetCmdLineArgumentf(argc, (const char**)argc, "iterdx",(float*)&iter_dxpct); 
 		
 	pdata.mutDipIter = 0;
 	cutGetCmdLineArgumenti(argc, (const char**)argc, "dipit", (int*) &pdata.mutDipIter);
@@ -741,7 +743,7 @@ main(int argc, char** argv)
 
 	initParamList();
 	setParams();
-	psystem->reset(ParticleSystem::CONFIG_RANDOM, 1100);
+	psystem->reset(1100, 0.4f);
     if (g_useGL) 
         initMenus();
 
