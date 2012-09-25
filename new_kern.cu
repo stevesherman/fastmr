@@ -89,7 +89,8 @@ __global__ void findCellStartK(uint* cellStart,		//o: cell starts
 }
 
 
-__global__ void reorderK(uint* dSortedIndex, float4* sortedPos, float4* sortedMom, float4* oldPos, float4* oldMom)
+__global__ void reorderK(const uint* dSortedIndex, float4* sortedPos, float4* sortedMom, 
+		const float4* oldPos, const float4* oldMom)
 {
 	uint idx = blockIdx.x*blockDim.x + threadIdx.x;
 	if(idx >= nparams.N)

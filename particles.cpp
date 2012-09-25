@@ -641,6 +641,7 @@ main(int argc, char** argv)
 
 	cutGetCmdLineArgumentf(argc, (const char**)argc, "pin_d", (float*)&pin_dist);
 	cutGetCmdLineArgumentf(argc, (const char**)argc, "contact_dist", (float*)&contact_dist);
+	cutGetCmdLineArgumentf(argc, (const char**)argc, "rebuild_dist", (float*)&rebuild_pct);
 	cutGetCmdLineArgumentf(argc, (const char**)argc, "iterdx",(float*)&iter_dxpct); 
 		
 	pdata.mutDipIter = 0;

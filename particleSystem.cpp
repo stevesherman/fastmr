@@ -256,7 +256,7 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
 	setParameters(&m_params);
 	setNParameters(&newp);
 	bool rebuildNList = false;	
-	//printf("dx_since: %f\t cut: %f\n", dx_since, rebuildDist*m_params.pRadius[0]);
+//	printf("dx_since: %g\t cut: %g\n", dx_since, rebuildDist*m_params.pRadius[0]);
 	if(dx_since > rebuildDist*m_params.pRadius[0])
 	{
 		rebuildNList = true;
@@ -286,8 +286,8 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
 		m_randSet--;
 	} else {
 		if (rebuildNList) {
-			NListCut(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dMoments, m_dGridParticleHash, 
-					m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, 2.05f);
+			NListVar(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dMoments, m_dGridParticleHash, 
+					m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, 4.0f + rebuildDist + limdxpct );
 			dx_since = 0.0f;
 		} else {
 			pswap(m_dSortedPos, m_dPos1);//make sortespos have output from previous iter
@@ -310,7 +310,7 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
 			magForces(	m_dSortedPos,	//yin: yn 
 						m_dSortedPos,	//yn
 						m_dPos1,   	//yn + 1/2*k1
-						m_dTemp,   	//k1
+						m_dForces1,   	//k1
 						m_dMoments, m_dNeighList, m_dNumNeigh, newp.N, deltaTime/2);
 			cutilCheckMsg("magForces");
 			magForces(	m_dPos1, 		//yin: yn + 1/2*k1
@@ -329,19 +329,16 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
 						m_dForces4,		//k4
 						m_dMoments, m_dNeighList, m_dNumNeigh, newp.N, deltaTime);
 		
-			integrateRK4(m_dSortedPos, m_dPos1, m_dPos2, m_dPos3, m_dPos4, m_dTemp, 
+			integrateRK4(m_dSortedPos, m_dPos1, m_dPos2, m_dPos3, m_dPos4, m_dForces1, 
 					m_dForces2, m_dForces3, m_dForces4, deltaTime, newp.N);
 
 			solve = false;	
 		
-					
-			//need some sort of controller for error
-			
 			//find max force
 			//printf("callmax\n");
 			//maxf = maxforce( (float4*) m_dForces1, newp.N);
 			//maxFdx = limdxpct*Cd*m_params.pRadius[0]/deltaTime; //force to cause a dx
-			dx_moved = maxvel((float4*)m_dTemp,(float4*)m_dPos1,newp)*deltaTime;
+			dx_moved = maxvel((float4*)m_dForces1,(float4*)m_dPos1,newp)*deltaTime;
 			//limdx is limit allowed per iteration
 			float limDx = limdxpct*m_params.pRadius[0];
 			if(dx_moved > limDx){
@@ -362,7 +359,11 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
 			}
 		}
 		dx_since += dx_moved + newp.shear*9.0f*m_params.pRadius[0]*deltaTime;	
-		pswap(m_dTemp, m_dForces1);
+		//if we're not going to rebuilt the nlist on the next iteration, update sorted pos
+		if(dx_since <= rebuildDist*m_params.pRadius[0]){
+	//		pswap(m_dSortedPos, m_dPos1);//make sortespos have output from previous iter
+		}
+
 	}
 	it_since_sort++;
 		
@@ -428,7 +429,7 @@ void ParticleSystem::getMagnetization()
 
 void ParticleSystem::getGraphData(uint& graphs, uint& edges)
 {
-	sort_and_reorder();//make sure the particles in good positions for computing graph data
+	//sort_and_reorder();//make sure the particles in good positions for computing graph data
 	uint maxn = NListVar(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dMoments, m_dGridParticleHash, 
 			m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, m_contact_dist);
 	edges = numInteractions(m_dNumNeigh, newp.N)/2;
@@ -470,7 +471,7 @@ void ParticleSystem::logStuff(FILE* file, float simtime)
 	if(m_randSet != 0)  //dont log if we're setting ICs
 		return;
 	
-	uint edges, graphs;
+	uint edges=0, graphs=0;
     getGraphData(graphs,edges);
 	float3 M = magnetization((float4*) m_dMoments, newp.N, newp.L.x*newp.L.y*newp.L.z);
 
@@ -529,21 +530,22 @@ ParticleSystem::logParams(FILE* file)
 	#endif
 	fprintf(file, "Build Date: %s\t svn version: %s\n", DATE, SVN_REV);
 	float vfrtot = m_params.volfr[0]+m_params.volfr[1]+m_params.volfr[2];
-	fprintf(file, "vfrtot: %.3f\t v0: %.3f\t v1: %.3f\t v2: %.3f\n",vfrtot,	m_params.volfr[0], 
+	fprintf(file, "vfrtot: %.4f\t v0: %.4f\t v1: %.3f\t v4: %.4f\n",vfrtot,	m_params.volfr[0], 
 			m_params.volfr[1], m_params.volfr[2]);
-	fprintf(file, "ntotal: %d\t n0: %d  \t n1: %d  \t n2: %d\n", newp.N, m_params.nump[0],
+	fprintf(file, "ntotal: %d\t n0: %d\t n1: %d  \t n2: %d\n", newp.N, m_params.nump[0],
 			m_params.nump[1], m_params.nump[2]);
-	fprintf(file, "\t\t mu_p0: %.1f \t mu_p1: %.1f \t mu_p2: %.1f \n", m_params.mu_p[0], 
+	fprintf(file, "\t\t mu0: %.1f \t mu1: %.1f \t mu2: %.1f \n", m_params.mu_p[0], 
 			m_params.mu_p[1], m_params.mu_p[2]);
-	fprintf(file, "\t\t a0: %.2g\t a1: %.2g\t a2: %.2g\n", m_params.pRadius[0], 
+	fprintf(file, "\t\t a0: %.3g\t a1: %.3g\t a2: %.3g\n", m_params.pRadius[0], 
 			m_params.pRadius[1],m_params.pRadius[2]);
 	fprintf(file, "\t\t std0: %.3g\t std1: %.3g\t std2: %.3g\n", m_params.rstd[0], m_params.rstd[1], m_params.rstd[2]);
 	fprintf(file, "grid: %d x %d x %d = %d cells\n", newp.gridSize.x, newp.gridSize.y, 
 			newp.gridSize.z, newp.numCells);
 	fprintf(file, "worldsize: %.4gmm x %.4gmm x %.4gmm\n", newp.L.x*1e3f, 
 			newp.L.y*1e3f, newp.L.z*1e3f);
-	fprintf(file, "spring: %.2f visc: %.3f  ", m_params.spring, m_params.viscosity);
-	fprintf(file, "Pin_d: %.4f Contact_d: %.4f\n", newp.pin_d, m_contact_dist);
+	fprintf(file, "spring: %.2f visc: %.2f ", m_params.spring, m_params.viscosity);
+	fprintf(file, "Pin_d: %.3f Contact_d: %.3f\n", newp.pin_d, m_contact_dist);
+	fprintf(file, "rebuildDist: %.4g\n", rebuildDist);
 	fprintf(file, "H.x: %.3g\tH.y: %.3g\tH.z: %.3g\n", newp.extH.x, newp.extH.y, newp.extH.z);
 
 }
@@ -627,8 +629,7 @@ ParticleSystem::reset(uint numiter, float scale_start)
 			if(m_params.rstd[j] > 0) {
 				u=frand(); v=frand();
 				norm = sqrt(-2.0*log(u))*cos(2.0*PI_F*v);
-				float med_diam = m_params.pRadius[j];//*
-						//expf(-0.5f*m_params.rstd[j]*m_params.rstd[j]);
+				float med_diam = m_params.pRadius[j];
 				radius = exp(norm*m_params.rstd[j])*med_diam;	
 			} else {
 				radius = m_params.pRadius[j];
@@ -652,9 +653,11 @@ ParticleSystem::reset(uint numiter, float scale_start)
 			
 		}
 		ti+=i;
+		float vfr_actual = vtot*newp.Linv.x*newp.Linv.y*newp.Linv.z;
+		m_params.volfr[j] = vfr_actual;
 		printf("minrad: %g maxrad: %g\n", minrad/m_params.pRadius[j], 
 				maxrad/m_params.pRadius[j]);
-		printf("actual vfr = %g\n", vtot*newp.Linv.x*newp.Linv.y*newp.Linv.z);
+		printf("actual vfr = %g\n", vfr_actual);
 
 	}
 		
