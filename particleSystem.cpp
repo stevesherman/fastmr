@@ -287,7 +287,7 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
 	} else {
 		if (rebuildNList) {
 			NListVar(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dMoments, m_dGridParticleHash, 
-					m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, 4.0f + rebuildDist + limdxpct );
+					m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, 4.0f + rebuildDist + .0f*limdxpct );
 			dx_since = 0.0f;
 		} else {
 			pswap(m_dSortedPos, m_dPos1);//make sortespos have output from previous iter
@@ -530,7 +530,7 @@ ParticleSystem::logParams(FILE* file)
 	#endif
 	fprintf(file, "Build Date: %s\t svn version: %s\n", DATE, SVN_REV);
 	float vfrtot = m_params.volfr[0]+m_params.volfr[1]+m_params.volfr[2];
-	fprintf(file, "vfrtot: %.4f\t v0: %.4f\t v1: %.3f\t v4: %.4f\n",vfrtot,	m_params.volfr[0], 
+	fprintf(file, "vfrtot: %.4f\t v0: %.4f\t v1: %.3f\t v2: %.4f\n",vfrtot,	m_params.volfr[0], 
 			m_params.volfr[1], m_params.volfr[2]);
 	fprintf(file, "ntotal: %d\t n0: %d\t n1: %d  \t n2: %d\n", newp.N, m_params.nump[0],
 			m_params.nump[1], m_params.nump[2]);
