@@ -49,7 +49,7 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize):
 	newp.origin = m_params.worldOrigin;
 	newp.Linv = 1/newp.L;
 	newp.max_fdr_sq = 8.0f*m_params.pRadius[0]*8.0f*m_params.pRadius[0];
-	newp.numAdjCells = 27;
+	newp.numAdjCells = 125;
 	newp.spring = m_params.spring;
 	//newp.spring = 1.0f/(.02f*2.0f*m_params.pRadius[0]);
 	//newp.uf = m_params.uf;
@@ -76,7 +76,7 @@ void pswap(float*& a, float*& b) {
 
 ParticleSystem::~ParticleSystem()
 {
-    _finalize();
+	_finalize();
     newp.N = 0;
 }
 
@@ -188,8 +188,8 @@ void
 ParticleSystem::_finalize()
 {
     assert(m_bInitialized);
-
-    delete [] m_hPos;
+	
+	delete [] m_hPos;
     delete [] m_hMoments;
 	delete [] m_hForces;
     delete [] m_hCellStart;
@@ -233,7 +233,7 @@ ParticleSystem::_finalize()
 
 }
 
-// step the simulation
+// step the simulation, limdxpct is that max distance before iteration is re-solved
 float ParticleSystem::update(float deltaTime, float limdxpct)
 {
     assert(m_bInitialized);
@@ -284,10 +284,18 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
 		pswap(m_dPos1, m_dPos3);
 		deltaTime = 0;
 		m_randSet--;
+		if(m_randSet == 0) {dx_since = 999; rand_scale = 1.0f;}
 	} else {
 		if (rebuildNList) {
-			NListVar(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dMoments, m_dGridParticleHash, 
-					m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, 4.0f + rebuildDist + .0f*limdxpct );
+			//NListVar(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dMoments, m_dGridParticleHash, 
+			//		m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, 4.0f + rebuildDist + 0.0f*limdxpct );
+			
+			NListCut(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dMoments, m_dGridParticleHash, 
+					m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh,  8.1f , 0.3f);
+			//if(dx_since == 999){
+			//	NListCut(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dMoments, m_dGridParticleHash, 
+			//		m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh,  8.1f , 0.3f);
+			//}
 			dx_since = 0.0f;
 		} else {
 			pswap(m_dSortedPos, m_dPos1);//make sortespos have output from previous iter
@@ -355,6 +363,7 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
 				printf("timestep fail!");
 				getBadP();
 				getMagnetization();
+				NListStats();
 				assert(false);
 			}
 		}
@@ -429,7 +438,7 @@ void ParticleSystem::getMagnetization()
 
 void ParticleSystem::getGraphData(uint& graphs, uint& edges)
 {
-	//sort_and_reorder();//make sure the particles in good positions for computing graph data
+	sort_and_reorder();//make sure the particles in good positions for computing graph data
 	uint maxn = NListVar(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dMoments, m_dGridParticleHash, 
 			m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, m_contact_dist);
 	edges = numInteractions(m_dNumNeigh, newp.N)/2;
@@ -463,6 +472,7 @@ ParticleSystem::dumpParticles(uint start, uint count)
 		}
 	}
 	printf("Force cut = %g\n", sqrtf(newp.max_fdr_sq));
+	getBadP();
 }
 
 void ParticleSystem::logStuff(FILE* file, float simtime)
@@ -504,6 +514,66 @@ void ParticleSystem::printStress()
 			bf*newp.Linv.x*newp.Linv.z, gs);
 }
 
+void ParticleSystem::NListStats()
+{
+	//sort_and_reorder();//make sure the particles in good positions for computing graph data
+	//uint maxn = NListCut(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dMoments, m_dGridParticleHash, 
+	//		m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, 8.0f, 0.3f);
+	uint maxn = 0;
+	uint nInter = numInteractions(m_dNumNeigh, newp.N);
+	printf("total interactions: %d\t mean interactions: %f\n", nInter, (float)nInter/newp.N);
+		dx_since = 1e6f;//set this to a really large number so that the nlist is regenerated
+	
+	//print a histogram of the number of neighbors
+	copyArrayFromDevice(m_hNumNeigh,  m_dNumNeigh,  0, sizeof(uint)*newp.N);
+	copyArrayFromDevice(m_hPos, m_dSortedPos, 0, sizeof(float)*4*newp.N);
+	uint step = 20;
+	uint nump = 0;
+	uint np_star = 0.01*newp.N;
+	double meanrad;
+	for(uint bin = 0; bin < m_maxNeigh; bin += step) {
+		nump = 0;
+		meanrad = 0;
+		for(uint ii = 0; ii < newp.N; ii++){
+			uint nn = m_hNumNeigh[ii];
+			maxn = nn > maxn ? nn : maxn;
+			if(nn >= bin && m_hNumNeigh[ii] < bin+step){
+				meanrad += m_hPos[4*ii+3];
+				nump++;
+			}
+		}
+		meanrad = meanrad/nump;
+		if(nump != 0) {
+			printf("bin %d-%d\t meanrad: %.4g\t nump: %d\t", bin, bin+step-1, meanrad,nump);
+			for(uint ii = 0; ii < round((float)nump/np_star); ii++)
+				printf("*");
+			printf("\n");
+		}
+	}
+	printf("Max number of neighbors currently: %d, allocated %d\n", maxn, m_maxNeigh);
+
+	m_hNeighList = new uint[newp.N*m_maxNeigh];
+	copyArrayFromDevice(m_hNeighList, m_dNeighList, 0, sizeof(uint)*newp.N*m_maxNeigh);
+	uint n_neigh;
+	for(uint ii = 0; ii < newp.N; ii++) {
+		n_neigh = m_hNumNeigh[ii];
+		//if(ii < 50) printf("n_neigh: %d\n", n_neigh);
+		uint numzeros = 0;
+		for(uint jj = 0; jj <  n_neigh; jj++) {
+			uint neigh = m_hNeighList[ii + newp.N*jj];
+			numzeros = (neigh == 0) ? numzeros+1 : numzeros;
+			if(neigh == ii)
+				printf("Warning: self interaction on particle %d at %d entry\n", ii, jj);
+		}
+		if(numzeros > 1){
+			printf("Excessive (%d) interactions with particle 0 by particle %d\n", numzeros,ii);
+		}
+	}
+	
+	//graphs = adjConGraphs(m_hNeighList, m_hNumNeigh, newp.N);
+	delete [] m_hNeighList;
+
+}
 void
 ParticleSystem::logParticles(FILE* file)
 {
@@ -682,7 +752,7 @@ ParticleSystem::reset(uint numiter, float scale_start)
 				uint idc = i + j*newp.gridSize.x + k*newp.gridSize.y*newp.gridSize.x;
 				uint hash = m_hCellHash[idc];
 				uint cn = 0;
-				const int cdist = 1;
+				const int cdist = 2;
 				for(int kk=-cdist; kk<=cdist; kk++){
 					for(int jj=-cdist; jj<=cdist; jj++){
 						for(int ii=-cdist; ii<=cdist;ii++){

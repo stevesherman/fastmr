@@ -38,7 +38,7 @@ public:
 	void getBadP();
 	void getMagnetization();
 	void printStress();
-
+	void NListStats();
 	void zeroDevice();
    
 	void setCollideSpring(float x) { m_params.cspring = x;}

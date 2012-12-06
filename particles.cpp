@@ -436,7 +436,10 @@ void key(unsigned char key, int /*x*/, int /*y*/)
         break;
     case '\033':
     case 'q':
-        exit(0);
+        if(g_useGL) {
+			printf("the impending segfault appears to be a graphics issue, and not a code error\n");
+		}
+		exit(0);
         break;
     case 'v':
         mode = M_VIEW;
@@ -450,6 +453,9 @@ void key(unsigned char key, int /*x*/, int /*y*/)
         break;
 	case 'i':
 		printf("interactions: %d\n", psystem->getInteractions());
+		break;
+	case 'n':
+		psystem->NListStats();
 		break;
 	case 'd':
         psystem->dumpGrid();
@@ -477,7 +483,9 @@ void key(unsigned char key, int /*x*/, int /*y*/)
 		frameCount=0; simtime = 0; resolved = 0;
 		break;
     case '3':
-        break;
+        psystem->reset(20, 1.0f);
+		frameCount=0; simtime = 0; resolved = 0;
+		break;
     case '4':
         {
             // shoot ball from camera
@@ -744,7 +752,7 @@ main(int argc, char** argv)
 
 	initParamList();
 	setParams();
-	psystem->reset(1100, 0.4f);
+	psystem->reset(11, 0.4f);
     if (g_useGL) 
         initMenus();
 

@@ -10,7 +10,7 @@ CUDEPS		     := particles_kernel.cu particles_kernel.cuh particleSystem.cuh \
 					new_kcall.cuh new_kern.cu new_kern.cuh 
 CCFILES		     := particles.cpp particleSystem.cpp render_particles.cpp shaders.cpp connectedgraphs.cpp sfc_pack.cpp
 
-CUDACCFLAGS := #-DTHRUST_DEBUG -G -g
+CUDACCFLAGS :=  #-DTHRUST_DEBUG -G -g
 SVN_REV := -D'SVN_REV="$(shell svnversion -n .)"'
 DATE_FLAG := -D'DATE="$(shell date)"'
 PFLAGS := $(SVN_REV) $(DATE_FLAG) 

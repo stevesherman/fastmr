@@ -25,7 +25,7 @@ uint NListVar(uint*& nlist, uint* num_neigh, float* dpos, float* dmom,
 
 uint NListCut(uint*& nlist, uint* num_neigh, float* dpos, float* dmom,
 		uint* phash, uint* cellStart, uint* cellEnd, uint* cellAdj, 
-		uint numParticles, uint& max_neigh, float cut);
+		uint numParticles, uint& max_neigh, float cut, float bigpct);
 
 void magForces(	float* dSortedPos, float* dIntPos, float* newPos, float* dForce, 
 		float* dMom, uint* nlist, uint* num_neigh, 

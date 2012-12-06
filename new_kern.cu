@@ -477,8 +477,9 @@ __global__ void NListVarK(uint* nlist,	//	o:neighbor list
 			float lsq = dr.x*dr.x + dr.y*dr.y + dr.z*dr.z;
 			
 			if(lsq <= dist_sq*sepdist*sepdist){
-				if(n_neigh < max_neigh)
+				if(n_neigh < max_neigh){
 					nlist[nparams.N*n_neigh + idx] = idx2;
+				}
 				n_neigh++;
 			}
 		}
@@ -494,7 +495,9 @@ __global__ void NListCutK(uint* nlist,	//	o:neighbor list
 							const uint* cellStart,
 							const uint* cellEnd,
 							const uint* cellAdj,
-							uint max_neigh, float cut)
+							uint max_neigh, 
+							float bigd,
+							float lild)
 {
 	uint idx = blockIdx.x*blockDim.x + threadIdx.x;
 	if(idx >= nparams.N)
@@ -533,10 +536,10 @@ __global__ void NListCutK(uint* nlist,	//	o:neighbor list
 			}
 			
 			float sepdist;
-			if(Cp1 == 0 || Cp2 == 0.0f) {
+			if(Cp1 == 0.0f || Cp2 == 0.0f) {
 				sepdist = 1.05f*bigrad + 1.05f*lilrad;
 			} else {
-				sepdist = cut*bigrad + (8.1f-cut)*lilrad;
+				sepdist = bigd*bigrad + lild*lilrad;
 			}
 
 
