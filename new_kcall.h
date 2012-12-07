@@ -19,22 +19,20 @@ uint NListFixed(uint*& nlist, uint* num_neigh, float* dpos,
 
 
 uint NListVar(uint*& nlist, uint* num_neigh, float* dpos, float* dmom,
-		uint* phash, uint* cellStart, uint* cellEnd, 
-		uint* cellAdj, uint numParticles, 
-		uint& max_neigh, float max_dist);
+		uint* phash, uint* cellStart, uint* cellEnd, uint* cellAdj,
+	   	uint numParticles, uint& max_neigh, float max_dist);
 
 uint NListCut(uint*& nlist, uint* num_neigh, float* dpos, float* dmom,
 		uint* phash, uint* cellStart, uint* cellEnd, uint* cellAdj, 
 		uint numParticles, uint& max_neigh, float cut, float bigpct);
 
-void magForces(	float* dSortedPos, float* dIntPos, float* newPos, float* dForce, 
-		float* dMom, uint* nlist, uint* num_neigh, 
+void magForces(const float* dSortedPos, const float* dIntPos, float* newPos, 
+		float* dForce, const float* dMom, const uint* nlist, const uint* num_neigh, 
 		uint numParticles, float deltaTime);
 
-void magFricForces(	float* dSortedPos, float* dIntPos, float* newPos, 
-		float* dForceOut, float* dMom, float* dForceIn,
-		uint* nlist, uint* num_neigh, uint numParticles, float deltaTime);
-
+void magFricForces(const float* dSortedPos, const float* dIntPos, float* newPos, 
+		float* dForceOut, const float* dMom, const float* dForceIn,
+		const uint* nlist, const uint* num_neigh, uint numParticles, float deltaTime);
 
 void collision_new(	const float* dSortedPos, const float* dOldVel, 
 		const uint* nlist, const uint* num_neigh, float* dNewVel, 

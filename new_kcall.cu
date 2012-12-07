@@ -129,7 +129,11 @@ uint NListCut(uint*& nlist, uint* num_neigh, float* dpos, float* dmom, uint* pha
 {
 	uint numThreads = 128;
 	uint numBlocks = iDivUp2(numParticles, numThreads);
-	cudaFuncSetCacheConfig(NListVarK, cudaFuncCachePreferL1);	
+	cudaFuncSetCacheConfig(NListCutK, cudaFuncCachePreferL1);	
+	
+	//cudaMemset(nlist, 0, numParticles*max_neigh*sizeof(uint));
+	//cudaMemset(num_neigh,0,numParticles*sizeof(uint));
+	//cudaDeviceSynchronize();
 	
 	NListCutK<<<numBlocks, numThreads>>>(nlist, num_neigh, (float4*) dpos, (float4*) dmom, 
 			phash, cellStart, cellEnd, cellAdj, max_neigh, cut*bigpct, cut*(1.0f - bigpct));
@@ -146,18 +150,18 @@ uint NListCut(uint*& nlist, uint* num_neigh, float* dpos, float* dmom, uint* pha
 		cudaFree(nlist);
 		assert(cudaMalloc((void**)&nlist, numParticles*maxn*sizeof(uint)) == cudaSuccess);
 		cudaMemset(nlist, 0, numParticles*maxn*sizeof(uint));
+		max_neigh = maxn;//update it if we succesfully reallocate
 		NListCutK<<<numBlocks, numThreads>>>(nlist, num_neigh, (float4*) dpos, (float4*) dmom, 
-				phash, cellStart, cellEnd, cellAdj, max_neigh, cut*bigpct, cut*(1.0f - bigpct));
+				phash, cellStart, cellEnd, cellAdj, maxn, cut*bigpct, cut*(1.0f - bigpct));
 		cutilCheckMsg("after extension");
-		max_neigh = maxn;
 	}
 
 	return maxn;
 }
 
 
-void magForces(	float* dSortedPos, float* dIntPos, float* newPos, float* dForce, 
-		float* dMom, uint* nlist, uint* num_neigh, uint numParticles, float deltaTime)
+void magForces(const float* dSortedPos, const float* dIntPos, float* newPos, float* dForce, 
+		const float* dMom, const uint* nlist, const uint* num_neigh, uint numParticles, float deltaTime)
 {
 	assert(newPos != dIntPos);
 	assert(newPos != dSortedPos);
@@ -178,9 +182,9 @@ void magForces(	float* dSortedPos, float* dIntPos, float* newPos, float* dForce,
 	cutilCheckMsg("Magforces error");
 }
 
-void magFricForces(	float* dSortedPos, float* dIntPos, float* newPos, 
-		float* dForceOut, float* dMom, float* dForceIn, uint* nlist, 
-		uint* num_neigh, uint numParticles, float deltaTime)
+void magFricForces(const float* dSortedPos, const float* dIntPos, float* newPos, 
+		float* dForceOut, float* dMom, const float* dForceIn, const uint* nlist, 
+		const uint* num_neigh, uint numParticles, float deltaTime)
 {
 	assert(newPos != dIntPos);
 	assert(newPos != dSortedPos);
@@ -219,6 +223,8 @@ void mutualMagn(const float* pos, const float* oldMag, float* newMag,
 	cudaUnbindTexture(mom_tex);
 	cutilCheckMsg("Mutual Magn error");
 }
+
+
 void integrateRK4(const float* oldPos, float* PosA, const float* PosB,
 		const float* PosC, const float* PosD, float* forceA, 
 		const float* forceB, const float* forceC, const float* forceD, 

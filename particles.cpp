@@ -79,7 +79,7 @@ float iter_dxpct = 0.035;
 float rebuild_pct = 0.1;
 
 float contact_dist = 1.05f;
-float pin_dist = 1.05f;
+float pin_dist = 0.995f;
 float3 worldSize;
 int numIterations = 0; // run until exit
 float maxtime = 0;
@@ -752,7 +752,7 @@ main(int argc, char** argv)
 
 	initParamList();
 	setParams();
-	psystem->reset(11, 0.4f);
+	psystem->reset(1100, 0.4f);
     if (g_useGL) 
         initMenus();
 
