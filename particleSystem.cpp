@@ -1,12 +1,14 @@
 #include "particleSystem.h"
-#include "particleSystem.cuh"
+#include "utilities.h"
 #include "particles_kernel.h"
 #include "connectedgraphs.h"
 #include "new_kern.h"
 #include "new_kcall.h"
 #include "sfc_pack.h"
-#include <cutil_inline.h>
-#include <cutil_math.h>
+
+#include <cuda_runtime.h>
+#include <helper_cuda.h>
+#include <helper_math.h>
 
 #include <assert.h>
 #include <math.h>
@@ -125,7 +127,7 @@ ParticleSystem::_initialize()
         m_posVbo = createVBO(memSize);    
 		registerGLBufferObject(m_posVbo, &m_cuda_posvbo_resource);
     } else {
-       	cutilSafeCall( cudaMalloc( (void **)&m_cudaPosVBO, memSize )) ;
+       	checkCudaErrors( cudaMalloc( (void **)&m_cudaPosVBO, memSize )) ;
     }
 
     cudaMalloc((void**)&m_dMoments, memSize);
@@ -173,13 +175,11 @@ ParticleSystem::_initialize()
         }
         glUnmapBufferARB(GL_ARRAY_BUFFER);
     } else {
-        cutilSafeCall( cudaMalloc( (void **)&m_cudaColorVBO, sizeof(float)*newp.N*4) );
+        checkCudaErrors( cudaMalloc( (void **)&m_cudaColorVBO, sizeof(float)*newp.N*4) );
     }
  	
 	assert(cudaMalloc((void**)&m_dNeighList, newp.N*m_maxNeigh*sizeof(uint)) == cudaSuccess);
 		
-	cutilCheckError(cutCreateTimer(&m_timer));
-	
     setParameters(&m_params);
 	m_bInitialized = true;
 }
@@ -227,8 +227,8 @@ ParticleSystem::_finalize()
         glDeleteBuffers(1, (const GLuint*)&m_posVbo);
         glDeleteBuffers(1, (const GLuint*)&m_colorVBO);
     } else {
-        cutilSafeCall( cudaFree(m_cudaPosVBO) );
-        cutilSafeCall( cudaFree(m_cudaColorVBO) );
+        checkCudaErrors( cudaFree(m_cudaPosVBO) );
+        checkCudaErrors( cudaFree(m_cudaColorVBO) );
     }
 
 }
@@ -252,7 +252,6 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
         dRendPos = (float *) m_cudaPosVBO;
 		dRendColor = (float*) m_cudaColorVBO; //shouldn't be a big deal, as color is only touched above
     }
-	cutilCheckMsg("ohno");	
 	setParameters(&m_params);
 	setNParameters(&newp);
 	bool rebuildNList = false;	
@@ -315,7 +314,6 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
 						m_dPos1,   	//yn + 1/2*k1
 						m_dForces1,   	//k1
 						m_dMoments, m_dNeighList, m_dNumNeigh, newp.N, deltaTime/2);
-			cutilCheckMsg("magForces");
 			magForces(	m_dPos1, 		//yin: yn + 1/2*k1
 						m_dSortedPos, 	//yn
 						m_dPos2, 		//yn + 1/2*k2

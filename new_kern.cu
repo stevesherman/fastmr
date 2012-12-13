@@ -9,7 +9,7 @@
 #endif
 
 #include <cuda_runtime.h>
-#include "cutil_math.h"
+#include <helper_math.h>
 #include <cstdlib>
 
 #include "new_kern.h"

@@ -9,8 +9,7 @@
 
 #include <stdio.h>
 #include <math.h>
-#include "cutil_math.h"
-#include "math_constants.h"
+#include "helper_math.h"
 #include "particles_kernel.h"
 
 __constant__ SimParams params;

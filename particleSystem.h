@@ -93,7 +93,6 @@ protected: // data
     float3 m_worldSize;
 	uint m_numGridCells;
 	float m_colorFmax;
-    uint m_timer;
 	float m_contact_dist;
 
 	// CPU data

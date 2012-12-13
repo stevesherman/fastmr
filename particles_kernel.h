@@ -48,7 +48,7 @@ struct SimParams {
     float cdamping;
     float boundaryDamping;
 
-	int mutDipIter;
+	unsigned int mutDipIter;
 
 	float colorFmax;
 

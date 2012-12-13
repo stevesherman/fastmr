@@ -15,8 +15,10 @@
 
 // This file contains C wrappers around the some of the CUDA API and the
 // kernel functions so that they can be called from "particleSystem.cpp"
-#include <cutil_inline.h>
-#include "cutil_math.h"
+#include <cuda_runtime.h>
+#include <cuda_gl_interop.h>
+#include <helper_cuda.h>
+#include <helper_cuda_gl.h>
 
 #include <cstdlib>
 #include <cstdio>
@@ -28,8 +30,6 @@
 #include <GL/freeglut.h>
 #endif
 
-#include <cuda_gl_interop.h>
-
 #include "thrust/device_ptr.h"
 #include "thrust/sort.h"
 #include "thrust/count.h"
@@ -38,7 +38,7 @@
 #include "thrust/inner_product.h"
 #include "particles_kernel.h"
 #include "new_kern.h"
-#include "particleSystem.cuh"
+#include "utilities.h"
 #include "particles_kernel.cu"
 
 using namespace thrust;
@@ -52,23 +52,22 @@ uint iDivUp(uint a, uint b)
 }
 
 void cudaInit(int argc, char **argv)
-{   
-    // use command-line specified CUDA device, otherwise use device with highest Gflops/s
-    if( cutCheckCmdLineFlag(argc, (const char**)argv, "device") ) {
-        cutilDeviceInit(argc, argv);
-    } else {
-        cudaSetDevice( cutGetMaxGflopsDeviceId() );
-    }
+{
+	int devID;
+
+	// use command-line specified CUDA device, otherwise use device with highest Gflops/s
+	devID = findCudaDevice(argc, (const char **)argv);
+
+	if (devID < 0) {
+		printf("No CUDA Capable devices found, exiting...\n");
+		exit(EXIT_SUCCESS);
+	}
 }
 
 void cudaGLInit(int argc, char **argv)
-{   
-    // use command-line specified CUDA device, otherwise use device with highest Gflops/s
-    if( cutCheckCmdLineFlag(argc, (const char**)argv, "device") ) {
-        cutilDeviceInit(argc, argv);
-    } else {
-        cudaGLSetGLDevice( cutGetMaxGflopsDeviceId() );
-    }
+{
+	// use command-line specified CUDA device, otherwise use device with highest Gflops/s
+	findCudaGLDevice(argc, (const char **)argv);
 }
 
 void threadSync()
@@ -368,7 +367,7 @@ void renderStuff(const float* pos,
 											colorFmax,
 											scale,
 											numParticles);
-	cutilCheckMsg("Render Kernel execution failed");
+	getLastCudaError("Render Kernel execution failed");
 }
 
 }   // extern "C"

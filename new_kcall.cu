@@ -3,9 +3,14 @@
 #include <cstdlib>
 #include <assert.h>
 
-#include "vector_types.h"
+//#include "vector_types.h"
+#include <cuda_runtime.h>
+#include <cuda_gl_interop.h>
+#include <helper_cuda.h>
+#include <helper_cuda_gl.h>
+#include <helper_functions.h>
+//#include "helper_inline.h"
 
-#include "cutil_inline.h"
 #include "thrust/reduce.h"
 #include "thrust/extrema.h"
 #include "thrust/device_ptr.h"
@@ -27,7 +32,7 @@ void comp_phash(float* dpos, uint* d_pHash, uint* d_pIndex, uint* d_CellHash, ui
 
 
 	comp_phashK<<<numBlocks, numThreads>>> ( (float4*) dpos, d_pHash, d_pIndex, d_CellHash);
-	cutilCheckMsg("in phash computation");	
+	getLastCudaError("in phash computation");	
 }
 
 
@@ -69,11 +74,11 @@ uint NListFixed(uint*& nlist, uint* num_neigh, float* dpos, uint* phash, uint* c
 			phash, cellStart, cellEnd, cellAdj, max_neigh, max_dist*max_dist);
 	
 	//cudaDeviceSynchronize();
-	cutilCheckMsg("NListFixed");
+	getLastCudaError("NListFixed");
 	thrust::maximum<uint> mx;
 	thrust::device_ptr<uint> numneigh_ptr(num_neigh);
 	uint maxn = thrust::reduce(numneigh_ptr, numneigh_ptr+numParticles, 0, mx);
-	cutilCheckMsg("max nneigh thrust call");	
+	getLastCudaError("max nneigh thrust call");	
 	
 	if(maxn > max_neigh){
 		printf("Extending FixNList from %u to %u\n", max_neigh, maxn);
@@ -82,7 +87,7 @@ uint NListFixed(uint*& nlist, uint* num_neigh, float* dpos, uint* phash, uint* c
 		cudaMemset(nlist, 0, numParticles*maxn*sizeof(uint));
 		NListFixedK<<<numBlocks, numThreads>>>(nlist, num_neigh, (float4*) dpos, 
 				phash, cellStart, cellEnd, cellAdj, maxn, max_dist*max_dist);
-		cutilCheckMsg("after extension");
+		getLastCudaError("after extension");
 		max_neigh = maxn;
 	}
 
@@ -102,11 +107,11 @@ uint NListVar(uint*& nlist, uint* num_neigh, float* dpos, float* dmom, uint* pha
 			phash, cellStart, cellEnd, cellAdj, max_neigh, max_dist_m*max_dist_m);
 	
 	//cudaDeviceSynchronize();
-	cutilCheckMsg("NListVar");
+	getLastCudaError("NListVar");
 	thrust::maximum<uint> mx;
 	thrust::device_ptr<uint> numneigh_ptr(num_neigh);
 	uint maxn = thrust::reduce(numneigh_ptr, numneigh_ptr+numParticles, 0, mx);
-	cutilCheckMsg("max nneigh thrust call");	
+	getLastCudaError("max nneigh thrust call");	
 	
 	if(maxn > max_neigh){
 		printf("Extending VarNList from %u to %u\n", max_neigh, maxn);
@@ -115,7 +120,7 @@ uint NListVar(uint*& nlist, uint* num_neigh, float* dpos, float* dmom, uint* pha
 		cudaMemset(nlist, 0, numParticles*maxn*sizeof(uint));
 		NListVarK<<<numBlocks, numThreads>>>(nlist, num_neigh, (float4*) dpos, 
 				(float4*) dmom, phash, cellStart, cellEnd, cellAdj, maxn, max_dist_m*max_dist_m);
-		cutilCheckMsg("after extension");
+		getLastCudaError("after extension");
 		max_neigh = maxn;
 	}
 
@@ -139,11 +144,11 @@ uint NListCut(uint*& nlist, uint* num_neigh, float* dpos, float* dmom, uint* pha
 			phash, cellStart, cellEnd, cellAdj, max_neigh, cut*bigpct, cut*(1.0f - bigpct));
 	
 	//cudaDeviceSynchronize();
-	cutilCheckMsg("NListCut");
+	getLastCudaError("NListCut");
 	thrust::maximum<uint> mx;
 	thrust::device_ptr<uint> numneigh_ptr(num_neigh);
 	uint maxn = thrust::reduce(numneigh_ptr, numneigh_ptr+numParticles, 0, mx);
-	cutilCheckMsg("max nneigh thrust call");	
+	getLastCudaError("max nneigh thrust call");	
 	
 	if(maxn > max_neigh){
 		printf("Extending CutNList from %u to %u\n", max_neigh, maxn);
@@ -153,7 +158,7 @@ uint NListCut(uint*& nlist, uint* num_neigh, float* dpos, float* dmom, uint* pha
 		max_neigh = maxn;//update it if we succesfully reallocate
 		NListCutK<<<numBlocks, numThreads>>>(nlist, num_neigh, (float4*) dpos, (float4*) dmom, 
 				phash, cellStart, cellEnd, cellAdj, maxn, cut*bigpct, cut*(1.0f - bigpct));
-		cutilCheckMsg("after extension");
+		getLastCudaError("after extension");
 	}
 
 	return maxn;
@@ -179,7 +184,7 @@ void magForces(const float* dSortedPos, const float* dIntPos, float* newPos, flo
 	cudaUnbindTexture(pos_tex);
 	cudaUnbindTexture(mom_tex);
 
-	cutilCheckMsg("Magforces error");
+	getLastCudaError("Magforces error");
 }
 
 void magFricForces(const float* dSortedPos, const float* dIntPos, float* newPos, 
@@ -202,7 +207,7 @@ void magFricForces(const float* dSortedPos, const float* dIntPos, float* newPos,
 	cudaUnbindTexture(pos_tex);
 	cudaUnbindTexture(mom_tex);
 
-	cutilCheckMsg("Magforces error");
+	getLastCudaError("Magforces error");
 }
 
 
@@ -221,7 +226,7 @@ void mutualMagn(const float* pos, const float* oldMag, float* newMag,
 
 	cudaUnbindTexture(pos_tex);
 	cudaUnbindTexture(mom_tex);
-	cutilCheckMsg("Mutual Magn error");
+	getLastCudaError("Mutual Magn error");
 }
 
 
@@ -264,6 +269,6 @@ void collision_new(	const float* dSortedPos, const float* dOldVel, const uint* n
 	cudaUnbindTexture(pos_tex);
 	cudaUnbindTexture(vel_tex);
 
-	cutilCheckMsg("hi");
+	getLastCudaError("hi");
 }
 }

@@ -5,11 +5,13 @@
 #include <GL/freeglut.h>
 
 //CUDA utilities and system inlcudes
-#include <cutil_inline.h>
-#include <cutil_gl_inline.h>
+#include <cuda_runtime.h>
+#include <helper_functions.h>
+#include <helper_math.h>
+#include <helper_cuda.h>
+#include <helper_cuda_gl.h>
 #include <rendercheck_gl.h>
 #include <math.h>
-#include <cutil_math.h>
 //Includes
 #include <cstdlib>
 #include <cstdio>
@@ -25,8 +27,8 @@
 #include "new_kern.h"
 
 //shared library test functions
-#include <shrUtils.h>
-#include <shrQATest.h>
+//#include <shrUtils.h>
+//#include <shrQATest.h>
 
 #define MAX_EPSILON_ERROR 5.00f
 #define THRESHOLD         0.30f
@@ -81,7 +83,7 @@ float rebuild_pct = 0.1;
 float contact_dist = 1.05f;
 float pin_dist = 0.995f;
 float3 worldSize;
-int numIterations = 0; // run until exit
+unsigned int numIterations = 0; // run until exit
 float maxtime = 0;
 
 
@@ -93,7 +95,7 @@ ParticleSystem *psystem = 0;
 // fps
 static int fpsCount = 0;
 static int fpsLimit = 1;
-unsigned int timer;
+StopWatchInterface *timer = NULL;
 
 ParticleRenderer *renderer = 0;
 
@@ -118,11 +120,7 @@ extern "C" void copyArrayFromDevice(void* host, const void* device, unsigned int
 
 void cleanup()
 {
-    cutilCheckError( cutDeleteTimer( timer));
-
-    if (g_CheckRender) {
-        delete g_CheckRender; g_CheckRender = NULL;
-    }
+	sdkDeleteTimer(&timer);    
 }
 void setParams(){
     psystem->setGlobalDamping(pdata.globalDamping);
@@ -197,9 +195,9 @@ void initGL(int argc, char **argv)
 void runBenchmark()
 {
     printf("Run %u particles simulation for %f us...\n\n", pdata.numBodies, maxtime);
-    cudaThreadSynchronize();
-    cutilCheckError(cutStartTimer(timer));  
-    //for (int ii = 0; ii < numIterations; ii++){
+    cudaDeviceSynchronize();
+    sdkStartTimer(&timer);
+	//for (int ii = 0; ii < numIterations; ii++){
 	while(simtime < maxtime*1e3f){
 		qupdate();	    
 	}
@@ -207,9 +205,9 @@ void runBenchmark()
 	if(logInterval > 0)
 		psystem->logStuff(datalog, simtime*1e-3f);
 
-    cudaThreadSynchronize();
-    cutilCheckError(cutStopTimer(timer));  
-    float fAvgSeconds = (1.0e-3 * cutGetTimerValue(timer))/numIterations;
+    cudaDeviceSynchronize();
+    sdkStopTimer(&timer);
+	float fAvgSeconds = (float)1.0e-3 * (float)sdkGetTimerValue(&timer)/(float)numIterations;
 
     printf("particles, Throughput = %.4f KParticles/s, Time = %.5fs, Size = %u particles\n", 
             (1.0e-3 * pdata.numBodies)/fAvgSeconds, fAvgSeconds*numIterations, pdata.numBodies);
@@ -221,20 +219,20 @@ void computeFPS()
     fpsCount++;
     if (fpsCount == fpsLimit) {
         char fps[256];
-        float ifps = 1.f / (cutGetAverageTimerValue(timer) / 1000.f);
+        float ifps = 1.f / (sdkGetAverageTimerValue(&timer) / 1000.f);
         sprintf(fps, "CUDA MR Fluid Sim (%d particles): %3.1f fps Time: %.2f us",pdata.numBodies, ifps, simtime*1e-3);  
 
         glutSetWindowTitle(fps);
         fpsCount = 0; 
 
-        cutilCheckError(cutResetTimer(timer));  
+        sdkResetTimer(&timer);  
     }
 }
 
 void display()
 {
   
-  	cutilCheckError(cutStartTimer(timer));  
+  	sdkStartTimer(&timer);  
 	setParams();
     // update the simulation
     if (!bPause)
@@ -286,7 +284,7 @@ void display()
         glEnable(GL_DEPTH_TEST);
     }
 
-    cutilCheckError(cutStopTimer(timer));  
+    sdkStopTimer(&timer);  
 	
 
     glutSwapBuffers();
@@ -486,26 +484,6 @@ void key(unsigned char key, int /*x*/, int /*y*/)
         psystem->reset(20, 1.0f);
 		frameCount=0; simtime = 0; resolved = 0;
 		break;
-    case '4':
-        {
-            // shoot ball from camera
-            float vel[4], velw[4], pos[4], posw[4];
-            vel[0] = 0.0f;
-            vel[1] = 0.0f;
-            vel[2] = -0.05f;
-            vel[3] = 0.0f;
-            ixform(vel, velw, modelView);
-
-            pos[0] = 0.0f;
-            pos[1] = 0.0f;
-            pos[2] = -2.5f;
-            pos[3] = 1.0;
-            ixformPoint(pos, posw, modelView);
-            posw[3] = 0.0f;
-
-        }
-        break;
-
     case 'h':
         displaySliders = !displaySliders;
         break;
@@ -592,24 +570,36 @@ void initMenus()
 int
 main(int argc, char** argv) 
 {
-    shrSetLogFileName ("particles.txt");
-    shrLog("%s Starting...\n\n", argv[0]);
 
+	//my addition of an anon function for setting values from cmd line
+	auto clArgInt = [=](const char* label, unsigned int& val) { 
+		if(checkCmdLineFlag(argc, (const char **) argv, label))
+			val = getCmdLineArgumentInt(argc, (const char**)argv, label);
+	};
 
+	auto clArgFloat = [=](const char* label, float& val) { 
+		if(checkCmdLineFlag(argc, (const char **) argv, label))
+			val = getCmdLineArgumentFloat(argc, (const char**)argv, label);
+	};
+
+	//set the device and gl status
 	numIterations = 0;
-	int devID = cutGetMaxGflopsDeviceId();
-	if(cutCheckCmdLineFlag(argc, (const char **)argv, "noGL")) {
+	unsigned int devID = gpuGetMaxGflopsDeviceId();
+	if(checkCmdLineFlag(argc, (const char **)argv, "noGL")) {
 		g_useGL = false;
-		cutGetCmdLineArgumenti(argc, (const char**) argv, "device", (int *) &devID);
+		clArgInt("device", devID);
 	}
 	cudaSetDevice(devID);
 	printf("devID: %d\n", devID);
-	cutGetCmdLineArgumenti(argc, (const char **)argv, "record", (int *) &recordInterval);
-	cutGetCmdLineArgumenti(argc, (const char **)argv, "logf", (int *) &logInterval);
-	cutGetCmdLineArgumenti(argc, (const char **)argv, "plogf", (int *) &partlogInt);	
+	
+	//set logging parameters
+	clArgInt("record", recordInterval);
+	clArgInt("logf", logInterval);
+	clArgInt("plogf", partlogInt);	
+	
 	//set the random seed
 	uint randseed = time(NULL);
-	cutGetCmdLineArgumenti(argc, (const char **)argv, "randseed", (int *) &randseed);
+	clArgInt("randseed", randseed);
 	srand(randseed);
 	printf("randseed: %d\n", randseed);
 	
@@ -618,46 +608,46 @@ main(int argc, char** argv)
 	//DEFINE SIMULATION PARAMETERS
 
 	float worldsize1d = .35;//units of mm
-	cutGetCmdLineArgumentf(argc, (const char**)argv, "wsize", (float*) &worldsize1d);
+	clArgFloat("wsize", worldsize1d);
 	worldSize = make_float3(worldsize1d*1e-3f, worldsize1d*1e-3f, worldsize1d*1e-3f);
 	float volume = worldSize.x*worldSize.y*worldSize.z; 
 
 	pdata.shear = 500;
-	cutGetCmdLineArgumentf(argc, (const char**)argv, "shear", (float*) &pdata.shear);
+	clArgFloat("shear", pdata.shear);
 	
 	pdata.spring = 50;	
-	cutGetCmdLineArgumentf(argc, (const char**)argv, "k", (float*) &pdata.spring);
+	clArgFloat("k", pdata.spring);
 
 	externalH = 100;
-	cutGetCmdLineArgumentf(argc, (const char**)argv, "H", (float*) &externalH);
+	clArgFloat("H", externalH);
 	pdata.externalH = make_float3(0, externalH*1e3f, 0);
 
-	cutGetCmdLineArgumentf(argc, (const char**)argv, "dt", (float*) &timestep);//units of ns
-	cutGetCmdLineArgumenti(argc, (const char**) argv, "i", &numIterations);
+	clArgFloat("dt", timestep);//units of ns
+	clArgInt("i", numIterations);
 	maxtime =timestep*numIterations*1e-3;//maxtime has units of us for simplicity
-	cutGetCmdLineArgumentf(argc, (const char**) argv, "maxtime", &maxtime);//units of ns as well
+	clArgFloat("maxtime", maxtime);//units of ns as well
 	numIterations = maxtime/timestep*1e3f;
 	pdata.viscosity = 0.1;
-	cutGetCmdLineArgumentf(argc, (const char**)argc, "visc", (float*) &pdata.viscosity);
+	clArgFloat("visc", pdata.viscosity);
 
 	pdata.colorFmax = colorFmax*1e-7;
 	pdata.globalDamping = 0.8f; 
 	pdata.cdamping = 0.03f;
 	pdata.cspring = 10;
-	cutGetCmdLineArgumentf(argc, (const char**)argc, "cspring", (float*)&pdata.cspring);
+	clArgFloat("cspring", pdata.cspring);
 	pdata.boundaryDamping = -0.03f;
 
-	cutGetCmdLineArgumentf(argc, (const char**)argc, "pin_d", (float*)&pin_dist);
-	cutGetCmdLineArgumentf(argc, (const char**)argc, "contact_dist", (float*)&contact_dist);
-	cutGetCmdLineArgumentf(argc, (const char**)argc, "rebuild_dist", (float*)&rebuild_pct);
-	cutGetCmdLineArgumentf(argc, (const char**)argc, "iterdx",(float*)&iter_dxpct); 
+	clArgFloat("pin_d", pin_dist);
+	clArgFloat("contact_dist", contact_dist);
+	clArgFloat("rebuild_dist", rebuild_pct);
+	clArgFloat("iterdx",iter_dxpct); 
 		
 	pdata.mutDipIter = 0;
-	cutGetCmdLineArgumenti(argc, (const char**)argc, "dipit", (int*) &pdata.mutDipIter);
+	clArgInt("dipit", pdata.mutDipIter);
 		
 
 	char* title;	
-	if(cutGetCmdLineArgumentstr( argc, (const char**) argv, "logt", &title)){
+	if(getCmdLineArgumentString( argc, (const char**)argv, "logt", &title)){
 		filename = title;
 	}
 	
@@ -665,7 +655,7 @@ main(int argc, char** argv)
 	sprintf(crashname, "/home/steve/Datasets/%s.crash.dat", filename);
 
 	pdata.flowmode = false;
-	if(cutCheckCmdLineFlag(argc, (const char **)argv, "flowmode")) {	
+	if(checkCmdLineFlag(argc, (const char **)argv, "flowmode")) {	
 		pdata.flowmode = true;
 	}
 	pdata.flowvel = 2e7; 
@@ -673,52 +663,52 @@ main(int argc, char** argv)
 
 	float radius = 4.0f;
 	//haven't figured out a good way to do this in a loop
-	cutGetCmdLineArgumentf(argc, (const char**)argv, "rad0", (float*) &radius);
+	clArgFloat("rad0", radius);
 	pdata.pRadius[0] = radius*1e-6f; //median diameter
 	pdata.volfr[0] = 0.30f;
-	cutGetCmdLineArgumentf(argc, (const char**)argv, "vfr0", (float*) &pdata.volfr[0]);
+	clArgFloat("vfr0", pdata.volfr[0]);
 	pdata.mu_p[0] = 2000; //relative permeability
-	cutGetCmdLineArgumentf(argc, (const char**)argv, "xi0", (float*) &pdata.mu_p[0]);
+	clArgFloat("xi0", pdata.mu_p[0]);
 	pdata.nump[0] = (pdata.volfr[0] * volume) / (4.0f/3.0f*PI_F*pow(pdata.pRadius[0],3)); 
 	pdata.rstd[0] = 0; //sigma0 in log normal distribution
-	cutGetCmdLineArgumentf(argc, (const char**)argv, "std0", (float*) &pdata.rstd[0]);	
+	clArgFloat("std0", pdata.rstd[0]);	
 	if(pdata.rstd[0] > 0){//eq 3.24 crowe
 		pdata.nump[0] = (pdata.volfr[0]*volume) / (4.0f/3.0f*PI_F*pow(pdata.pRadius[0],3)
 					*exp(4.5f*pdata.rstd[0]*pdata.rstd[0]));
 	}
 
 	radius = 6.0f;
-	cutGetCmdLineArgumentf(argc, (const char**)argv, "rad1", (float*) &radius);
+	clArgFloat("rad1", radius);
 	pdata.pRadius[1] = radius*1e-6f;
 	pdata.volfr[1] = 0.0f;
-	cutGetCmdLineArgumentf(argc, (const char**)argv, "vfr1", (float*) &pdata.volfr[1]);
+	clArgFloat("vfr1", pdata.volfr[1]);
 	pdata.mu_p[1] = 2000;
-	cutGetCmdLineArgumentf(argc, (const char**)argv, "xi1", (float*) &pdata.mu_p[1]);
+	clArgFloat("xi1", pdata.mu_p[1]);
 	pdata.nump[1] = (pdata.volfr[1] * volume) / (4.0f/3.0f*PI_F*pow(pdata.pRadius[1],3)); 
 	pdata.rstd[1] = 0;
-	cutGetCmdLineArgumentf(argc, (const char**)argv, "std1", (float*) &pdata.rstd[1]);
+	clArgFloat("std1", pdata.rstd[1]);
 	if(pdata.rstd[1] > 0){//eq 3.24 crowe
 		pdata.nump[1] = (pdata.volfr[1]*volume) / (4.0f/3.0f*PI_F*pow(pdata.pRadius[1],3)
 					*exp(4.5f*pdata.rstd[1]*pdata.rstd[1]));
 	}
 	
 	radius = 25.0f;
-	cutGetCmdLineArgumentf(argc, (const char**)argv, "rad2", (float*) &radius);
+	clArgFloat("rad2", radius);
 	pdata.pRadius[2] = radius*1e-6f;
 	pdata.volfr[2] = 0.0f;
-	cutGetCmdLineArgumentf(argc, (const char**)argv, "vfr2", (float*) &pdata.volfr[2]);
+	clArgFloat("vfr2", pdata.volfr[2]);
 	pdata.mu_p[2] = 1;
-	cutGetCmdLineArgumentf(argc, (const char**)argv, "xi2", (float*) &pdata.mu_p[2]);
+	clArgFloat("xi2", pdata.mu_p[2]);
 	pdata.nump[2] = (pdata.volfr[2] * volume) / (4.0f/3.0f*PI_F*pow(pdata.pRadius[2],3)); 
 	pdata.rstd[2] = 0;
-	cutGetCmdLineArgumentf(argc, (const char**)argv, "std2", (float*) &pdata.rstd[2]);
+	clArgFloat("std2", pdata.rstd[2]);
 	if(pdata.rstd[2] > 0){//eq 3.24 crowe
 		pdata.nump[2] = (pdata.volfr[2]*volume) / (4.0f/3.0f*PI_F*pow(pdata.pRadius[2],3)
 					*exp(4.5f*pdata.rstd[2]*pdata.rstd[2]));
 	}
 
 	pdata.numBodies = pdata.nump[0] + pdata.nump[1] + pdata.nump[2];
-	bool benchmark = cutCheckCmdLineFlag(argc, (const char**) argv, "benchmark") != 0;
+	bool benchmark = checkCmdLineFlag(argc, (const char**) argv, "benchmark") != 0;
 
 
 	pdata.worldOrigin = worldSize*-0.5f;
@@ -748,7 +738,7 @@ main(int argc, char** argv)
         renderer->setColorBuffer(psystem->getColorBuffer());
     }
 
-    cutilCheckError(cutCreateTimer(&timer));
+    sdkCreateTimer(&timer);
 
 	initParamList();
 	setParams();
@@ -804,5 +794,6 @@ main(int argc, char** argv)
 
     cudaThreadExit();
 
-    shrEXIT(argc, (const char**)argv);
+	exit(0);
+    //shrEXIT(argc, (const char**)argv);
 }
