@@ -74,9 +74,9 @@ NVCC            ?= $(CUDA_BIN_PATH)/nvcc
 GCC             ?= g++ 
 
 # Extra user flags
-EXTRA_NVCCFLAGS ?= -O2
+EXTRA_NVCCFLAGS ?= -O3
 EXTRA_LDFLAGS   ?=
-EXTRA_CCFLAGS   ?= -std=c++0x -O2 -D'SVN_REV="$(shell svnversion -n .)"'
+EXTRA_CCFLAGS   ?= -std=c++0x -O3 -D'SVN_REV="$(shell svnversion -n .)"'
 
 # CUDA code generation flags - only using 20 because i only have 20
 GENCODE_SM10    := -gencode arch=compute_10,code=sm_10
@@ -126,7 +126,6 @@ endif
 
 
 # Common includes and paths for CUDA
-#INCLUDES      := -I$(CUDA_INC_PATH) -I. -I.. -I../../common/inc
 INCLUDES      := -I$(CUDA_INC_PATH) -Iinc -I. -Iinc/GL
 LDFLAGS       += $(LIBPATH_OPENGL)
 
