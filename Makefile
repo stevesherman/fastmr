@@ -76,7 +76,7 @@ GCC             ?= g++
 # Extra user flags
 EXTRA_NVCCFLAGS ?= -O2
 EXTRA_LDFLAGS   ?=
-EXTRA_CCFLAGS   ?= -std=c++0x -O2
+EXTRA_CCFLAGS   ?= -std=c++0x -O2 -D'SVN_REV="$(shell svnversion -n .)"'
 
 # CUDA code generation flags - only using 20 because i only have 20
 GENCODE_SM10    := -gencode arch=compute_10,code=sm_10
@@ -112,7 +112,7 @@ ifneq ($(DARWIN),)
     LIBPATH_OPENGL  := -L../../common/lib/$(OSLOWER) -L/System/Library/Frameworks/OpenGL.framework/Libraries -framework GLUT -lGL -lGLU ../../common/lib/$(OSLOWER)/libGLEW.a
 else
     # Linux specific libraries and paths to include
-    LIBPATH_OPENGL  := -L../../common/lib/$(OSLOWER)/$(OS_ARCH) -L/usr/X11R6/lib -lGL -lGLU -lX11 -lXi -lXmu -lglut -lGLEW 
+    LIBPATH_OPENGL  := -L/usr/X11R6/lib -lGL -lGLU -lX11 -lXi -lXmu -lglut -lGLEW  
 endif
 
 # Debug build flags
@@ -127,7 +127,7 @@ endif
 
 # Common includes and paths for CUDA
 #INCLUDES      := -I$(CUDA_INC_PATH) -I. -I.. -I../../common/inc
-INCLUDES      := -I$(CUDA_INC_PATH) -Iinc -I.
+INCLUDES      := -I$(CUDA_INC_PATH) -Iinc -I. -Iinc/GL
 LDFLAGS       += $(LIBPATH_OPENGL)
 
 # Target rules
@@ -159,8 +159,6 @@ connectedgraphs.o: connectedgraphs.cpp
 
 fmr: particles.o new_kcall.o particleSystem.o connectedgraphs.o render_particles.o shaders.o utilities.o
 	$(GCC) $(CCFLAGS) -o $@ $+ $(LDFLAGS) $(EXTRA_LDFLAGS)
-	mkdir -p ../../bin/$(OSLOWER)/$(TARGET)
-	cp $@ ../../bin/$(OSLOWER)/$(TARGET)
 
 run: build
 	./fmr
