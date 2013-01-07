@@ -18,7 +18,7 @@ uint adjConGraphs(uint* nlist, uint* num_neigh, uint numParticles)
 	uint curr = 0;
 	uint chainl = 0;
 	vector<uint> length_list;
-
+	//depth first search
 	for(uint i=0; i < numParticles; i++){
 		//if we haven't visited, prime the stack, and add to chain counter
 		chainl = 0;
@@ -46,8 +46,10 @@ uint adjConGraphs(uint* nlist, uint* num_neigh, uint numParticles)
 			length_list.push_back(chainl);
 		}
 	}
-	nth_element(length_list.begin(), length_list.begin()+numGraphs/2, length_list.end());
-	//printf("median chain length: %d\n", length_list[numGraphs/2]);
+	
+	//find the median element 
+	//nth_element(length_list.begin(), length_list.begin()+numGraphs/2, length_list.end());
+	
 	delete visited;
 	return numGraphs;
 }	

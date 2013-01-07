@@ -76,7 +76,7 @@ GCC             ?= g++
 # Extra user flags
 EXTRA_NVCCFLAGS ?= -O3
 EXTRA_LDFLAGS   ?=
-EXTRA_CCFLAGS   ?= -std=c++0x -O3 -D'SVN_REV="$(shell svnversion -n .)"'
+EXTRA_CCFLAGS   ?= -std=c++0x -O3 -D'SVN_REV="$(shell svnversion -n .)"' -march=native
 
 # CUDA code generation flags - only using 20 because i only have 20
 GENCODE_SM10    := -gencode arch=compute_10,code=sm_10

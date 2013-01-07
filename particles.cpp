@@ -42,9 +42,9 @@ const uint width = 800, height = 600;
 // view params
 int ox, oy;
 int buttonState = 0;
-float camera_trans[] = {0, 0, -.002};
+float camera_trans[] = {0, 0, -1.5e-3};
 float camera_rot[]   = {0, 0, 0};
-float camera_trans_lag[] = {0, 0, -3};
+float camera_trans_lag[] = {0, 0, -2e-3};
 float camera_rot_lag[] = {0, 0, 0};
 const float inertia = 0.1;
 ParticleRenderer::DisplayMode displayMode = ParticleRenderer::PARTICLE_SPHERES;
@@ -484,7 +484,13 @@ void key(unsigned char key, int /*x*/, int /*y*/)
         psystem->reset(20, 1.0f);
 		frameCount=0; simtime = 0; resolved = 0;
 		break;
-    case 'h':
+	case '5':
+		camera_trans[2] = -2*worldSize.z ;
+		camera_rot[1] = 26;
+		camera_rot[0] = 23;
+		camera_trans[1] = 0.05*worldSize.y;
+		break;
+	case 'h':
         displaySliders = !displaySliders;
         break;
 	case 'b':
@@ -514,7 +520,7 @@ void idle(void)
     }
 
     if (demoMode) {
-        camera_rot[1] += 0.02f;
+        //camera_rot[1] += 0.02f;
         /*if (demoCounter++ > 1000) {
             ballr = 10 + (rand() % 10);
             demoCounter = 0;
