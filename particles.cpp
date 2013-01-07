@@ -484,12 +484,13 @@ void key(unsigned char key, int /*x*/, int /*y*/)
         psystem->reset(20, 1.0f);
 		frameCount=0; simtime = 0; resolved = 0;
 		break;
-	case '5':
-		camera_trans[2] = -2*worldSize.z ;
-		camera_rot[1] = 26;
-		camera_rot[0] = 23;
-		camera_trans[1] = 0.05*worldSize.y;
+	case '5':  									// preset angle for pretty screenshots
+		camera_trans[2] = -2.5*worldSize.z ;	// zoom
+		camera_rot[1] = 26;						// elevation angle
+		camera_rot[0] = 23;						// azimuth angle
+		camera_trans[1] = 0.05*worldSize.y;		// vert shift
 		break;
+	
 	case 'h':
         displaySliders = !displaySliders;
         break;
