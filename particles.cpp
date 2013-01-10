@@ -9,7 +9,7 @@
 #include <helper_functions.h>
 #include <helper_math.h>
 #include <helper_cuda.h>
-#include <helper_cuda_gl.h>
+#include "helper_cuda_gl.h"
 #include <rendercheck_gl.h>
 #include <math.h>
 //Includes
@@ -17,7 +17,6 @@
 #include <cstdio>
 #include <ctime>
 #include <algorithm>
-//#include <cuda_gl_interop.h>
 
 #include "particles.h"
 #include "particleSystem.h"
@@ -25,10 +24,7 @@
 #include "paramgl.h"
 #include "particles_kernel.h"
 #include "new_kern.h"
-
-//shared library test functions
-//#include <shrUtils.h>
-//#include <shrQATest.h>
+#include "utilities.h"
 
 #define MAX_EPSILON_ERROR 5.00f
 #define THRESHOLD         0.30f
@@ -37,17 +33,16 @@
 	const int binIdx = 1;	// pick the proper sReferenceBin
 #endif
 
-const uint width = 800, height = 600;
+uint width = 600, height = 600;
 
 // view params
 int ox, oy;
 int buttonState = 0;
-float camera_trans[] = {0, 0, -1.5e-3};
+float camera_trans[] = {0, 0, -2.2e-3};
 float camera_rot[]   = {0, 0, 0};
-float camera_trans_lag[] = {0, 0, -2e-3};
+float camera_trans_lag[] = {0, 0, -3e-3};
 float camera_rot_lag[] = {0, 0, 0};
 const float inertia = 0.1;
-ParticleRenderer::DisplayMode displayMode = ParticleRenderer::PARTICLE_SPHERES;
 
 FILE* datalog;
 FILE* crashlog;
@@ -58,6 +53,7 @@ char crashname[231];
 
 int mode = 0;
 bool displayEnabled = true;
+bool rotatable = false;
 uint recordInterval = 0;
 uint logInterval = 0;
 uint partlogInt = 0;
@@ -114,9 +110,8 @@ CheckRender       *g_CheckRender = NULL;
 #define MAX(a,b) ((a > b) ? a : b)
 
 
-extern "C" void cudaInit(int argc, char **argv);
-extern "C" void cudaGLInit(int argc, char **argv);
-extern "C" void copyArrayFromDevice(void* host, const void* device, unsigned int vbo, int size);
+//extern "C" void cudaInit(int argc, char **argv);
+//extern "C" void cudaGLInit(int argc, char **argv);
 
 void cleanup()
 {
@@ -188,7 +183,7 @@ void initGL(int argc, char **argv)
 
     glEnable(GL_DEPTH_TEST);
     glClearColor(1.0, 1.3, 1.3, 1.0);
-
+	glMatrixMode(GL_MODELVIEW);
     glutReportErrors();
 }
 
@@ -229,6 +224,46 @@ void computeFPS()
     }
 }
 
+
+void drawAxes() 
+{
+	glPushMatrix();
+	glViewport(0,0,width/6,height/6);	
+	
+	float axes_size = ((float)width/600)*worldSize.x/2;
+	glTranslatef(0, 0.1*axes_size, -20.0f*axes_size);
+	glRotatef(camera_rot_lag[0], 1.0, 0.0, 0.0);
+    glRotatef(camera_rot_lag[1], 0.0, 1.0, 0.0);
+
+	glPushMatrix();
+	//if(!rotatable) //this makes for prettier pictures but ugly movies
+		glTranslatef(-worldSize.x/2,-worldSize.y/2,0);
+
+	glLineWidth(1.0);
+	glBegin (GL_LINES);
+	glColor3f (0.1,0.1,0.1); 
+	glVertex3f (0,0,0);
+	glVertex3f (axes_size,0,0); 
+	glColor3f (0.1,0.1,0.1); 
+	glVertex3f (0,0,0);
+	glVertex3f (0,axes_size,0);
+	glColor3f (0.1,0.1,0.1); 
+	glVertex3f (0,0,0);
+	glVertex3f (0,0,axes_size); 
+	glEnd();
+
+
+	//I have no idea why these need to be shifted, but ...
+	glRasterPos3f(1.5*axes_size,0,0);
+	glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, 'x');
+    glRasterPos3f(0,1.5*axes_size,0);
+	glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, 'y');
+    glRasterPos3f(0,0,1.5*axes_size);
+	glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, 'z');
+	glPopMatrix();
+	glPopMatrix();
+}
+
 void display()
 {
   
@@ -239,36 +274,49 @@ void display()
     {
 		qupdate();
 		if (renderer){ 
-            renderer->setVertexBuffer(psystem->getCurrentReadBuffer(), psystem->getNumParticles());
+            renderer->setVertexBuffer(psystem->getCurrentReadBuffer(), 
+					psystem->getNumParticles());
 		}
     }
 
     // render
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);  
+   	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);  
 
-    // view transform
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-    for (int c = 0; c < 3; ++c)
-    {
+	for (int c = 0; c < 3; ++c) {
         camera_trans_lag[c] += (camera_trans[c] - camera_trans_lag[c]) * inertia;
         camera_rot_lag[c] += (camera_rot[c] - camera_rot_lag[c]) * inertia;
     }
-    glTranslatef(camera_trans_lag[0], camera_trans_lag[1], camera_trans_lag[2]);
+	
+    // view transform
+    //glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+	
+	drawAxes();
+
+	
+	//draw cube and particles
+	glPushMatrix();	
+    
+	glTranslatef(camera_trans_lag[0], camera_trans_lag[1], camera_trans_lag[2]);
     glRotatef(camera_rot_lag[0], 1.0, 0.0, 0.0);
     glRotatef(camera_rot_lag[1], 0.0, 1.0, 0.0);
 
-    glGetFloatv(GL_MODELVIEW_MATRIX, modelView);
+	glViewport(0,0,width,height);
+
+    //glGetFloatv(GL_MODELVIEW_MATRIX, modelView);
 
     // cube
     glColor3f(0.0, 0.0, 0.0);
-    glutWireCube(worldSize.x);
+    glLineWidth(2.0);
+	glutWireCube(worldSize.x);
 
-    if (renderer && displayEnabled)
-    {
-        renderer->display(displayMode);
+	if (displayEnabled) {
+		renderer->display(ParticleRenderer::PARTICLE_SPHERES);
     }
 	
+	glPopMatrix();	
+
+
 	if(recordInterval != 0 && (frameCount % recordInterval == 0)){
 		char asd [32];
 		sprintf(asd, "./cap/frame%.5d.ppm", frameCount/recordInterval);
@@ -279,24 +327,22 @@ void display()
         glDisable(GL_DEPTH_TEST);
         glBlendFunc(GL_ONE_MINUS_DST_COLOR, GL_ZERO); // invert color
         glEnable(GL_BLEND);
-        paramlist->Render(0, 0);
+        glLineWidth(1.0);
+		paramlist->Render(0, 0);
         glDisable(GL_BLEND);
         glEnable(GL_DEPTH_TEST);
     }
 
     sdkStopTimer(&timer);  
 	
-
     glutSwapBuffers();
     glutReportErrors();
 
     computeFPS();
 	if((numIterations > 0) && ((int)frameCount > numIterations)){
-		printf("hi\n");
 		exit(0);
 	}
 	if((maxtime > 0) && (simtime >= maxtime*1e3)){
-		printf("yo\n");
 		exit(0);	
 	}
 
@@ -312,14 +358,20 @@ void reshape(int w, int h)
 {
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    gluPerspective(60.0, (float) w / (float) h, 0.1e-6, 1);
+    float aspRatio = (float) w / (float) h;
+	gluPerspective(15.0, aspRatio, 0.1e-6, 10);
+	
+	//float ort = 1e-3;  //orthonormal stuff - never worked
+	//glOrtho(-aspRatio*ort,aspRatio*ort,-ort,ort,1e-8,1e-2);
+	width = w;
+	height = h;
 
     glMatrixMode(GL_MODELVIEW);
     glViewport(0, 0, w, h);
 
     if (renderer) {
         renderer->setWindowSize(w, h);
-        renderer->setFOV(60.0);
+        renderer->setFOV(15);
     }
 }
 
@@ -445,11 +497,7 @@ void key(unsigned char key, int /*x*/, int /*y*/)
     case 'm':
         psystem->getMagnetization();
 		break;
-    case 'p':
-        displayMode = (ParticleRenderer::DisplayMode)
-                      ((displayMode + 1) % ParticleRenderer::PARTICLE_NUM_MODES);
-        break;
-	case 'i':
+   	case 'i':
 		printf("interactions: %d\n", psystem->getInteractions());
 		break;
 	case 'n':
@@ -485,12 +533,16 @@ void key(unsigned char key, int /*x*/, int /*y*/)
 		frameCount=0; simtime = 0; resolved = 0;
 		break;
 	case '5':  									// preset angle for pretty screenshots
-		camera_trans[2] = -2.5*worldSize.z ;	// zoom
-		camera_rot[1] = 26;						// elevation angle
-		camera_rot[0] = 23;						// azimuth angle
+		camera_rot[0] = 15;						// elevation angle
+		camera_rot[1] = 23;					// azimuth angle
+		camera_trans[0] = -0.0*worldSize.x;	// horiz shift
 		camera_trans[1] = 0.05*worldSize.y;		// vert shift
+		camera_trans[2] = -6.5*worldSize.z;		// zoom
 		break;
-	
+	case '6':
+		rotatable = !rotatable;
+		printf("Idle rotation toggled: %s\n", rotatable ? "on" : "off");	
+		break;
 	case 'h':
         displaySliders = !displaySliders;
         break;
@@ -520,12 +572,8 @@ void idle(void)
         printf("Entering demo mode\n");
     }
 
-    if (demoMode) {
-        //camera_rot[1] += 0.02f;
-        /*if (demoCounter++ > 1000) {
-            ballr = 10 + (rand() % 10);
-            demoCounter = 0;
-        }*/
+    if (demoMode && rotatable) {
+        camera_rot[1] += 0.02f;
     }
 
     glutPostRedisplay();
@@ -737,6 +785,7 @@ main(int argc, char** argv)
     } else {
         initGL(argc, argv);
         cudaGLInit(argc, argv);
+
     }
 	psystem = new ParticleSystem(pdata, g_useGL, worldSize);
 		if (g_useGL) {

@@ -21,6 +21,7 @@
  extern "C"
 {
 void cudaInit(int argc, char **argv);
+void cudaGLInit(int argc, char **argv);
 
 void allocateArray(void **devPtr, int size);
 void freeArray(void *devPtr);
