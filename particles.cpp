@@ -359,7 +359,7 @@ void reshape(int w, int h)
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     float aspRatio = (float) w / (float) h;
-	gluPerspective(15.0, aspRatio, 0.1e-6, 10);
+	gluPerspective(20.0, aspRatio, 0.1e-6, 10);
 	
 	//float ort = 1e-3;  //orthonormal stuff - never worked
 	//glOrtho(-aspRatio*ort,aspRatio*ort,-ort,ort,1e-8,1e-2);
@@ -371,7 +371,7 @@ void reshape(int w, int h)
 
     if (renderer) {
         renderer->setWindowSize(w, h);
-        renderer->setFOV(15);
+        renderer->setFOV(20);
     }
 }
 
@@ -537,7 +537,7 @@ void key(unsigned char key, int /*x*/, int /*y*/)
 		camera_rot[1] = 23;					// azimuth angle
 		camera_trans[0] = -0.0*worldSize.x;	// horiz shift
 		camera_trans[1] = 0.05*worldSize.y;		// vert shift
-		camera_trans[2] = -6.5*worldSize.z;		// zoom
+		camera_trans[2] = -5.0*worldSize.z;		// zoom
 		break;
 	case '6':
 		rotatable = !rotatable;
@@ -591,7 +591,7 @@ void initParamList()
 		paramlist->AddParam(new Param<float>("shear rate", pdata.shear, 0, 2000, 50, &pdata.shear));
 		paramlist->AddParam(new Param<float>("colorFmax", colorFmax, 0, 15, 0.1f, &colorFmax));
     	paramlist->AddParam(new Param<float>("visc", pdata.viscosity, 0.001f, .25f, 0.001f, &pdata.viscosity));
-		paramlist->AddParam(new Param<float>("max dx pct", iter_dxpct, 0, .2f, 0.002f, &iter_dxpct));
+		paramlist->AddParam(new Param<float>("max dx pct", iter_dxpct, 0, .1f, 0.001f, &iter_dxpct));
 		paramlist->AddParam(new Param<float>("pin dist", pin_dist, 0.995f, 1.5f, 0.005f, &pin_dist));
 		paramlist->AddParam(new Param<float>("contact_dist", contact_dist, .95f, 1.25f, 0.001f, &contact_dist));
 		paramlist->AddParam(new Param<float>("rebuild dist", rebuild_pct, 0.0f, 1.0f, 0.005f, &rebuild_pct));
@@ -675,7 +675,7 @@ main(int argc, char** argv)
 
 	externalH = 100;
 	clArgFloat("H", externalH);
-	pdata.externalH = make_float3(0, externalH*1e3f, 0);
+	pdata.externalH = make_float3(0,externalH*1e3f,0);
 
 	clArgFloat("dt", timestep);//units of ns
 	clArgInt("i", numIterations);

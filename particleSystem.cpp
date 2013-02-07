@@ -295,12 +295,12 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
 			dx_since = 0.0f;
 		}
 
-		/*resetMom((float4*) m_dMoments, newp.extH, newp.N);	
+		if(m_params.mutDipIter != 0) resetMom((float4*) m_dMoments, newp.extH, newp.N);	
 		//note that odd numbers of iterations prevent sheet formation
-		for(int i = 0; i < 0; i++) {
+		for(int i = 0; i < m_params.mutDipIter; i++) {
 			mutualMagn(m_dSortedPos,m_dMoments, m_dTemp, m_dNeighList, m_dNumNeigh, newp.N);
 			pswap(m_dMoments, m_dTemp);	
-		}*/
+		}
 
 		bool solve = true;
 
@@ -336,9 +336,6 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
 			solve = false;	
 		
 			//find max force
-			//printf("callmax\n");
-			//maxf = maxforce( (float4*) m_dForces1, newp.N);
-			//maxFdx = limdxpct*Cd*m_params.pRadius[0]/deltaTime; //force to cause a dx
 			dx_moved = maxvel((float4*)m_dForces1,(float4*)m_dPos1,newp)*deltaTime;
 			//limdx is limit allowed per iteration
 			float limDx = limdxpct*m_params.pRadius[0];
