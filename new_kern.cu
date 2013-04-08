@@ -357,10 +357,10 @@ __global__ void integrateRK4K(
 	
 	oldp += (1.0f/6.0f)*(k1 + 2.0f*k2 + 2.0f*k3 + k4);
 
-	oldp.x -= nparams.L.x*rintf(oldp.x*nparams.Linv.x);
+	oldp.x -= nparams.L.x*rintf(oldp.x*nparams.Linv.x);//this runs the risk of floating point errors pushing things outside the box
 	oldp.z -= nparams.L.z*rintf(oldp.z*nparams.Linv.z);
-	if (oldp.y > -1.0f*nparams.origin.y - radius ) { oldp.y = -1.0f*nparams.origin.z - radius;}
-	if (oldp.y < nparams.origin.y + radius ) { oldp.y = nparams.origin.z + radius; }
+	if (oldp.y > -1.0f*nparams.origin.y - radius ) { oldp.y = -1.0f*nparams.origin.y - radius;}
+	if (oldp.y < nparams.origin.y + radius ) { oldp.y = nparams.origin.y + radius; }
 
 	PosA[index] = make_float4(oldp, radius);
 

@@ -149,23 +149,23 @@ struct f4norm : public unary_function<float4, float>{
 
 struct isOut
 {
-	isOut(float bmax) : bmax(bmax) {}	
+	isOut(float3 bmax) : bmax(bmax) {}	
 	
 	__host__ __device__ bool operator()(const float4 &p){
 		if(isnan(p.x) || isnan(p.y) || isnan(p.z))
 			return true;
-		if(fabsf(p.x) > bmax )
+		if(fabsf(p.x) > bmax.x )
 			return true;
-		if(fabsf(p.y)-p.w > bmax)//>= due to pinning BCs? not true anymore i think
+		if(fabsf(p.y)-p.w > bmax.x)//>= due to pinning BCs? not true anymore i think
 			return true;
-		if(fabsf(p.z) > bmax )
+		if(fabsf(p.z) > bmax.x )
 			return true;
 		return false;
 	}
-	const float bmax;
+	const float3 bmax;
 };
 
-bool isOutofBounds(float4* positions, float border, uint numParticles)
+bool isOutofBounds(float4* positions, float3 border, uint numParticles)
 {
 	int x = count_if(device_ptr<float4>(positions),
 					device_ptr<float4>(positions+numParticles),

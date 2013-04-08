@@ -291,7 +291,7 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
 			//NListVar(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dMoments, m_dGridParticleHash, 
 			//		m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, 4.0f + rebuildDist + 0.0f*limdxpct );
 			NListCut(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dMoments, m_dGridParticleHash, 
-					m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh,  8.0f + rebuildDist, 0.3f);
+					m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh,  8.0f + rebuildDist, 0.5f);
 			dx_since = 0.0f;
 		}
 
@@ -342,7 +342,7 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
 			if(dx_moved > limDx){
 				solve = true;
 			} else { //if not excess force, check for out of bounds
-				solve = isOutofBounds((float4*)m_dPos1, -newp.origin.x, newp.N);
+				solve = isOutofBounds((float4*)m_dPos1, newp.L/2.0, newp.N);
 			}
 			if(solve){
 				deltaTime *=.5f;

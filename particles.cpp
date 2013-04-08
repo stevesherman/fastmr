@@ -137,6 +137,12 @@ void qupdate()
 	//this crude hack makes pinned particles at start unpinned so they can space and unfuck each other
 	if(simtime < timestep)	psystem->setPinDist(0.8f);
 
+
+	/*if(simtime > 3e4) {
+	   	float shrink = timestep*1e-9f*5e-4f;	
+		printf("Shrinking at %.2fus by %g to %g\n", simtime*1e-3, shrink, psystem->getHeight());
+		psystem->dangerousResize(psystem->getHeight() - shrink);	
+	}*/
 	float dtout = 1e9*psystem->update(timestep*1e-9f, iter_dxpct);
 	if(fabs(dtout - timestep) > .01f*dtout)
 		resolved++;
@@ -161,6 +167,7 @@ void qupdate()
 		psystem->logParticles(plog);
 		fclose(plog);	
 	}
+	
 
 	simtime += dtout;//so that it logs at the correct time
 	frameCount++;

@@ -38,7 +38,7 @@ void unmapGLBufferObject(struct cudaGraphicsResource *cuda_vbo_resource);
 
 void setParameters(SimParams *hostParams);
 
-bool isOutofBounds(float4* pos, float border, uint numparticles);
+bool isOutofBounds(float4* pos, float3 border, uint numparticles);
 bool excessForce(float4* pos, float force, uint numparticles);
 float maxforce(float4* pos, uint numpartices);
 float3 magnetization(float4* pos, uint numparticles, float simVol);

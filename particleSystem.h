@@ -57,7 +57,12 @@ public:
 	void setContactDist(float x) {m_contact_dist = x;}
 	void setRebuildDist(float x) {rebuildDist = x;}
 
-
+	void dangerousResize(double  y) {
+		newp.L.y = y; 
+		newp.Linv.y = 1.0/y;
+		newp.origin.y = -newp.L.y/2.0;
+	};
+	float getHeight() { return newp.L.y;}
 	float getParticleRadius() { return m_params.pRadius[0]; }
     uint3 getGridSize() { return m_params.gridSize; }
     float3 getWorldOrigin() { return m_params.worldOrigin; }
