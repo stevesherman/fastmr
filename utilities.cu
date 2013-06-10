@@ -31,6 +31,7 @@
 #endif
 
 #include "thrust/device_ptr.h"
+#include "thrust/iterator/constant_iterator.h"
 #include "thrust/sort.h"
 #include "thrust/count.h"
 #include "thrust/functional.h"
@@ -156,9 +157,9 @@ struct isOut
 			return true;
 		if(fabsf(p.x) > bmax.x )
 			return true;
-		if(fabsf(p.y)-p.w > bmax.x)//>= due to pinning BCs? not true anymore i think
+		if(fabsf(p.y)+p.w > bmax.y)//>= due to pinning BCs? not true anymore i think
 			return true;
-		if(fabsf(p.z) > bmax.x )
+		if(fabsf(p.z) > bmax.z )
 			return true;
 		return false;
 	}
@@ -307,6 +308,16 @@ float maxvel(float4* forces, float4* positions, NewParams& params){
 	return inner_product(device_ptr<float4>(forces), device_ptr<float4>(forces+params.N),
 			device_ptr<float4>(positions), 0.0f, maximum<float>(), vel_calc);
 }
+
+void pshift(float4* positions, float3 s, uint numParticles){
+	float4 shift = make_float4(s, 0.0f);
+	constant_iterator<int> test(3);
+	constant_iterator<float4> shifter(shift);
+	thrust::transform(device_ptr<float4>(positions), device_ptr<float4>(positions+numParticles),
+			shifter, device_ptr<float4>(positions), plus<float4>());
+}
+			
+
 
 struct isExcessForce
 {

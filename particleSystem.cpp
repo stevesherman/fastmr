@@ -288,8 +288,6 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
 		if(m_randSet == 0) {dx_since = 999; rand_scale = 1.0f;}
 	} else {
 		if (rebuildNList) {
-			//NListVar(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dMoments, m_dGridParticleHash, 
-			//		m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, 4.0f + rebuildDist + 0.0f*limdxpct );
 			NListCut(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dMoments, m_dGridParticleHash, 
 					m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh,  8.0f + rebuildDist, 0.5f);
 			dx_since = 0.0f;
@@ -350,7 +348,7 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
 				//getBadP();	
 			}
 			if(deltaTime <= 1e-30f && deltaTime != 0) {
-				printf("timestep fail!");
+				printf("timestep fail!, ws=%fmm\n", newp.L.y*1e3);
 				getBadP();
 				getMagnetization();
 				NListStats();
@@ -364,6 +362,24 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
 		
 	return deltaTime;
 }
+
+
+
+void ParticleSystem::dangerousResize(double  y) {
+	float Lold = newp.L.y;
+	float deltay = Lold - y;
+	pshift((float4*) m_dPos1, make_float3(0, deltay/2.0, 0) , newp.N);
+	newp.L.y = y; 
+	newp.Linv.y = 1.0/y;
+	newp.origin.y = -newp.L.y/2.0;
+	newp.cellSize.y = newp.L.y/newp.gridSize.y;
+	if( newp.cellSize.y < 8.0f*m_params.pRadius[0]) {
+		newp.cellSize.y = 8.0f*m_params.pRadius[0];
+		printf("Cells shrunk excessively\n");
+	}
+
+}
+
 
 // takes contents of Pos1 and sorts it into m_dSortedPos
 void ParticleSystem::sort_and_reorder() {
@@ -449,6 +465,7 @@ ParticleSystem::dumpParticles(uint start, uint count)
     copyArrayFromDevice(m_hPos, m_dPos1, 0, sizeof(float)*4*count);
 	copyArrayFromDevice(m_hForces, m_dForces1,0, sizeof(float)*4*count);
 	copyArrayFromDevice(m_hMoments, m_dMoments, 0, sizeof(float)*4*count);
+	uint n_outside = 0;
 	for(uint i=start; i<start+count; i++) {
 		if(sqrt(m_hForces[i*4]*m_hForces[i*4] + m_hForces[i*4+1]*m_hForces[i*4+1] + m_hForces[i*4+2]*m_hForces[i*4+2]) > 1e-5f) {
     
@@ -456,8 +473,10 @@ ParticleSystem::dumpParticles(uint start, uint count)
 			printf("  Forces: (%.7g, %.7g, %.7g, %.7g)\n", m_hForces[i*4+0], m_hForces[i*4+1], m_hForces[i*4+2], m_hForces[i*4+3]);
 			printf("  Moments: (%.7g, %.7g, %.7g, %.7g)\n", m_hMoments[i*4+0], m_hMoments[i*4+1], m_hMoments[i*4+2], m_hMoments[i*4+3]);
 		}
+		if(fabs(m_hPos[i*4+1])+m_hPos[i*4+3] > 0.35e-3) n_outside++;
 	}
 	printf("Force cut = %g\n", sqrtf(newp.max_fdr_sq));
+	printf("n_outside = %d\n", n_outside);
 	getBadP();
 }
 
@@ -784,4 +803,6 @@ ParticleSystem::reset(uint numiter, float scale_start)
 	copyArrayToDevice(m_dPos1, m_hPos, 0, 4*newp.N*sizeof(float));
 
 }
+
+
 

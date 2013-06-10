@@ -51,6 +51,7 @@ float calcKinEn(float4* forces, float4* position, NewParams& params);
 uint numInteractions(uint* m_hNeighList, uint numParticles);
 float maxvel(float4* forces, float4* positions, NewParams& params);
 void resetMom(float4* moments, float3 extH, uint numParticles);
+void pshift(float4* positions, float3 s, uint numParticles);
 
 
 

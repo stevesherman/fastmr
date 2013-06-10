@@ -75,14 +75,12 @@ float externalH = 100; //kA/m
 float colorFmax = 3.5;
 float iter_dxpct = 0.035;
 float rebuild_pct = 0.1;
-
+float strain = 0, period = 24;//compression params, period in ms
 float contact_dist = 1.05f;
 float pin_dist = 0.995f;
 float3 worldSize;
 unsigned int numIterations = 0; // run until exit
 float maxtime = 0;
-
-
 
 int resolved = 0;//number of times the integrator had to resolve a step
 
@@ -137,12 +135,10 @@ void qupdate()
 	//this crude hack makes pinned particles at start unpinned so they can space and unfuck each other
 	if(simtime < timestep)	psystem->setPinDist(0.8f);
 
+	float ws = worldSize.y*(1.0f + strain*sin(2.0f*PI_F/(period*1e6f)*simtime));
+	psystem->dangerousResize(ws);
 
-	/*if(simtime > 3e4) {
-	   	float shrink = timestep*1e-9f*5e-4f;	
-		printf("Shrinking at %.2fus by %g to %g\n", simtime*1e-3, shrink, psystem->getHeight());
-		psystem->dangerousResize(psystem->getHeight() - shrink);	
-	}*/
+
 	float dtout = 1e9*psystem->update(timestep*1e-9f, iter_dxpct);
 	if(fabs(dtout - timestep) > .01f*dtout)
 		resolved++;
@@ -244,29 +240,29 @@ void drawAxes()
 
 	glPushMatrix();
 	//if(!rotatable) //this makes for prettier pictures but ugly movies
-		glTranslatef(-worldSize.x/2,-worldSize.y/2,0);
+	glTranslatef(-worldSize.x/2,-worldSize.y/2,0);
+	glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA); 
+    glEnable(GL_BLEND);
+	glEnable(GL_LINE_SMOOTH);
 
 	glLineWidth(1.0);
 	glBegin (GL_LINES);
 	glColor3f (0.1,0.1,0.1); 
-	glVertex3f (0,0,0);
-	glVertex3f (axes_size,0,0); 
-	glColor3f (0.1,0.1,0.1); 
-	glVertex3f (0,0,0);
-	glVertex3f (0,axes_size,0);
-	glColor3f (0.1,0.1,0.1); 
-	glVertex3f (0,0,0);
-	glVertex3f (0,0,axes_size); 
+	glVertex3f (0,0,0); glVertex3f (axes_size,0,0); 
+	glVertex3f (0,0,0); glVertex3f (0,axes_size,0);
+	glVertex3f (0,0,0); glVertex3f (0,0,axes_size); 
 	glEnd();
 
-
-	//I have no idea why these need to be shifted, but ...
 	glRasterPos3f(1.5*axes_size,0,0);
 	glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, 'x');
     glRasterPos3f(0,1.5*axes_size,0);
 	glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, 'y');
     glRasterPos3f(0,0,1.5*axes_size);
 	glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, 'z');
+	
+	glDisable(GL_LINE_SMOOTH);
+	glDisable(GL_BLEND);
+
 	glPopMatrix();
 	glPopMatrix();
 }
@@ -297,9 +293,8 @@ void display()
     // view transform
     //glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
-	
+		
 	drawAxes();
-
 	
 	//draw cube and particles
 	glPushMatrix();	
@@ -308,18 +303,49 @@ void display()
     glRotatef(camera_rot_lag[0], 1.0, 0.0, 0.0);
     glRotatef(camera_rot_lag[1], 0.0, 1.0, 0.0);
 
-	glViewport(0,0,width,height);
+	glViewport(0,0,width,height); //draw over full streen
+	//draw particles
+	renderer->display(ParticleRenderer::PARTICLE_SPHERES);
 
-    //glGetFloatv(GL_MODELVIEW_MATRIX, modelView);
-
-    // cube
-    glColor3f(0.0, 0.0, 0.0);
+    // cube w/ anti-aliasing
+    glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_BLEND);
+	glEnable(GL_LINE_SMOOTH);
+	glColor3f(0.0, 0.0, 0.0);
     glLineWidth(2.0);
 	glutWireCube(worldSize.x);
 
-	if (displayEnabled) {
-		renderer->display(ParticleRenderer::PARTICLE_SPHERES);
-    }
+	if (strain != 0.0){
+		float3 ws_act = psystem->getWorldSize();//actual worldSize
+		glColor3f(1.0,0.0,0.0);
+		glBegin(GL_LINE_LOOP);
+		glVertex3f(ws_act.x/2, ws_act.y/2, ws_act.z/2);
+		glVertex3f(ws_act.x/2, -ws_act.y/2, ws_act.z/2);
+		glVertex3f(ws_act.x/2, -ws_act.y/2, -ws_act.z/2);	
+		glVertex3f(ws_act.x/2, ws_act.y/2, -ws_act.z/2);
+		glEnd();
+		glBegin(GL_LINE_LOOP);
+		glVertex3f(-ws_act.x/2, ws_act.y/2, ws_act.z/2);
+		glVertex3f(-ws_act.x/2, -ws_act.y/2, ws_act.z/2);
+		glVertex3f(-ws_act.x/2, -ws_act.y/2, -ws_act.z/2);	
+		glVertex3f(-ws_act.x/2, ws_act.y/2, -ws_act.z/2);
+		glEnd();
+		glBegin(GL_LINES);
+		glVertex3f(-ws_act.x/2, ws_act.y/2, ws_act.z/2);
+		glVertex3f(ws_act.x/2, ws_act.y/2, ws_act.z/2);
+		glVertex3f(-ws_act.x/2, -ws_act.y/2, ws_act.z/2);
+		glVertex3f(ws_act.x/2, -ws_act.y/2, ws_act.z/2);
+		glVertex3f(-ws_act.x/2, ws_act.y/2, -ws_act.z/2);
+		glVertex3f(ws_act.x/2, ws_act.y/2, -ws_act.z/2);
+		glVertex3f(-ws_act.x/2, -ws_act.y/2, -ws_act.z/2);
+		glVertex3f(ws_act.x/2, -ws_act.y/2, -ws_act.z/2);
+		glEnd();
+	}
+	
+	glDisable(GL_LINE_SMOOTH);
+	glDisable(GL_BLEND);
+
+	
 	
 	glPopMatrix();	
 
@@ -368,8 +394,6 @@ void reshape(int w, int h)
     float aspRatio = (float) w / (float) h;
 	gluPerspective(20.0, aspRatio, 0.1e-6, 10);
 	
-	//float ort = 1e-3;  //orthonormal stuff - never worked
-	//glOrtho(-aspRatio*ort,aspRatio*ort,-ort,ort,1e-8,1e-2);
 	width = w;
 	height = h;
 
@@ -679,6 +703,9 @@ main(int argc, char** argv)
 	
 	pdata.spring = 50;	
 	clArgFloat("k", pdata.spring);
+
+	clArgFloat("strain", strain);
+	clArgFloat("Period", period);//input period in ms
 
 	externalH = 100;
 	clArgFloat("H", externalH);

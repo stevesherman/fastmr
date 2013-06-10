@@ -161,8 +161,6 @@ __global__ void magForcesK( const float4* dSortedPos,	//i: pos we use to calcula
 			m2 = (Cp2 == 0.0f) ? nparams.Cpol*nparams.extH : m2;
 			dm1m2 = dot(m1,m2);
 			
-			//force += 3.0f*MU_0*MU_C*dm1m2/(2.0f*PI_F*sepdist*sepdist*sepdist*sepdist)*
-			//		expf(-nparams.spring*(sqrtf(lsq)/sepdist - 1))*er;
 			force += 3.0f*MU_0*MU_C*length(m1)*length(m2)/(2.0f*PI_F*sepdist*sepdist*sepdist*sepdist)*
 					expf(-nparams.spring*(sqrtf(lsq)/sepdist - 1))*er;
 

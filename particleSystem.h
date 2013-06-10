@@ -57,12 +57,8 @@ public:
 	void setContactDist(float x) {m_contact_dist = x;}
 	void setRebuildDist(float x) {rebuildDist = x;}
 
-	void dangerousResize(double  y) {
-		newp.L.y = y; 
-		newp.Linv.y = 1.0/y;
-		newp.origin.y = -newp.L.y/2.0;
-	};
-	float getHeight() { return newp.L.y;}
+	void dangerousResize(double  y);
+	float3 getWorldSize() { return newp.L;}
 	float getParticleRadius() { return m_params.pRadius[0]; }
     uint3 getGridSize() { return m_params.gridSize; }
     float3 getWorldOrigin() { return m_params.worldOrigin; }
@@ -76,16 +72,16 @@ protected: // methods
     ParticleSystem() {}
     uint createVBO(uint size);
 
-    void _initialize();
-    void _finalize();
-	void sort_and_reorder();
-	uint it_since_sort;
-    void initGrid(uint3 size, float3 spacing, float3 jitter, uint numParticles);
+void _initialize();
+void _finalize();
+void sort_and_reorder();
+uint it_since_sort;
+void initGrid(uint3 size, float3 spacing, float3 jitter, uint numParticles);
 
 protected: // data
-    bool m_bInitialized, m_bUseOpenGL;
-    bool m_2d;
-	uint m_numParticles;
+bool m_bInitialized, m_bUseOpenGL;
+bool m_2d;
+uint m_numParticles;
 	uint m_maxNeigh;
 	int m_randSet;
 	float rand_scale;
