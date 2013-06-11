@@ -352,6 +352,7 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
 				getBadP();
 				getMagnetization();
 				NListStats();
+				dumpParticles(0, newp.N);
 				assert(false);
 			}
 		}
@@ -473,7 +474,7 @@ ParticleSystem::dumpParticles(uint start, uint count)
 			printf("  Forces: (%.7g, %.7g, %.7g, %.7g)\n", m_hForces[i*4+0], m_hForces[i*4+1], m_hForces[i*4+2], m_hForces[i*4+3]);
 			printf("  Moments: (%.7g, %.7g, %.7g, %.7g)\n", m_hMoments[i*4+0], m_hMoments[i*4+1], m_hMoments[i*4+2], m_hMoments[i*4+3]);
 		}
-		if(fabs(m_hPos[i*4+1])+m_hPos[i*4+3] > 0.35e-3) n_outside++;
+		if(fabs(m_hPos[i*4+1])+m_hPos[i*4+3] > newp.L.y/2.0f) n_outside++;
 	}
 	printf("Force cut = %g\n", sqrtf(newp.max_fdr_sq));
 	printf("n_outside = %d\n", n_outside);

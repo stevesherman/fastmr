@@ -153,13 +153,15 @@ struct isOut
 	isOut(float3 bmax) : bmax(bmax) {}	
 	
 	__host__ __device__ bool operator()(const float4 &p){
+		//allows for particles to be out of bounds by ~1ULP of fp error
+		float err = 1 + 1e-6f;
 		if(isnan(p.x) || isnan(p.y) || isnan(p.z))
 			return true;
-		if(fabsf(p.x) > bmax.x )
+		if(fabsf(p.x) > bmax.x*err )
 			return true;
-		if(fabsf(p.y)+p.w > bmax.y)//>= due to pinning BCs? not true anymore i think
+		if(fabsf(p.y)+p.w > bmax.y*err)
 			return true;
-		if(fabsf(p.z) > bmax.z )
+		if(fabsf(p.z) > bmax.z*err )
 			return true;
 		return false;
 	}
