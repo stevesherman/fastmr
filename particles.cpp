@@ -517,10 +517,7 @@ void key(unsigned char key, int /*x*/, int /*y*/)
         break;
     case '\033':
     case 'q':
-        if(g_useGL) {
-			printf("the impending segfault appears to be a graphics issue, and not a code error\n");
-		}
-		exit(0);
+       	exit(0);
         break;
     case 'v':
         mode = M_VIEW;
