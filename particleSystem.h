@@ -33,6 +33,7 @@ public:
     void dumpGrid();
     void dumpParticles(uint start, uint count);
 	void logParticles(FILE* file);
+	int loadParticles(FILE* file);
 	void logParams(FILE* file);
 	void logStuff(FILE* file, float simtime);
 	void getBadP();

@@ -18,6 +18,10 @@
 #include <ctime>
 #include <algorithm>
 
+#include <iostream>
+#include <fstream>
+
+
 #include "particles.h"
 #include "particleSystem.h"
 #include "render_particles.h"
@@ -26,12 +30,6 @@
 #include "new_kern.h"
 #include "utilities.h"
 
-#define MAX_EPSILON_ERROR 5.00f
-#define THRESHOLD         0.30f
-
-#ifdef __DEVICE_EMULATION__
-	const int binIdx = 1;	// pick the proper sReferenceBin
-#endif
 
 uint width = 600, height = 600;
 
@@ -72,14 +70,13 @@ SimParams pdata;
 float timestep = 500; //in units of nanoseconds
 double simtime = 0.0f;
 float externalH = 100; //kA/m
-float colorFmax = 3.5;
+float colorFmax = 0.75;
 float iter_dxpct = 0.035;
 float rebuild_pct = 0.1;
 float strain = 0, period = 24;//compression params, period in ms
 float contact_dist = 1.05f;
 float pin_dist = 0.995f;
 float3 worldSize;
-unsigned int numIterations = 0; // run until exit
 float maxtime = 0;
 
 int resolved = 0;//number of times the integrator had to resolve a step
@@ -120,7 +117,7 @@ void setParams(){
     psystem->setRepelSpring(pdata.spring);
     psystem->setShear(pdata.shear);
     psystem->setExternalH(make_float3(0.0f, externalH*1e3, 0.0f));
-	psystem->setColorFmax(colorFmax*1e-7f);
+	psystem->setColorFmax(colorFmax);
 	psystem->setViscosity(pdata.viscosity);
 	psystem->setDipIt(pdata.mutDipIter);
 	psystem->setPinDist(pin_dist);
@@ -195,7 +192,6 @@ void runBenchmark()
     printf("Run %u particles simulation for %f us...\n\n", pdata.numBodies, maxtime);
     cudaDeviceSynchronize();
     sdkStartTimer(&timer);
-	//for (int ii = 0; ii < numIterations; ii++){
 	while(simtime < maxtime*1e3f){
 		qupdate();	    
 	}
@@ -205,10 +201,10 @@ void runBenchmark()
 
     cudaDeviceSynchronize();
     sdkStopTimer(&timer);
-	float fAvgSeconds = (float)1.0e-3 * (float)sdkGetTimerValue(&timer)/(float)numIterations;
+	float fAvgSeconds = (float)1.0e-3 * (float)sdkGetTimerValue(&timer)/(float)frameCount;
 
     printf("particles, Throughput = %.4f KParticles/s, Time = %.5fs, Size = %u particles\n", 
-            (1.0e-3 * pdata.numBodies)/fAvgSeconds, fAvgSeconds*numIterations, pdata.numBodies);
+            (1.0e-3 * pdata.numBodies)/fAvgSeconds, fAvgSeconds*frameCount, pdata.numBodies);
 
 }
 
@@ -372,9 +368,6 @@ void display()
     glutReportErrors();
 
     computeFPS();
-	if((numIterations > 0) && ((int)frameCount > numIterations)){
-		exit(0);
-	}
 	if((maxtime > 0) && (simtime >= maxtime*1e3)){
 		exit(0);	
 	}
@@ -617,7 +610,7 @@ void initParamList()
 		paramlist->AddParam(new Param<float>("spring constant",pdata.spring, 0, 100, 1, &pdata.spring));
 		paramlist->AddParam(new Param<float>("H (kA/m)", externalH, 0, 1e3, 5, &externalH));
 		paramlist->AddParam(new Param<float>("shear rate", pdata.shear, 0, 2000, 50, &pdata.shear));
-		paramlist->AddParam(new Param<float>("colorFmax", colorFmax, 0, 15, 0.1f, &colorFmax));
+		paramlist->AddParam(new Param<float>("colorFmax", colorFmax, 0, 1, 0.01f, &colorFmax));
     	paramlist->AddParam(new Param<float>("visc", pdata.viscosity, 0.001f, .25f, 0.001f, &pdata.viscosity));
 		paramlist->AddParam(new Param<float>("max dx pct", iter_dxpct, 0, .1f, 0.001f, &iter_dxpct));
 		paramlist->AddParam(new Param<float>("pin dist", pin_dist, 0.995f, 1.5f, 0.005f, &pin_dist));
@@ -666,7 +659,6 @@ main(int argc, char** argv)
 	};
 
 	//set the device and gl status
-	numIterations = 0;
 	unsigned int devID = gpuGetMaxGflopsDeviceId();
 	if(checkCmdLineFlag(argc, (const char **)argv, "noGL")) {
 		g_useGL = false;
@@ -679,60 +671,7 @@ main(int argc, char** argv)
 	clArgInt("record", recordInterval);
 	clArgInt("logf", logInterval);
 	clArgInt("plogf", partlogInt);	
-	
-	//set the random seed
-	uint randseed = time(NULL);
-	clArgInt("randseed", randseed);
-	srand(randseed);
-	printf("randseed: %d\n", randseed);
-	
-	
-	
-	//DEFINE SIMULATION PARAMETERS
-
-	float worldsize1d = .35;//units of mm
-	clArgFloat("wsize", worldsize1d);
-	worldSize = make_float3(worldsize1d*1e-3f, worldsize1d*1e-3f, worldsize1d*1e-3f);
-	float volume = worldSize.x*worldSize.y*worldSize.z; 
-
-	pdata.shear = 500;
-	clArgFloat("shear", pdata.shear);
-	
-	pdata.spring = 50;	
-	clArgFloat("k", pdata.spring);
-
-	clArgFloat("strain", strain);
-	clArgFloat("Period", period);//input period in ms
-
-	externalH = 100;
-	clArgFloat("H", externalH);
-	pdata.externalH = make_float3(0,externalH*1e3f,0);
-
-	clArgFloat("dt", timestep);//units of ns
-	clArgInt("i", numIterations);
-	maxtime =timestep*numIterations*1e-3;//maxtime has units of us for simplicity
-	clArgFloat("maxtime", maxtime);//units of ns as well
-	numIterations = maxtime/timestep*1e3f;
-	pdata.viscosity = 0.1;
-	clArgFloat("visc", pdata.viscosity);
-
-	pdata.colorFmax = colorFmax*1e-7;
-	pdata.globalDamping = 0.8f; 
-	pdata.cdamping = 0.03f;
-	pdata.cspring = 10;
-	clArgFloat("cspring", pdata.cspring);
-	pdata.boundaryDamping = -0.03f;
-
-	clArgFloat("pin_d", pin_dist);
-	clArgFloat("contact_dist", contact_dist);
-	clArgFloat("rebuild_dist", rebuild_pct);
-	clArgFloat("iterdx",iter_dxpct); 
-		
-	pdata.mutDipIter = 0;
-	clArgInt("dipit", pdata.mutDipIter);
-		
-
-	char* title;	
+	char* title;//i have no idea how this works	
 	if(getCmdLineArgumentString( argc, (const char**)argv, "logt", &title)){
 		filename = title;
 	}
@@ -740,62 +679,199 @@ main(int argc, char** argv)
    	sprintf(logfile, "/home/steve/Datasets/%s.dat", filename);
 	sprintf(crashname, "/home/steve/Datasets/%s.crash.dat", filename);
 
-	pdata.flowmode = false;
-	if(checkCmdLineFlag(argc, (const char **)argv, "flowmode")) {	
-		pdata.flowmode = true;
-	}
-	pdata.flowvel = 2e7; 
-	pdata.nd_plug = .20;	
-
-	float radius = 4.0f;
-	//haven't figured out a good way to do this in a loop
-	clArgFloat("rad0", radius);
-	pdata.pRadius[0] = radius*1e-6f; //median diameter
-	pdata.volfr[0] = 0.30f;
-	clArgFloat("vfr0", pdata.volfr[0]);
-	pdata.mu_p[0] = 2000; //relative permeability
-	clArgFloat("xi0", pdata.mu_p[0]);
-	pdata.nump[0] = (pdata.volfr[0] * volume) / (4.0f/3.0f*PI_F*pow(pdata.pRadius[0],3)); 
-	pdata.rstd[0] = 0; //sigma0 in log normal distribution
-	clArgFloat("std0", pdata.rstd[0]);	
-	if(pdata.rstd[0] > 0){//eq 3.24 crowe
-		pdata.nump[0] = (pdata.volfr[0]*volume) / (4.0f/3.0f*PI_F*pow(pdata.pRadius[0],3)
-					*exp(4.5f*pdata.rstd[0]*pdata.rstd[0]));
-	}
-
-	radius = 6.0f;
-	clArgFloat("rad1", radius);
-	pdata.pRadius[1] = radius*1e-6f;
-	pdata.volfr[1] = 0.0f;
-	clArgFloat("vfr1", pdata.volfr[1]);
-	pdata.mu_p[1] = 2000;
-	clArgFloat("xi1", pdata.mu_p[1]);
-	pdata.nump[1] = (pdata.volfr[1] * volume) / (4.0f/3.0f*PI_F*pow(pdata.pRadius[1],3)); 
-	pdata.rstd[1] = 0;
-	clArgFloat("std1", pdata.rstd[1]);
-	if(pdata.rstd[1] > 0){//eq 3.24 crowe
-		pdata.nump[1] = (pdata.volfr[1]*volume) / (4.0f/3.0f*PI_F*pow(pdata.pRadius[1],3)
-					*exp(4.5f*pdata.rstd[1]*pdata.rstd[1]));
-	}
+	//set the random seed
+	uint randseed = time(NULL);
+	clArgInt("randseed", randseed);
+	srand(randseed);
+	printf("randseed: %d\n", randseed);
 	
-	radius = 25.0f;
-	clArgFloat("rad2", radius);
-	pdata.pRadius[2] = radius*1e-6f;
-	pdata.volfr[2] = 0.0f;
-	clArgFloat("vfr2", pdata.volfr[2]);
-	pdata.mu_p[2] = 1;
-	clArgFloat("xi2", pdata.mu_p[2]);
-	pdata.nump[2] = (pdata.volfr[2] * volume) / (4.0f/3.0f*PI_F*pow(pdata.pRadius[2],3)); 
-	pdata.rstd[2] = 0;
-	clArgFloat("std2", pdata.rstd[2]);
-	if(pdata.rstd[2] > 0){//eq 3.24 crowe
-		pdata.nump[2] = (pdata.volfr[2]*volume) / (4.0f/3.0f*PI_F*pow(pdata.pRadius[2],3)
-					*exp(4.5f*pdata.rstd[2]*pdata.rstd[2]));
+	
+	//DEFINE SIMULATION PARAMETERS
+
+	//set defaults
+	pdata.shear = 500;
+	pdata.spring = 50;
+	externalH = 100;
+	pdata.viscosity = 0.1;
+	pdata.colorFmax = colorFmax;
+	pdata.globalDamping = 0.8f; 
+	pdata.cdamping = 0.03f;
+	pdata.cspring = 10;
+	pdata.boundaryDamping = -0.03f;
+	pdata.mutDipIter = 0;
+
+	//first check if we are restarting
+	bool restart = checkCmdLineFlag(argc, (const char**)argv, "restart");
+	if(restart){
+		printf("Attempting to restart from %s\n", crashname);	
+		
+		crashlog = fopen(crashname, "r");
+		if(crashlog == NULL) fprintf(stderr,"No such crashfile exists!\n\n");
+		
+		char buff[1024]; 
+		int numlines = 0;
+		int matches;
+		float time;
+		char verno[30];
+
+		if(fgets(buff, 1024, crashlog) != NULL) {
+			matches = sscanf(buff, "Time: %g ns", &time);
+			printf("matches = %d\t time: %g ns\n", matches, time);
+		}
+
+		if(fgets(buff, 1024, crashlog) != NULL){
+			printf("%s", buff);
+			matches = sscanf(buff, "Build Date: %*s %*d %*d %*d:%*d:%*d\t svn version: %s", verno);
+			printf("matches = %d\t verno: %s\n", matches, verno);
+			if(strncmp(SVN_REV, verno, 25))
+				fprintf(stderr, "Warning, running data from version: %s on %s\n", verno, SVN_REV);
+		}
+
+		if(fgets(buff, 1024, crashlog) != NULL){
+			matches = sscanf(buff, "vfrtot: %*f\t v0: %f\t v1: %f\t v2: %f", &pdata.volfr[0], 
+					&pdata.volfr[1], &pdata.volfr[2]);
+			printf("matches = %d,\t v0: %.4f\t v1: %.4f\t v2: %.4f\n", matches, pdata.volfr[0], 
+					pdata.volfr[1], pdata.volfr[2]);
+		}
+
+		if(fgets(buff, 1024, crashlog) != NULL){
+			matches = sscanf(buff, "ntotal: %d n0: %d n1: %d n2: %d",&pdata.numBodies, 
+					&pdata.nump[0], &pdata.nump[1], &pdata.nump[2]);
+			printf("matches = %d,\t ntotal: %d n0: %d n1: %d n2: %d\n",matches, pdata.numBodies, 
+					pdata.nump[0], pdata.nump[1], pdata.nump[2]);
+		}
+
+		if(fgets(buff, 1024, crashlog) != NULL){
+			matches = sscanf(buff, " mu0: %f mu1: %f mu2: %f", &pdata.mu_p[0], &pdata.mu_p[1], 
+					&pdata.mu_p[2]);
+			printf("matches = %d,\t mu0: %f mu1: %f mu2: %f\n", matches, pdata.mu_p[0], 
+					pdata.mu_p[1], pdata.mu_p[2]);
+		}
+
+		if(fgets(buff, 1024, crashlog) != NULL){
+			matches = sscanf(buff, " a0: %g a1: %g a2: %g", &pdata.pRadius[0], 
+					&pdata.pRadius[1], &pdata.pRadius[2]);
+			printf("matches = %d,\t a0: %g a1: %g a2: %g\n", matches, pdata.pRadius[0], 
+					pdata.pRadius[1], pdata.pRadius[2]);
+		}
+			
+		if(fgets(buff, 1024, crashlog) != NULL){
+			matches = sscanf(buff, " std0: %f std1: %f std2: %f", &pdata.rstd[0], 
+					&pdata.rstd[1], &pdata.rstd[2]);
+			printf("matches = %d,\t std0: %f std1: %f std2: %f\n", matches, pdata.rstd[0], 
+					pdata.rstd[1], pdata.rstd[2]);
+		}
+		
+		if(fgets(buff, 1024, crashlog) != NULL){
+			matches = sscanf(buff, "grid: %d x%d x %d = %*d cells", &pdata.gridSize.x, 
+					&pdata.gridSize.y, &pdata.gridSize.z);
+			printf("matches = %d \t grid %d %d %d\n", matches, pdata.gridSize.x, pdata.gridSize.y, 
+					pdata.gridSize.z);
+		}
+		
+		if(fgets(buff, 1024, crashlog) != NULL){
+			matches = sscanf(buff, "worldsize: %fmm x %fmm x %fmm", &worldSize.x, &worldSize.y, &worldSize.z);
+			printf("matches = %d\t ws: %f %f %f\n", matches, worldSize.x, worldSize.y, worldSize.z);
+		}
+		worldSize = worldSize*1e-3;
+			
+		if(fgets(buff, 1024, crashlog) != NULL){
+			matches = sscanf(buff, "spring: %f visc: %f Pin_d: %f contact_d: %f", &pdata.spring, 
+					&pdata.viscosity, &pin_dist, &contact_dist); 
+			printf("matches %d\t k %f visc %f pind %f contactd %f\n", matches, pdata.spring, 
+					pdata.viscosity, pin_dist, contact_dist);
+		}
+		if(fgets(buff, 1024, crashlog) != NULL){
+			matches = sscanf(buff, "rebuildDist: %f", &rebuild_pct);
+			printf("matches %d rbd_d %f\n", matches, rebuild_pct);
+		}
+		if(fgets(buff, 1024, crashlog) != NULL){
+			matches = sscanf(buff, "H.x: %*f H.y: %f H.z %*f", &externalH);
+			externalH = externalH*1e-3f;
+			printf("matches %d externalH %f\n", matches, externalH);
+		}	   
+		//fclose(crashlog);
+	} else {
+		float worldsize1d = .35;//units of mm
+		clArgFloat("wsize", worldsize1d);
+		worldSize = make_float3(worldsize1d*1e-3f, worldsize1d*1e-3f, worldsize1d*1e-3f);
+		float volume = worldSize.x*worldSize.y*worldSize.z; 
+
+		float radius = 4.0f;
+		//haven't figured out a good way to do this in a loop
+		clArgFloat("rad0", radius);
+		pdata.pRadius[0] = radius*1e-6f; //median diameter
+		pdata.volfr[0] = 0.30f;
+		clArgFloat("vfr0", pdata.volfr[0]);
+		pdata.mu_p[0] = 2000; //relative permeability
+		clArgFloat("xi0", pdata.mu_p[0]);
+		pdata.nump[0] = (pdata.volfr[0] * volume) / (4.0f/3.0f*PI_F*pow(pdata.pRadius[0],3)); 
+		pdata.rstd[0] = 0; //sigma0 in log normal distribution
+		clArgFloat("std0", pdata.rstd[0]);	
+		if(pdata.rstd[0] > 0){//eq 3.24 crowe
+			pdata.nump[0] = (pdata.volfr[0]*volume) / (4.0f/3.0f*PI_F*pow(pdata.pRadius[0],3)
+						*exp(4.5f*pdata.rstd[0]*pdata.rstd[0]));
+		}
+
+		radius = 6.0f;
+		clArgFloat("rad1", radius);
+		pdata.pRadius[1] = radius*1e-6f;
+		pdata.volfr[1] = 0.0f;
+		clArgFloat("vfr1", pdata.volfr[1]);
+		pdata.mu_p[1] = 2000;
+		clArgFloat("xi1", pdata.mu_p[1]);
+		pdata.nump[1] = (pdata.volfr[1] * volume) / (4.0f/3.0f*PI_F*pow(pdata.pRadius[1],3)); 
+		pdata.rstd[1] = 0;
+		clArgFloat("std1", pdata.rstd[1]);
+		if(pdata.rstd[1] > 0){//eq 3.24 crowe
+			pdata.nump[1] = (pdata.volfr[1]*volume) / (4.0f/3.0f*PI_F*pow(pdata.pRadius[1],3)
+						*exp(4.5f*pdata.rstd[1]*pdata.rstd[1]));
+		}
+		
+		radius = 25.0f;
+		clArgFloat("rad2", radius);
+		pdata.pRadius[2] = radius*1e-6f;
+		pdata.volfr[2] = 0.0f;
+		clArgFloat("vfr2", pdata.volfr[2]);
+		pdata.mu_p[2] = 1;
+		clArgFloat("xi2", pdata.mu_p[2]);
+		pdata.nump[2] = (pdata.volfr[2] * volume) / (4.0f/3.0f*PI_F*pow(pdata.pRadius[2],3)); 
+		pdata.rstd[2] = 0;
+		clArgFloat("std2", pdata.rstd[2]);
+		if(pdata.rstd[2] > 0){//eq 3.24 crowe
+			pdata.nump[2] = (pdata.volfr[2]*volume) / (4.0f/3.0f*PI_F*pow(pdata.pRadius[2],3)
+						*exp(4.5f*pdata.rstd[2]*pdata.rstd[2]));
+		}
+		
+		pdata.numBodies = pdata.nump[0] + pdata.nump[1] + pdata.nump[2];
 	}
 
-	pdata.numBodies = pdata.nump[0] + pdata.nump[1] + pdata.nump[2];
-	bool benchmark = checkCmdLineFlag(argc, (const char**) argv, "benchmark") != 0;
 
+	//now we take comman flags, overwriting default/restart values
+
+
+	clArgFloat("shear", pdata.shear);
+	clArgFloat("k", pdata.spring);
+
+	clArgFloat("strain", strain);
+	clArgFloat("Period", period);//input period in ms
+
+	clArgFloat("H", externalH);
+	pdata.externalH = make_float3(0,externalH*1e3f,0);
+
+	clArgFloat("dt", timestep);//units of ns
+	clArgFloat("maxtime", maxtime);//units of ns as well
+	clArgFloat("visc", pdata.viscosity);
+
+	clArgFloat("cspring", pdata.cspring);
+	
+	clArgFloat("pin_d", pin_dist);
+	clArgFloat("contact_dist", contact_dist);
+	clArgFloat("rebuild_dist", rebuild_pct);
+	clArgFloat("iterdx",iter_dxpct); 
+	clArgInt("dipit", pdata.mutDipIter);
+		
+	bool benchmark = checkCmdLineFlag(argc, (const char**) argv, "benchmark") != 0;
 
 	pdata.worldOrigin = worldSize*-0.5f;
 	float cellSize_des = 8.0f*pdata.pRadius[0];
@@ -819,7 +895,7 @@ main(int argc, char** argv)
 
     }
 	psystem = new ParticleSystem(pdata, g_useGL, worldSize);
-		if (g_useGL) {
+	if (g_useGL) {
         renderer = new ParticleRenderer;
         renderer->setParticleRadius(psystem->getParticleRadius());
         renderer->setColorBuffer(psystem->getColorBuffer());
@@ -829,7 +905,13 @@ main(int argc, char** argv)
 
 	initParamList();
 	setParams();
-	psystem->reset(1100, 0.4f);
+	if(restart) {
+		int val = psystem->loadParticles(crashlog);
+		fclose(crashlog);
+		if(val < 0) exit(0);
+	} else {
+		psystem->reset(1100, 0.4f);
+	}
     if (g_useGL) 
         initMenus();
 
@@ -852,10 +934,9 @@ main(int argc, char** argv)
 
     if (benchmark || !g_useGL) 
     {
-        if (numIterations <= 0){ 
+       	if(maxtime <= 0)
 			maxtime = timestep*500*1e-3;
-			numIterations = 500;
-		}
+
         runBenchmark();
     }
 	else if(g_useGL)

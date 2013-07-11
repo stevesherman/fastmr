@@ -63,7 +63,7 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize):
 	newp.tanfric = 1e-5f;
 	m_contact_dist = 1.05f;	
 	_initialize();
-	rand_scale = 0.1f;
+	rand_scale = 1.0f;
 	dx_since = 1e6f;
 	rebuildDist = 0.01;
 	it_since_sort = 0;
@@ -104,7 +104,7 @@ void
 ParticleSystem::_initialize()
 {
     assert(!m_bInitialized);
-	m_randSet = 200;
+	m_randSet = 0;
     // allocate host storage
     m_hPos = new float[newp.N*4];
     m_hMoments = new float[newp.N*4];
@@ -243,7 +243,11 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
         dRendPos = (float *) mapGLBufferObject(&m_cuda_posvbo_resource);
     	dRendColor = (float *) mapGLBufferObject(&m_cuda_colorvbo_resource);
 		
-		renderStuff(m_dPos1, m_dMoments, m_dForces1, dRendPos, dRendColor, m_colorFmax, rand_scale, newp.N);
+		//express colors as fraction of reference force, F0
+		float ref_moment = 4.0f*PI_F*pow(m_params.pRadius[0],3)*
+				(m_params.mu_p[0] - MU_C)/(m_params.mu_p[0]+2.0f*MU_C)*length(newp.extH);	
+		float F0 = 3*MU_0*ref_moment*ref_moment/ (4*PI_F*pow(2*m_params.pRadius[0],4));
+ 		renderStuff(m_dPos1, m_dMoments, m_dForces1, dRendPos, dRendColor, m_colorFmax*F0, rand_scale, newp.N);
 		
 		unmapGLBufferObject(m_cuda_posvbo_resource);
 		unmapGLBufferObject(m_cuda_colorvbo_resource);
@@ -468,7 +472,7 @@ ParticleSystem::dumpParticles(uint start, uint count)
 	copyArrayFromDevice(m_hMoments, m_dMoments, 0, sizeof(float)*4*count);
 	uint n_outside = 0;
 	for(uint i=start; i<start+count; i++) {
-		if(sqrt(m_hForces[i*4]*m_hForces[i*4] + m_hForces[i*4+1]*m_hForces[i*4+1] + m_hForces[i*4+2]*m_hForces[i*4+2]) > 1e-5f) {
+		if(sqrt(m_hForces[i*4]*m_hForces[i*4] + m_hForces[i*4+1]*m_hForces[i*4+1] + m_hForces[i*4+2]*m_hForces[i*4+2]) > 1e-7f) {
     
 			printf("Position: (%.7g, %.7g, %.7g, %.7g)\n", m_hPos[i*4+0], m_hPos[i*4+1], m_hPos[i*4+2], m_hPos[i*4+3]);
 			printf("  Forces: (%.7g, %.7g, %.7g, %.7g)\n", m_hForces[i*4+0], m_hForces[i*4+1], m_hForces[i*4+2], m_hForces[i*4+3]);
@@ -588,8 +592,8 @@ void ParticleSystem::NListStats()
 	delete [] m_hNeighList;
 
 }
-void
-ParticleSystem::logParticles(FILE* file)
+
+void ParticleSystem::logParticles(FILE* file)
 {
     // debug
     copyArrayFromDevice(m_hPos, m_dPos1, 0, sizeof(float)*4*newp.N);
@@ -603,12 +607,53 @@ ParticleSystem::logParticles(FILE* file)
 	fprintf(file, "-1\t-1\t-1\t-1\t-1\t-1\t-1\t-1\t\n");
 }
 
-void
-ParticleSystem::logParams(FILE* file)
+int ParticleSystem::loadParticles(FILE* file)
 {
-	#ifndef DATE
-	#define DATE "No date"  
-	#endif 
+	//assumes the file* is pointing to the start of the particle data
+	char buff[1024]; int matches;
+	for(uint i=0; i<newp.N; i++) {
+		if(fgets(buff, 1024, file) != NULL){
+			matches = sscanf(buff, "%f %f %f %f\t %f %f %f %f\t %f %f %f %f", &m_hPos[i*4+0], &m_hPos[i*4+1], &m_hPos[i*4+2],
+					&m_hPos[i*4+3], &m_hForces[i*4+0], &m_hForces[i*4+1], &m_hForces[i*4+2], &m_hForces[i*4+3], 
+					&m_hMoments[i*4+0], &m_hMoments[i*4+1], &m_hMoments[i*4+2], &m_hMoments[i*4+3]);
+		   if(matches != 12) {
+			   fprintf(stderr, "Failed to read in particles, i=%d matches=%d\n", i, matches);
+			   return -1;
+		   }
+		} else {
+			fprintf(stderr, "particle loader failed to read in a line, i=%d\n", i);
+			return -1;
+		}
+	}
+	int endcheck[8];
+	int endref[8] = {-1, -1, -1, -1, -1, -1, -1, -1 };  
+	if(fgets(buff, 1024, file) != NULL){
+		matches = sscanf(buff, "%d %d %d %d\t %d %d %d %d ", endcheck, endcheck+1, endcheck+2, endcheck+3,
+				endcheck+4, endcheck+5,endcheck+6, endcheck+7);
+		if(matches != 8)
+			fprintf(stderr, "not enough entries at end, matches = %d\n", matches);
+		for(int i = 0; i < 8; i++){
+			if(	endcheck[i] != endref[i]){
+				fprintf(stderr, "particle loader failed to find file terminator in expected location\n");
+				fprintf(stderr, "%d %d %d %d %d %d %d %d\n", endcheck[0], endcheck[1], endcheck[2], endcheck[3],
+						endcheck[4], endcheck[5], endcheck[6], endcheck[7]);
+				return -1;
+			}
+		}
+	} else {
+		fprintf(stderr, "particle loader file too short, failed to find terminator\n");
+		return -1;
+	}
+
+	copyArrayToDevice(m_dPos1, m_hPos, 0, 4*newp.N*sizeof(float));
+	copyArrayToDevice(m_dMoments, m_hMoments, 0, 4*newp.N*sizeof(float));
+	copyArrayToDevice(m_dForces1, m_hForces, 0, 4*newp.N*sizeof(float));	
+	return 0;
+}
+
+
+void ParticleSystem::logParams(FILE* file)
+{
 	#ifndef SVN_REV
 	#define SVN_REV "no svn verion number"
 	#endif
