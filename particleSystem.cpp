@@ -63,6 +63,7 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize):
 	newp.tanfric = 1e-5f;
 	m_contact_dist = 1.05f;	
 	_initialize();
+	zeroDevice();
 	initGrid();
 	rand_scale = 1.0f;
 	dx_since = 1e6f;
@@ -490,7 +491,6 @@ void ParticleSystem::logStuff(FILE* file, float simtime)
 {
  	
 	if(m_randSet != 0){  //dont log if we're setting ICs
-		printf("hi\n");	
 		return;
 	}
 	
@@ -506,11 +506,10 @@ void ParticleSystem::logStuff(FILE* file, float simtime)
 	float gs = calcGlForce(  (float4*) m_dForces1, (float4*) m_dPos1, newp.N,
 			-newp.origin.y, 0.0f)*newp.Linv.x*newp.Linv.y*newp.Linv.z;
 	float kinen = calcKinEn( (float4*) m_dForces1, (float4*) m_dPos1, newp);
-	
+
 	fprintf(file, "%.5g\t%.5g\t%.5g\t%.5g\t%d\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\n", 
 			simtime, newp.shear, newp.extH.y, (float)newp.N/graphs, edges, tf, bf, 
 			gs, kinen, M.x, M.y, M.z);
-	
 }
 
 void ParticleSystem::printStress()

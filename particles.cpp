@@ -143,6 +143,7 @@ void qupdate()
 	if(logInterval != 0 && frameCount % logInterval == 0){
 		printf("iter %d at %.2f/%.1f us\n", frameCount, simtime*1e-3f, maxtime);
 		psystem->logStuff(datalog, simtime*1e-3);	
+		fflush(datalog);
 	}
 
 	if(frameCount % 1000 == 0 && frameCount != 0){
@@ -894,9 +895,10 @@ main(int argc, char** argv)
     } else {
         initGL(argc, argv);
         cudaGLInit(argc, argv);
-
     }
+	
 	psystem = new ParticleSystem(pdata, g_useGL, worldSize);
+	
 	if (g_useGL) {
         renderer = new ParticleRenderer;
         renderer->setParticleRadius(psystem->getParticleRadius());
@@ -907,6 +909,7 @@ main(int argc, char** argv)
 
 	initParamList();
 	setParams();
+	
 	if(restart) {
 		int val = psystem->loadParticles(crashlog);
 		fclose(crashlog);
@@ -914,7 +917,8 @@ main(int argc, char** argv)
 	} else {
 		psystem->resetParticles(1100, 0.4f);
 	}
-    if (g_useGL) 
+    
+	if (g_useGL) 
         initMenus();
 
 	if( recordInterval != 0 ) {
@@ -924,11 +928,12 @@ main(int argc, char** argv)
         g_CheckRender->EnableQAReadback(true);
     }
 	psystem->logParams(stdout); 
+	
 	if(logInterval != 0){
 		printf("saving: %s\n",logfile);
 		datalog = fopen(logfile, "a");
 		if(datalog == NULL) {
-			fprintf(stderr,"failed to open particle logfile\n");
+			fprintf(stderr,"failed to open particle logfile, ferror %d\n", ferror(datalog));
 		}
 		psystem->logParams(datalog);	
 		fprintf(datalog, "time\tshear\textH\tchainl\tedges\ttopf\tbotf\tgstress\tkinen\tM.x \tM.y \tM.z\n");
