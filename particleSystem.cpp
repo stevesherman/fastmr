@@ -63,6 +63,7 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize):
 	newp.tanfric = 1e-5f;
 	m_contact_dist = 1.05f;	
 	_initialize();
+	initGrid();
 	rand_scale = 1.0f;
 	dx_since = 1e6f;
 	rebuildDist = 0.01;
@@ -291,6 +292,7 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
 		m_randSet--;
 		if(m_randSet == 0) {dx_since = 999; rand_scale = 1.0f;}
 	} else {
+
 		if (rebuildNList) {
 			NListCut(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dMoments, m_dGridParticleHash, 
 					m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh,  8.0f + rebuildDist, 0.5f);
@@ -303,11 +305,10 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
 			mutualMagn(m_dSortedPos,m_dMoments, m_dTemp, m_dNeighList, m_dNumNeigh, newp.N);
 			pswap(m_dMoments, m_dTemp);	
 		}
-
-		bool solve = true;
-
-		float dx_moved = 0.0f;
+	
 		//if the particles are moving too much, half the timestep and resolve
+		bool solve = true;
+		float dx_moved = 0.0f;
 		while(solve) {
 		
 			
@@ -488,8 +489,10 @@ ParticleSystem::dumpParticles(uint start, uint count)
 void ParticleSystem::logStuff(FILE* file, float simtime)
 {
  	
-	if(m_randSet != 0)  //dont log if we're setting ICs
+	if(m_randSet != 0){  //dont log if we're setting ICs
+		printf("hi\n");	
 		return;
+	}
 	
 	uint edges=0, graphs=0;
     getGraphData(graphs,edges);
@@ -609,6 +612,7 @@ void ParticleSystem::logParticles(FILE* file)
 
 int ParticleSystem::loadParticles(FILE* file)
 {
+	zeroDevice();
 	//assumes the file* is pointing to the start of the particle data
 	char buff[1024]; int matches;
 	for(uint i=0; i<newp.N; i++) {
@@ -701,7 +705,7 @@ inline float frand()
 }
 
 void
-ParticleSystem::initGrid(uint3 size, float3 spacing, float3 jitter, uint numParticles)
+ParticleSystem::initParticleGrid(uint3 size, float3 spacing, float3 jitter, uint numParticles)
 {
     uint i = 0;
 	for(uint z=0; z<size.z-0; z++) {
@@ -740,7 +744,7 @@ ParticleSystem::initGrid(uint3 size, float3 spacing, float3 jitter, uint numPart
 }
 
 void
-ParticleSystem::reset(uint numiter, float scale_start)
+ParticleSystem::resetParticles(uint numiter, float scale_start)
 {
 	zeroDevice();
 	dx_since = 1e6f;
@@ -789,7 +793,15 @@ ParticleSystem::reset(uint numiter, float scale_start)
 		printf("actual vfr = %g\n", vfr_actual);
 
 	}
-		
+	copyArrayToDevice(m_dMoments, m_hMoments, 0, 4*newp.N*sizeof(float));
+	copyArrayToDevice(m_dPos1, m_hPos, 0, 4*newp.N*sizeof(float));
+
+}
+
+
+
+void ParticleSystem::initGrid()
+{	
 
     
 //	printf("gs: %d x%d x%d\n", newp.gridSize.x, newp.gridSize.y, newp.gridSize.z);
@@ -845,8 +857,6 @@ ParticleSystem::reset(uint numiter, float scale_start)
 	}
 	copyArrayToDevice(m_dCellAdj, m_hCellAdj,0, newp.numAdjCells*m_numGridCells*sizeof(uint));
 	copyArrayToDevice(m_dCellHash, m_hCellHash, 0, m_numGridCells*sizeof(uint));
-	copyArrayToDevice(m_dMoments, m_hMoments, 0, 4*newp.N*sizeof(float));
-	copyArrayToDevice(m_dPos1, m_hPos, 0, 4*newp.N*sizeof(float));
 
 }
 

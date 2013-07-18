@@ -20,7 +20,7 @@ public:
 	ParticleSystem(SimParams params, bool useGL, float3 worldSize);
 
     float update(float deltaTime, float limdxpct);
-    void reset(uint numiter, float scale_start);
+    void resetParticles(uint numiter, float scale_start);
 
     int    getNumParticles() const { return m_numParticles; }
 
@@ -72,17 +72,17 @@ public:
 protected: // methods
     ParticleSystem() {}
     uint createVBO(uint size);
-
-void _initialize();
-void _finalize();
-void sort_and_reorder();
-uint it_since_sort;
-void initGrid(uint3 size, float3 spacing, float3 jitter, uint numParticles);
+	void _initialize();
+	void initGrid();
+	void _finalize();
+	void sort_and_reorder();
+	void initParticleGrid(uint3 size, float3 spacing, float3 jitter, uint numParticles);
 
 protected: // data
-bool m_bInitialized, m_bUseOpenGL;
-bool m_2d;
-uint m_numParticles;
+	uint it_since_sort;
+	bool m_bInitialized, m_bUseOpenGL;
+	bool m_2d;
+	uint m_numParticles;
 	uint m_maxNeigh;
 	int m_randSet;
 	float rand_scale;

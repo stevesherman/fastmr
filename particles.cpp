@@ -132,9 +132,10 @@ void qupdate()
 	//this crude hack makes pinned particles at start unpinned so they can space and unfuck each other
 	if(simtime < timestep)	psystem->setPinDist(0.8f);
 
-	float ws = worldSize.y*(1.0f + strain*sin(2.0f*PI_F/(period*1e6f)*simtime));
-	psystem->dangerousResize(ws);
-
+	if(strain != 0) {
+		float ws = worldSize.y*(1.0f + strain*sin(2.0f*PI_F/(period*1e6f)*simtime));
+		psystem->dangerousResize(ws);
+	}
 
 	float dtout = 1e9*psystem->update(timestep*1e-9f, iter_dxpct);
 	if(fabs(dtout - timestep) > .01f*dtout)
@@ -144,11 +145,12 @@ void qupdate()
 		psystem->logStuff(datalog, simtime*1e-3);	
 	}
 
-	if(frameCount % 1000 == 0){
-		fprintf(crashlog, "Time: %g ns\n", simtime);
+	if(frameCount % 1000 == 0 && frameCount != 0){
+		crashlog = fopen(crashname, "w");
+		fprintf(crashlog, "Time: %.12g ns\n", simtime);
 		psystem->logParams(crashlog);
 		psystem->logParticles(crashlog);
-		rewind(crashlog);//sets up the overwrite
+		fclose(crashlog);//sets up the overwrite
 	}
 
 	if( (partlogInt!=0) && (frameCount % partlogInt == 0)){
@@ -542,15 +544,15 @@ void key(unsigned char key, int /*x*/, int /*y*/)
         displayEnabled = !displayEnabled;
         break;
 	case '1':
-        psystem->reset(1100, 0.3f);
+        psystem->resetParticles(1100, 0.3f);
 		frameCount=0; simtime = 0; resolved = 0;
 		break;
     case '2':
-        psystem->reset(300, 1.0f);
+        psystem->resetParticles(300, 1.0f);
 		frameCount=0; simtime = 0; resolved = 0;
 		break;
     case '3':
-        psystem->reset(20, 1.0f);
+        psystem->resetParticles(20, 1.0f);
 		frameCount=0; simtime = 0; resolved = 0;
 		break;
 	case '5':  									// preset angle for pretty screenshots
@@ -715,8 +717,8 @@ main(int argc, char** argv)
 		char verno[30];
 
 		if(fgets(buff, 1024, crashlog) != NULL) {
-			matches = sscanf(buff, "Time: %g ns", &time);
-			printf("matches = %d\t time: %g ns\n", matches, time);
+			matches = sscanf(buff, "Time: %lg ns", &simtime);
+			printf("matches = %d\t time: %g ns\n", matches, simtime);
 		}
 
 		if(fgets(buff, 1024, crashlog) != NULL){
@@ -910,7 +912,7 @@ main(int argc, char** argv)
 		fclose(crashlog);
 		if(val < 0) exit(0);
 	} else {
-		psystem->reset(1100, 0.4f);
+		psystem->resetParticles(1100, 0.4f);
 	}
     if (g_useGL) 
         initMenus();
@@ -925,12 +927,14 @@ main(int argc, char** argv)
 	if(logInterval != 0){
 		printf("saving: %s\n",logfile);
 		datalog = fopen(logfile, "a");
+		if(datalog == NULL) {
+			fprintf(stderr,"failed to open particle logfile\n");
+		}
 		psystem->logParams(datalog);	
 		fprintf(datalog, "time\tshear\textH\tchainl\tedges\ttopf\tbotf\tgstress\tkinen\tM.x \tM.y \tM.z\n");
 	}
 	
-	crashlog = fopen(crashname, "w");
-
+	
 
     if (benchmark || !g_useGL) 
     {
