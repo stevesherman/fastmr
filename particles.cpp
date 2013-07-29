@@ -561,9 +561,16 @@ void key(unsigned char key, int /*x*/, int /*y*/)
 		camera_rot[1] = 23;					// azimuth angle
 		camera_trans[0] = -0.0*worldSize.x;	// horiz shift
 		camera_trans[1] = 0.05*worldSize.y;		// vert shift
-		camera_trans[2] = -5.0*worldSize.z;		// zoom
+		camera_trans[2] = -4.8*worldSize.z;		// zoom
 		break;
 	case '6':
+		camera_rot[0] = 5;
+		camera_rot[1] = 87;
+		camera_trans[0] = 0;
+		camera_trans[1] = 0;
+		camera_trans[2] = -4.5*worldSize.z;
+		break;
+	case '7':
 		rotatable = !rotatable;
 		printf("Idle rotation toggled: %s\n", rotatable ? "on" : "off");	
 		break;

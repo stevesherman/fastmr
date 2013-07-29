@@ -507,7 +507,7 @@ void ParticleSystem::logStuff(FILE* file, float simtime)
 			-newp.origin.y, 0.0f)*newp.Linv.x*newp.Linv.y*newp.Linv.z;
 	float kinen = calcKinEn( (float4*) m_dForces1, (float4*) m_dPos1, newp);
 
-	fprintf(file, "%.5g\t%.5g\t%.5g\t%.5g\t%d\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\t%.5g\n", 
+	fprintf(file, "%.7g\t%.6g\t%.6g\t%.6g\t%d\t%.6g\t%.6g\t%.6g\t%.6g\t%.6g\t%.6g\t%.6g\n", 
 			simtime, newp.shear, newp.extH.y, (float)newp.N/graphs, edges, tf, bf, 
 			gs, kinen, M.x, M.y, M.z);
 }
