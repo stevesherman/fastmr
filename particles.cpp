@@ -209,6 +209,12 @@ void runBenchmark()
     printf("particles, Throughput = %.4f KParticles/s, Time = %.5fs, Size = %u particles\n", 
             (1.0e-3 * pdata.numBodies)/fAvgSeconds, fAvgSeconds*frameCount, pdata.numBodies);
 
+	crashlog = fopen(crashname, "w");
+	fprintf(crashlog, "Time: %.12g ns\n", simtime);
+	psystem->logParams(crashlog);
+	psystem->logParticles(crashlog);
+	fclose(crashlog);//sets up the overwrite
+
 }
 
 void computeFPS()

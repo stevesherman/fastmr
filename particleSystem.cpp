@@ -602,9 +602,9 @@ void ParticleSystem::logParticles(FILE* file)
 	copyArrayFromDevice(m_hForces, m_dForces1,0, sizeof(float)*4*newp.N);
 	copyArrayFromDevice(m_hMoments, m_dMoments, 0, sizeof(float)*4*newp.N);
     for(uint i=0; i<newp.N; i++) {
-		fprintf(file, "%.6g\t%.6g\t%.6g\t%.6g\t", m_hPos[i*4+0], m_hPos[i*4+1], m_hPos[i*4+2], m_hPos[i*4+3]);
-		fprintf(file, "%.6g\t%.6g\t%.6g\t%.6g\t", m_hForces[i*4+0], m_hForces[i*4+1], m_hForces[i*4+2], m_hForces[i*4+3]);
-		fprintf(file, "%.6g\t%.6g\t%.6g\t%.6g\n", m_hMoments[i*4+0], m_hMoments[i*4+1], m_hMoments[i*4+2], m_hMoments[i*4+3]);
+		fprintf(file, "%.9g\t%.9g\t%.9g\t%.9g\t", m_hPos[i*4+0], m_hPos[i*4+1], m_hPos[i*4+2], m_hPos[i*4+3]);
+		fprintf(file, "%.9g\t%.9g\t%.9g\t%.9g\t", m_hForces[i*4+0], m_hForces[i*4+1], m_hForces[i*4+2], m_hForces[i*4+3]);
+		fprintf(file, "%.9g\t%.9g\t%.9g\t%.9g\n", m_hMoments[i*4+0], m_hMoments[i*4+1], m_hMoments[i*4+2], m_hMoments[i*4+3]);
 	}
 	fprintf(file, "-1\t-1\t-1\t-1\t-1\t-1\t-1\t-1\t\n");
 }
