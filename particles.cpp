@@ -948,8 +948,10 @@ main(int argc, char** argv)
 		if(datalog == NULL) {
 			fprintf(stderr,"failed to open particle logfile, ferror %d\n", ferror(datalog));
 		}
-		psystem->logParams(datalog);	
-		fprintf(datalog, "time\tshear\textH\tchainl\tedges\ttopf\tbotf\tgstress\tkinen\tM.x \tM.y \tM.z\n");
+		if(!restart) {
+			psystem->logParams(datalog);	
+			fprintf(datalog, "time\tshear\textH\tchainl\tedges\ttopf\tbotf\tgstress\tkinen\tM.x \tM.y \tM.z\n");
+		}
 	}
 	
 	
