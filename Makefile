@@ -87,14 +87,14 @@ GENCODE_FLAGS   :=  $(GENCODE_SM20)
 
 # OS-specific build flags
 ifneq ($(DARWIN),) 
-      LDFLAGS   := -Xlinker -rpath $(CUDA_LIB_PATH) -L$(CUDA_LIB_PATH) -lcudart -lcufft
+      LDFLAGS   := -Xlinker -rpath $(CUDA_LIB_PATH) -L$(CUDA_LIB_PATH) -lcudart 
       CCFLAGS   := -arch $(OS_ARCH) 
 else
   ifeq ($(OS_SIZE),32)
-      LDFLAGS   := -L$(CUDA_LIB_PATH) -lcudart -lcufft
+      LDFLAGS   := -L$(CUDA_LIB_PATH) -lcudart 
       CCFLAGS   := -m32
   else
-      LDFLAGS   := -L$(CUDA_LIB_PATH) -lcudart -lcufft
+      LDFLAGS   := -L$(CUDA_LIB_PATH) -lcudart 
       CCFLAGS   := -m64
   endif
 endif
