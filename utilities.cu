@@ -368,6 +368,7 @@ void renderStuff(const float* pos,
 				float* rendColor,
 				float colorFmax,
 				float scale,
+				float rendercut,
 				uint numParticles)
 {
 	uint numThreads, numBlocks;
@@ -379,6 +380,7 @@ void renderStuff(const float* pos,
 											(float4*)rendColor,
 											colorFmax,
 											scale,
+											rendercut,
 											numParticles);
 	getLastCudaError("Render Kernel execution failed");
 }

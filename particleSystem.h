@@ -50,7 +50,7 @@ public:
     void setShear(float x) { m_params.shear = x; newp.shear = x;}
 	void setViscosity(float x) { m_params.viscosity = x; newp.visc = x;}
 	void setColorFmax(float x) { m_params.colorFmax=x; m_colorFmax = x;}
-
+	void setClipPlane(float x) { clipPlane = x;}
 	void setDipIt(uint x) {m_params.mutDipIter = x;}
     void setInteractionRadius(uint x) {m_params.interactionr = x;}
 	void setExternalH(float3 x) { m_params.externalH = x; newp.extH = x;}
@@ -95,6 +95,7 @@ protected: // data
     float3 m_worldSize;
 	uint m_numGridCells;
 	float m_colorFmax;
+	float clipPlane;
 	float m_contact_dist;
 
 	// CPU data

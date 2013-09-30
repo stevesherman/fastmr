@@ -71,6 +71,7 @@ float timestep = 500; //in units of nanoseconds
 double simtime = 0.0f;
 float externalH = 100; //kA/m
 float colorFmax = 0.75;
+float clipPlane = -1.0;
 float iter_dxpct = 0.035;
 float rebuild_pct = 0.1;
 float strain = 0, period = 24;//compression params, period in ms
@@ -123,6 +124,7 @@ void setParams(){
 	psystem->setPinDist(pin_dist);
 	psystem->setContactDist(contact_dist);
 	psystem->setRebuildDist(rebuild_pct);
+	psystem->setClipPlane(clipPlane);
 }
 
 
@@ -632,6 +634,7 @@ void initParamList()
 		paramlist->AddParam(new Param<float>("pin dist", pin_dist, 0.995f, 1.5f, 0.005f, &pin_dist));
 		paramlist->AddParam(new Param<float>("contact_dist", contact_dist, .95f, 1.25f, 0.001f, &contact_dist));
 		paramlist->AddParam(new Param<float>("rebuild dist", rebuild_pct, 0.0f, 1.0f, 0.005f, &rebuild_pct));
+		paramlist->AddParam(new Param<float>("clip plane", clipPlane, -1.0, 1.0, 0.1));
 	}
 }
 

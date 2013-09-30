@@ -137,7 +137,7 @@ build: fmr
 new_kcall.o: new_kcall.cu new_kern.cu
 	$(NVCC) $(NVCCFLAGS) $(EXTRA_NVCCFLAGS) $(GENCODE_FLAGS) $(INCLUDES) -o $@ -c $<
 
-utilities.o: utilities.cu
+utilities.o: utilities.cu particles_kernel.cu
 	$(NVCC) $(NVCCFLAGS) $(EXTRA_NVCCFLAGS) $(GENCODE_FLAGS) $(INCLUDES) -o $@ -c $<
 
 

@@ -69,6 +69,7 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize):
 	dx_since = 1e6f;
 	rebuildDist = 0.01;
 	it_since_sort = 0;
+	clipPlane = -1.0;
 }
 
 void pswap(float*& a, float*& b) {
@@ -248,8 +249,9 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
 		//express colors as fraction of reference force, F0
 		float ref_moment = 4.0f*PI_F*pow(m_params.pRadius[0],3)*
 				(m_params.mu_p[0] - MU_C)/(m_params.mu_p[0]+2.0f*MU_C)*length(newp.extH);	
-		float F0 = 3*MU_0*ref_moment*ref_moment/ (4*PI_F*pow(2*m_params.pRadius[0],4));
- 		renderStuff(m_dPos1, m_dMoments, m_dForces1, dRendPos, dRendColor, m_colorFmax*F0, rand_scale, newp.N);
+		float F0 = 3*MU_0*ref_moment*ref_moment/ (4*PI_F*powf(2*m_params.pRadius[0],4));
+ 		renderStuff(m_dPos1, m_dMoments, m_dForces1, dRendPos, dRendColor, m_colorFmax*F0, 
+				rand_scale, clipPlane,newp.N);
 		
 		unmapGLBufferObject(m_cuda_posvbo_resource);
 		unmapGLBufferObject(m_cuda_colorvbo_resource);

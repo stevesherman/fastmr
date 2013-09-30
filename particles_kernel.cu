@@ -21,6 +21,7 @@ __global__ void writeRender(const float4* pos,
 							float4* rendColor,
 							float colorFmax,
 							float scale,
+							float rendercut,
 							uint numParticles)
 {
 	uint index = blockIdx.x*blockDim.x + threadIdx.x;
@@ -28,6 +29,8 @@ __global__ void writeRender(const float4* pos,
 	
 	float4 rpos = pos[index];
 	rpos.w = rpos.w * scale;
+	if(rpos.z > rendercut*params.worldOrigin.z)	
+		rpos.w = 0;
 	float Cpol = moments[index].w;
 	//rpos.w = (Cpol == 1.0f) ? 0.0 : rpos.w;
 	//rendPos[index] = rpos;
