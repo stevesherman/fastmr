@@ -26,6 +26,10 @@ uint NListCut(uint*& nlist, uint* num_neigh, float* dpos, float* dmom,
 		uint* phash, uint* cellStart, uint* cellEnd, uint* cellAdj, 
 		uint numParticles, uint& max_neigh, float cut, float bigpct);
 
+uint vertEdge(uint* connections, const uint* nlist, const uint* num_neigh, const float* dPos, 
+		float maxth, float maxdist, uint numParticles);
+
+
 void magForces(const float* dSortedPos, const float* dIntPos, float* newPos, 
 		float* dForce, const float* dMom, const uint* nlist, const uint* num_neigh, 
 		uint numParticles, float deltaTime);

@@ -448,7 +448,7 @@ void ParticleSystem::getMagnetization()
 }
 
 
-void ParticleSystem::getGraphData(uint& graphs, uint& edges)
+void ParticleSystem::getGraphData(uint& graphs, uint& edges, uint& vcon)
 {
 	//no reordering, assume m_contact_dist << m_interaction_dist, so it should always be fine
 	uint maxn = NListVar(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dMoments, m_dGridParticleHash, 
@@ -461,6 +461,8 @@ void ParticleSystem::getGraphData(uint& graphs, uint& edges)
 	copyArrayFromDevice(m_hNumNeigh,  m_dNumNeigh,  0, sizeof(uint)*newp.N);
 	graphs = adjConGraphs(m_hNeighList, m_hNumNeigh, newp.N);
 	delete [] m_hNeighList;
+
+	vcon = vertEdge(m_dNumNeigh, m_dNeighList, m_dNumNeigh, m_dSortedPos,sqrtf(3.0/5.0), m_contact_dist, newp.N)/2;
 }
 
 uint ParticleSystem::getInteractions(){
@@ -477,11 +479,15 @@ ParticleSystem::dumpParticles(uint start, uint count)
 	copyArrayFromDevice(m_hMoments, m_dMoments, 0, sizeof(float)*4*count);
 	uint n_outside = 0;
 	for(uint i=start; i<start+count; i++) {
-		if(sqrt(m_hForces[i*4]*m_hForces[i*4] + m_hForces[i*4+1]*m_hForces[i*4+1] + m_hForces[i*4+2]*m_hForces[i*4+2]) > 1e-7f) {
+		if(sqrt(m_hForces[i*4]*m_hForces[i*4] + m_hForces[i*4+1]*m_hForces[i*4+1] 
+					+ m_hForces[i*4+2]*m_hForces[i*4+2]) > 1e-7f) {
     
-			printf("Position: (%.7g, %.7g, %.7g, %.7g)\n", m_hPos[i*4+0], m_hPos[i*4+1], m_hPos[i*4+2], m_hPos[i*4+3]);
-			printf("  Forces: (%.7g, %.7g, %.7g, %.7g)\n", m_hForces[i*4+0], m_hForces[i*4+1], m_hForces[i*4+2], m_hForces[i*4+3]);
-			printf("  Moments: (%.7g, %.7g, %.7g, %.7g)\n", m_hMoments[i*4+0], m_hMoments[i*4+1], m_hMoments[i*4+2], m_hMoments[i*4+3]);
+			printf("Position: (%.7g, %.7g, %.7g, %.7g)\n", m_hPos[i*4+0], 
+					m_hPos[i*4+1], m_hPos[i*4+2], m_hPos[i*4+3]);
+			printf("  Forces: (%.7g, %.7g, %.7g, %.7g)\n", m_hForces[i*4+0], 
+					m_hForces[i*4+1], m_hForces[i*4+2], m_hForces[i*4+3]);
+			printf("  Moments: (%.7g, %.7g, %.7g, %.7g)\n", m_hMoments[i*4+0], 
+					m_hMoments[i*4+1], m_hMoments[i*4+2], m_hMoments[i*4+3]);
 		}
 		if(fabs(m_hPos[i*4+1])+m_hPos[i*4+3] > newp.L.y/2.0f) n_outside++;
 	}
@@ -497,8 +503,8 @@ void ParticleSystem::logStuff(FILE* file, float simtime)
 		return;
 	}
 	
-	uint edges=0, graphs=0;
-    getGraphData(graphs,edges);
+	uint edges=0, graphs=0, vedge=0;
+    getGraphData(graphs,edges,vedge);
 	float3 M = magnetization((float4*) m_dMoments, newp.N, newp.L.x*newp.L.y*newp.L.z);
 
 	//cuda calls for faster computation 
@@ -510,9 +516,9 @@ void ParticleSystem::logStuff(FILE* file, float simtime)
 			-newp.origin.y, 0.0f)*newp.Linv.x*newp.Linv.y*newp.Linv.z;
 	float kinen = calcKinEn( (float4*) m_dForces1, (float4*) m_dPos1, newp);
 
-	fprintf(file, "%.7g\t%.6g\t%.6g\t%.6g\t%d\t%.6g\t%.6g\t%.6g\t%.6g\t%.6g\t%.6g\t%.6g\n", 
+	fprintf(file, "%.7g\t%.6g\t%.6g\t%.6g\t%d\t%.6g\t%.6g\t%.6g\t%.6g\t%.6g\t%.6g\t%.6g\t%d\n", 
 			simtime, newp.shear, newp.extH.y, (float)newp.N/graphs, edges, tf, bf, 
-			gs, kinen, M.x, M.y, M.z);
+			gs, kinen, M.x, M.y, M.z,vedge);
 }
 
 void ParticleSystem::printStress()

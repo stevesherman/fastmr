@@ -183,6 +183,45 @@ __global__ void magForcesK( const float4* dSortedPos,	//i: pos we use to calcula
 
 }
 
+__global__ void vertEdgeK(const uint* nlist, 
+						const uint* num_neigh,
+						const float4* dPos,
+						uint* conn,
+						float maxcosth, 			//cos(th) above which the counter increments
+						float maxdistsq)
+{
+	uint idx = blockDim.x*blockIdx.x + threadIdx.x;
+	if(idx >= nparams.N)
+		return;
+	uint n_neigh = num_neigh[idx];
+	float4 pos1 = dPos[idx];
+	//float4 pos1 = tex1Dfetch(pos_tex,idx);
+	float3 p1 = make_float3(pos1);
+	float radius1 = pos1.w;
+	
+	uint connections = 0;
+
+	for(uint i = 0; i < n_neigh; i++)
+	{
+		uint neighbor = nlist[i*nparams.N + idx];
+		
+		float4 pos2 = dPos[neighbor];
+		float3 p2 = make_float3(pos2);
+		float radius2 = pos2.w;
+		float sepdist = radius1 + radius2;
+
+		float3 er = p1 - p2;//start it out as dr, then modify to get er
+		er.x = er.x - nparams.L.x*rintf(er.x*nparams.Linv.x);
+		er.z = er.z - nparams.L.x*rintf(er.z*nparams.Linv.z);
+		float lsq = er.x*er.x + er.y*er.y + er.z*er.z;
+		er = er*rsqrtf(lsq);
+
+		if( lsq < maxdistsq*sepdist*sepdist  && fabs(er.y) < maxcosth)
+			connections++;
+	}
+	conn[idx] = connections; //for this to work, nlist must be regenned immediately after calling this
+}
+
 __global__ void magFricForcesK( const float4* dSortedPos,	//i: pos we use to calculate forces
 							const float4* dMom,		//i: the moment
 							const float4* dForceIn,  //i: the old force, used to find velocity		

@@ -509,7 +509,7 @@ void motion(int x, int y)
 void key(unsigned char key, int /*x*/, int /*y*/)
 {
 
-	uint nedges = 0, ngraphs = 0;
+	uint nedges = 0, ngraphs = 0, vcon = 0;
 	switch (key) 
     {
     case ' ':
@@ -543,9 +543,10 @@ void key(unsigned char key, int /*x*/, int /*y*/)
 		psystem->printStress();
 		break;
 	case 'g':
-		psystem->getGraphData(ngraphs,nedges);
+		psystem->getGraphData(ngraphs,nedges, vcon);
 		printf("numgraphs: %d, chainl: %f\n", ngraphs, (float)pdata.numBodies/(float) ngraphs);
 		printf("Edges = %d Mean edges = %f\n", nedges, (float)nedges/(float)pdata.numBodies);
+		printf("Vert edg %d Mean vedge = %f\n", vcon, (float)vcon/(float)pdata.numBodies);
 		break;
     case 'u':
         psystem->dumpParticles(0, pdata.numBodies);
@@ -956,7 +957,7 @@ main(int argc, char** argv)
 		}
 		if(!restart) {
 			psystem->logParams(datalog);	
-			fprintf(datalog, "time\tshear\textH\tchainl\tedges\ttopf\tbotf\tgstress\tkinen\tM.x \tM.y \tM.z\n");
+			fprintf(datalog, "time\tshear\textH\tchainl\tedges\ttopf\tbotf\tgstress\tkinen\tM.x \tM.y \tM.z \tvedge\n");
 		}
 	}
 	

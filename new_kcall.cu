@@ -165,6 +165,21 @@ uint NListCut(uint*& nlist, uint* num_neigh, float* dpos, float* dmom, uint* pha
 }
 
 
+uint vertEdge(uint* connections, const uint* nlist, const uint* num_neigh, const float* dPos, 
+		float maxth, float maxdist, uint numParticles)
+{
+	uint numThreads = 128;
+	uint numBlocks = iDivUp2(numParticles, numThreads);
+
+	vertEdgeK<<<numBlocks,numThreads>>>(nlist, num_neigh,(float4*) dPos, connections, maxth, maxdist*maxdist);
+
+	thrust::device_ptr<uint> conns(connections);
+	uint total = thrust::reduce(conns, conns+numParticles, 0,thrust::plus<uint>());
+
+	getLastCudaError("vertical connectivity");
+	return total;
+}
+
 void magForces(const float* dSortedPos, const float* dIntPos, float* newPos, float* dForce, 
 		const float* dMom, const uint* nlist, const uint* num_neigh, uint numParticles, float deltaTime)
 {
