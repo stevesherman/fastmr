@@ -50,7 +50,8 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize):
 	newp.cellSize = m_params.cellSize;
 	newp.origin = m_params.worldOrigin;
 	newp.Linv = 1/newp.L;
-	newp.max_fdr_sq = 8.0f*m_params.pRadius[0]*8.0f*m_params.pRadius[0];
+	force_dist = 8.0f;
+	newp.max_fdr_sq = force_dist*m_params.pRadius[0]*force_dist*m_params.pRadius[0];
 	newp.numAdjCells = 125;
 	newp.spring = m_params.spring;
 	//newp.spring = 1.0f/(.02f*2.0f*m_params.pRadius[0]);
@@ -298,7 +299,7 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
 
 		if (rebuildNList) {
 			NListCut(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dMoments, m_dGridParticleHash, 
-					m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh,  8.0f + rebuildDist, 0.5f);
+					m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh,  force_dist + rebuildDist, 0.5f);
 			dx_since = 0.0f;
 		}
 
@@ -382,8 +383,8 @@ void ParticleSystem::dangerousResize(double  y) {
 	newp.Linv.y = 1.0/y;
 	newp.origin.y = -newp.L.y/2.0;
 	newp.cellSize.y = newp.L.y/newp.gridSize.y;
-	if( newp.cellSize.y < 8.0f*m_params.pRadius[0]) {
-		newp.cellSize.y = 8.0f*m_params.pRadius[0];
+	if( newp.cellSize.y < force_dist*m_params.pRadius[0]) {
+		newp.cellSize.y = force_dist*m_params.pRadius[0];
 		printf("Cells shrunk excessively\n");
 	}
 

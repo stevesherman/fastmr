@@ -79,6 +79,7 @@ float contact_dist = 1.05f;
 float pin_dist = 0.995f;
 float3 worldSize;
 float maxtime = 0;
+float force_dist = 8;
 
 int resolved = 0;//number of times the integrator had to resolve a step
 
@@ -809,7 +810,7 @@ main(int argc, char** argv)
 			externalH = externalH*1e-3f;
 			printf("matches %d externalH %f\n", matches, externalH);
 		}	   
-		//fclose(crashlog);
+		//keep the crashlog open to read the particles
 	} else {
 		float worldsize1d = .35;//units of mm
 		clArgFloat("wsize", worldsize1d);
@@ -893,7 +894,9 @@ main(int argc, char** argv)
 	bool benchmark = checkCmdLineFlag(argc, (const char**) argv, "benchmark") != 0;
 
 	pdata.worldOrigin = worldSize*-0.5f;
-	float cellSize_des = 8.0f*pdata.pRadius[0];
+
+	clArgFloat("fdist", force_dist);	
+	float cellSize_des = force_dist*pdata.pRadius[0];
  
 	//gridSize.x = gridSize.y = gridSize.z = GRID_SIZE;
 	pdata.gridSize.x = floor(worldSize.x/cellSize_des);

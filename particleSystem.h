@@ -57,7 +57,7 @@ public:
 	void setPinDist(float x) { newp.pin_d = x;}
 	void setContactDist(float x) {m_contact_dist = x;}
 	void setRebuildDist(float x) {rebuildDist = x;}
-
+	void setForceDist(float x) {force_dist = x;}
 	void dangerousResize(double  y);
 	float3 getWorldSize() { return newp.L;}
 	float getParticleRadius() { return m_params.pRadius[0]; }
@@ -97,6 +97,7 @@ protected: // data
 	float m_colorFmax;
 	float clipPlane;
 	float m_contact_dist;
+	float force_dist;
 
 	// CPU data
     float* m_hPos;              // particle positions
