@@ -636,7 +636,7 @@ void initParamList()
 		paramlist->AddParam(new Param<float>("pin dist", pin_dist, 0.995f, 1.5f, 0.005f, &pin_dist));
 		paramlist->AddParam(new Param<float>("contact_dist", contact_dist, .95f, 1.25f, 0.001f, &contact_dist));
 		paramlist->AddParam(new Param<float>("rebuild dist", rebuild_pct, 0.0f, 1.0f, 0.005f, &rebuild_pct));
-		paramlist->AddParam(new Param<float>("clip plane", clipPlane, -1.0, 1.0, 0.1));
+		paramlist->AddParam(new Param<float>("clip plane", clipPlane, -1.0, 1.0, 0.01, &clipPlane));
 	}
 }
 
