@@ -744,8 +744,8 @@ main(int argc, char** argv)
 			printf("%s", buff);
 			matches = sscanf(buff, "Build Date: %*s %*d %*d %*d:%*d:%*d\t svn version: %s", verno);
 			printf("matches = %d\t verno: %s\n", matches, verno);
-			if(strncmp(SVN_REV, verno, 25))
-				fprintf(stderr, "Warning, running data from version: %s on %s\n", verno, SVN_REV);
+			if(strncmp(VERSION_NUMBER, verno, 25))
+				fprintf(stderr, "Warning, running data from version: %s on %s\n", verno, VERSION_NUMBER);
 		}
 
 		if(fgets(buff, 1024, crashlog) != NULL){

@@ -666,10 +666,10 @@ int ParticleSystem::loadParticles(FILE* file)
 
 void ParticleSystem::logParams(FILE* file)
 {
-	#ifndef SVN_REV
-	#define SVN_REV "no svn verion number"
+	#ifndef VERSION_NUMBER
+	#define VERSION_NUMBER "revno not found"
 	#endif
-	fprintf(file, "Build Date: %s %s\t svn version: %s\n", __DATE__, __TIME__,SVN_REV);
+	fprintf(file, "Build Date: %s %s\t version: %s\n", __DATE__, __TIME__,VERSION_NUMBER);
 	float vfrtot = m_params.volfr[0]+m_params.volfr[1]+m_params.volfr[2];
 	fprintf(file, "vfrtot: %.4f\t v0: %.4f\t v1: %.3f\t v2: %.4f\n",vfrtot,	m_params.volfr[0], 
 			m_params.volfr[1], m_params.volfr[2]);
