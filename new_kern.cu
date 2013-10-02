@@ -216,7 +216,7 @@ __global__ void vertEdgeK(const uint* nlist,
 		float lsq = er.x*er.x + er.y*er.y + er.z*er.z;
 		er = er*rsqrtf(lsq);
 
-		if( lsq < maxdistsq*sepdist*sepdist  && fabs(er.y) < maxcosth)
+		if( lsq < maxdistsq*sepdist*sepdist  && fabs(er.y) > maxcosth)
 			connections++;
 	}
 	conn[idx] = connections; //for this to work, nlist must be regenned immediately after calling this
