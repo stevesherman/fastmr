@@ -13,7 +13,6 @@
 #include <cstdlib>
 
 #include "new_kern.h"
-#include "particles_kernel.h"
 
 __constant__ NewParams nparams;
 
