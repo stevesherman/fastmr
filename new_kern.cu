@@ -413,60 +413,6 @@ __global__ void integrateRK4K(
 
 }
 
-__global__ void NListFixedK(uint* nlist,	//	o:neighbor list
-							uint* num_neigh,//	o:num neighbors
-							float4* dpos,	// 	i: position
-							uint* phash,
-							uint* cellStart,
-							uint* cellEnd,
-							uint* cellAdj,
-							uint max_neigh,
-							float max_dist_sq)
-{
-	uint idx = blockIdx.x*blockDim.x + threadIdx.x;
-	if(idx >= nparams.N)
-		return;
-	float4 pos1 = dpos[idx];
-	float3 p1 = make_float3(pos1);
-	//float rad1 = pos1.w;
-	uint hash = phash[idx];
-	uint n_neigh = 0;
-
-	for(uint i = 0; i < nparams.numAdjCells; i++)
-	{
-		//uint nhash = cellAdj[i*nparams.numCells + hash];
-		uint nhash = cellAdj[i + hash*nparams.numAdjCells];
-		uint cstart = cellStart[nhash];
-		if(cstart == 0xffffffff)//if empty, skip cell
-			continue;
-		uint cend = cellEnd[nhash];
-		for(uint idx2 = cstart; idx2 < cend; idx2++){
-			if(idx == idx2)
-				continue;
-			float4 pos2 = dpos[idx2];
-			//float4 pos2 = tex1Dfetch(pos_tex, idx2);
-			float3 p2 = make_float3(pos2);
-			//float rad2 = pos2.w;
-			float3 dr = p1 - p2;
-
-			dr.x = dr.x - nparams.L.x*rintf(dr.x*nparams.Linv.x);
-			dr.z = dr.z - nparams.L.z*rintf(dr.z*nparams.Linv.z);
-
-			float lsq = dr.x*dr.x + dr.y*dr.y + dr.z*dr.z;
-
-			if(lsq <= max_dist_sq){
-				if(n_neigh < max_neigh)
-					nlist[nparams.N*n_neigh + idx] = idx2;
-				n_neigh++;
-			}
-		}
-		
-	}
-	num_neigh[idx] = n_neigh;
-}
-
-
-
 __global__ void NListVarK(uint* nlist,	//	o:neighbor list
 							uint* num_neigh,//	o:num neighbors
 							const float4* dpos,	// 	i: position

@@ -44,13 +44,15 @@
 
 using namespace thrust;
 
-extern "C"
-{
-
 uint iDivUp(uint a, uint b)
 {
 	return (a%b == 0) ? (a/b) : (a/b +1);
 }
+
+
+extern "C"
+{
+
 
 void cudaInit(int argc, char **argv)
 {

@@ -31,4 +31,8 @@ struct NewParams {
 	float3 extH;
 	float Cpol;	
 };
+
+uint iDivUp(uint a, uint b);
+
+
 #endif
