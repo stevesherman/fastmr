@@ -4,6 +4,7 @@
 #include "connectedgraphs.h"
 #include "new_kern.h"
 #include "new_kcall.h"
+#include "vedge.h"
 #include "sfc_pack.h"
 
 #include <cuda_runtime.h>
@@ -448,13 +449,12 @@ void ParticleSystem::getMagnetization()
 }
 
 
-void ParticleSystem::getGraphData(uint& graphs, uint& edges, uint& vcon)
+void ParticleSystem::getGraphData(uint& graphs, uint& edges, uint& vert_edges)
 {
 	//no reordering, assume m_contact_dist << m_interaction_dist, so it should always be fine
 	uint maxn = NListVar(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dMoments, m_dGridParticleHash, 
 			m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, m_contact_dist);
 	edges = numInteractions(m_dNumNeigh, newp.N)/2;
-	dx_since = 1e6f;//set this to a really large number so that the nlist is regenerated
 	
 	m_hNeighList = new uint[newp.N*maxn];
 	copyArrayFromDevice(m_hNeighList, m_dNeighList, 0, sizeof(uint)*newp.N*maxn);
@@ -462,7 +462,20 @@ void ParticleSystem::getGraphData(uint& graphs, uint& edges, uint& vcon)
 	graphs = adjConGraphs(m_hNeighList, m_hNumNeigh, newp.N);
 	delete [] m_hNeighList;
 
-	vcon = vertEdge(m_dNumNeigh, m_dNeighList, m_dNumNeigh, m_dSortedPos,sqrtf(3.0/5.0), m_contact_dist, newp.N)/2;
+	maxn = vertNListVar(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dMoments, m_dGridParticleHash, 
+			m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, m_contact_dist, sqrtf(3.0/5.0));
+	vert_edges = numInteractions(m_dNumNeigh, newp.N)/2;
+
+	m_hNeighList = new uint[newp.N*maxn];
+	copyArrayFromDevice(m_hNeighList, m_dNeighList, 0, sizeof(uint)*newp.N*maxn);
+	copyArrayFromDevice(m_hNumNeigh,  m_dNumNeigh,  0, sizeof(uint)*newp.N);
+	graphs = adjConGraphs(m_hNeighList, m_hNumNeigh, newp.N);
+	delete [] m_hNeighList;
+	
+		
+	dx_since = 1e6f;//set this to a really large number so that the nlist is regenerated
+
+
 }
 
 uint ParticleSystem::getInteractions(){

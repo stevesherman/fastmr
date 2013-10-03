@@ -157,7 +157,10 @@ shaders.o: shaders.cpp
 connectedgraphs.o: connectedgraphs.cpp
 	$(GCC) $(CCFLAGS) $(EXTRA_CCFLAGS) $(INCLUDES) -o $@ -c $<
 
-fmr: particles.o new_kcall.o particleSystem.o connectedgraphs.o render_particles.o shaders.o utilities.o
+vedge.o: vedge.cu
+	$(NVCC) $(NVCCFLAGS) $(EXTRA_NVCCFLAGS) $(GENCODE_FLAGS) $(INCLUDES) -o $@ -c $<
+
+fmr: particles.o new_kcall.o particleSystem.o connectedgraphs.o render_particles.o shaders.o utilities.o vedge.o
 	$(GCC) $(CCFLAGS) -o $@ $+ $(LDFLAGS) $(EXTRA_LDFLAGS)
 
 run: build
