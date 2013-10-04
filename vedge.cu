@@ -17,7 +17,7 @@ extern __constant__ NewParams nparams;
 
 
 
-
+//template<class O>
 __global__ void funcNListK(uint* nlist,	//	o:neighbor list
 							uint* num_neigh,//	o:num neighbors
 							const float4* dpos,	// 	i: position
@@ -26,7 +26,7 @@ __global__ void funcNListK(uint* nlist,	//	o:neighbor list
 							const uint* cellEnd,
 							const uint* cellAdj,
 							const uint max_neigh,
-							NListDistCond op)
+							VertCond op)
 {
 	uint idx = blockIdx.x*blockDim.x + threadIdx.x;
 	if(idx >= nparams.N)
@@ -56,7 +56,7 @@ __global__ void funcNListK(uint* nlist,	//	o:neighbor list
 			dr.x = dr.x - nparams.L.x*rintf(dr.x*nparams.Linv.x);
 			dr.z = dr.z - nparams.L.z*rintf(dr.z*nparams.Linv.z);
 			float lsq = dr.x*dr.x + dr.y*dr.y + dr.z*dr.z;
-			dr *= rsqrtf(lsq);	
+			dr = dr*rsqrtf(lsq);	
 
 			if (op(rad1,rad2,dr,lsq)){
 				if(n_neigh < max_neigh){
@@ -69,7 +69,7 @@ __global__ void funcNListK(uint* nlist,	//	o:neighbor list
 	num_neigh[idx] = n_neigh;
 }
 
-extern "C" {
+//extern "C" {
 //uses an adjacency definition based on max_dist_m*(rad1 + rad2)
 //Note: this func modifies nlist and max_neigh
 
@@ -77,6 +77,7 @@ extern "C" {
 
 //pass in a functor of type NListDistCond
 //doesn't use moment data
+//template<class O>
 uint funcNList(	uint*& nlist, //reference to the nlist pointer
 		uint* num_neigh, 
 		const float* dpos, 
@@ -86,7 +87,7 @@ uint funcNList(	uint*& nlist, //reference to the nlist pointer
 		const uint* cellAdj, 
 		const uint numParticles, 
 		uint& max_neigh, 
-		NListDistCond op)
+		VertCond op)
 {
 	uint numThreads = 128;
 	uint numBlocks = (numParticles % numThreads == 0) ? (numParticles/numThreads) : (numParticles/numThreads+1);
@@ -113,4 +114,4 @@ uint funcNList(	uint*& nlist, //reference to the nlist pointer
 	return maxn;
 }
 
-}
+//}

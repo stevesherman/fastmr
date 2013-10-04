@@ -1,5 +1,5 @@
-#ifndef particle_system_cuh
-#define particle_system_cuh
+#ifndef utilities_h 
+#define utilities_h
 
 /*
  * Copyright 1993-2010 NVIDIA Corporation.  All rights reserved.
@@ -18,7 +18,7 @@
 
 #include "particles_kernel.h"
 #include "new_kern.h"
- extern "C"
+extern "C"
 {
 void cudaInit(int argc, char **argv);
 void cudaGLInit(int argc, char **argv);

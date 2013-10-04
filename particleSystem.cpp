@@ -464,14 +464,14 @@ void ParticleSystem::getGraphData(uint& graphs, uint& edges, uint& vert_edges)
 
 	uint temp = vertEdge(m_dNumNeigh, m_dNeighList, m_dNumNeigh, m_dSortedPos,sqrtf(3.0/5.0), m_contact_dist, newp.N)/2;
 
-	VertCond test = VertCond(m_contact_dist, sqrtf(3.0/5.0));
-	maxn = funcNList(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
+	VertCond test = VertCond(m_contact_dist*m_contact_dist, sqrtf(3.0/5.0));
+//	NListDistCond test; 
+	maxn = funcNList (m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
 			m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, test);
-	
 	vert_edges = numInteractions(m_dNumNeigh, newp.N)/2;
 	
 	if(temp != vert_edges)
-		printf("methods don't match! old: %d new %d\n", temp, vert_edges);
+		printf("methods don't match! old: %d new %d, maxn %d\n", temp, vert_edges,maxn);
 
 	m_hNeighList = new uint[newp.N*maxn];
 	copyArrayFromDevice(m_hNeighList, m_dNeighList, 0, sizeof(uint)*newp.N*maxn);

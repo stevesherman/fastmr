@@ -107,8 +107,8 @@ CheckRender       *g_CheckRender = NULL;
 #define MAX(a,b) ((a > b) ? a : b)
 
 
-//extern "C" void cudaInit(int argc, char **argv);
-//extern "C" void cudaGLInit(int argc, char **argv);
+extern "C" void cudaInit(int argc, char **argv);
+extern "C" void cudaGLInit(int argc, char **argv);
 
 void cleanup()
 {

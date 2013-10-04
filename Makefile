@@ -75,7 +75,7 @@ GCC             ?= g++
 
 # Extra user flags
 VERSION=\"$(shell git describe --dirty --tags)\"
-EXTRA_NVCCFLAGS ?= -O3
+EXTRA_NVCCFLAGS ?= -O3 -dc
 EXTRA_LDFLAGS   ?=
 EXTRA_CCFLAGS   ?= -std=c++0x -O3 -DVERSION_NUMBER=$(VERSION) -march=native
 
@@ -160,7 +160,10 @@ connectedgraphs.o: connectedgraphs.cpp
 vedge.o: vedge.cu
 	$(NVCC) $(NVCCFLAGS) $(EXTRA_NVCCFLAGS) $(GENCODE_FLAGS) $(INCLUDES) -o $@ -c $<
 
-fmr: particles.o new_kcall.o particleSystem.o connectedgraphs.o render_particles.o shaders.o utilities.o vedge.o
+total.o: vedge.o new_kcall.o utilities.o
+	$(NVCC) $(NVCCFLAGS) $(GENCODE_FLAGS) $(INCLUDES) -dlink $+ -o $@ 
+
+fmr: particles.o particleSystem.o connectedgraphs.o render_particles.o shaders.o total.o vedge.o utilities.o new_kcall.o
 	$(GCC) $(CCFLAGS) -o $@ $+ $(LDFLAGS) $(EXTRA_LDFLAGS)
 
 run: build
