@@ -17,7 +17,7 @@ extern __constant__ NewParams nparams;
 
 
 
-//template<class O>
+template<class O>
 __global__ void funcNListK(uint* nlist,	//	o:neighbor list
 							uint* num_neigh,//	o:num neighbors
 							const float4* dpos,	// 	i: position
@@ -26,7 +26,7 @@ __global__ void funcNListK(uint* nlist,	//	o:neighbor list
 							const uint* cellEnd,
 							const uint* cellAdj,
 							const uint max_neigh,
-							VertCond op)
+							O op)
 {
 	uint idx = blockIdx.x*blockDim.x + threadIdx.x;
 	if(idx >= nparams.N)
@@ -69,16 +69,13 @@ __global__ void funcNListK(uint* nlist,	//	o:neighbor list
 	num_neigh[idx] = n_neigh;
 }
 
-//extern "C" {
 //uses an adjacency definition based on max_dist_m*(rad1 + rad2)
 //Note: this func modifies nlist and max_neigh
 
-
-
 //pass in a functor of type NListDistCond
 //doesn't use moment data
-//template<class O>
-uint funcNList(	uint*& nlist, //reference to the nlist pointer
+template<class O>
+uint funcNList(uint*& nlist, //reference to the nlist pointer
 		uint* num_neigh, 
 		const float* dpos, 
 		const uint* phash, 
@@ -87,11 +84,11 @@ uint funcNList(	uint*& nlist, //reference to the nlist pointer
 		const uint* cellAdj, 
 		const uint numParticles, 
 		uint& max_neigh, 
-		VertCond op)
+		O op)
 {
 	uint numThreads = 128;
-	uint numBlocks = (numParticles % numThreads == 0) ? (numParticles/numThreads) : (numParticles/numThreads+1);
-	cudaFuncSetCacheConfig(funcNListK, cudaFuncCachePreferL1);	
+	uint numBlocks = iDivUp(numParticles, numThreads);
+	cudaFuncSetCacheConfig(funcNListK<O>, cudaFuncCachePreferL1);	
 
 	funcNListK<<<numBlocks, numThreads>>>(nlist, num_neigh, (float4*) dpos, phash, 
 			cellStart, cellEnd, cellAdj, max_neigh, op);
@@ -114,4 +111,17 @@ uint funcNList(	uint*& nlist, //reference to the nlist pointer
 	return maxn;
 }
 
-//}
+//instantiate various implementations for cross compiling
+template uint funcNList<VertCond>(uint*& nlist, uint* num_neigh, 
+		const float* dpos, const uint* phash, const uint* cellStart, 
+		const uint* cellEnd, const uint* cellAdj, const uint numParticles, 
+		uint& max_neigh, VertCond op);
+template uint funcNList<OutOfPlane>(uint*& nlist, uint* num_neigh, 
+		const float* dpos, const uint* phash, const uint* cellStart, 
+		const uint* cellEnd, const uint* cellAdj, const uint numParticles, 
+		uint& max_neigh, OutOfPlane op);
+template uint funcNList<VarCond>(uint*& nlist, uint* num_neigh, 
+		const float* dpos, const uint* phash, const uint* cellStart, 
+		const uint* cellEnd, const uint* cellAdj, const uint numParticles, 
+		uint& max_neigh, VarCond op);
+

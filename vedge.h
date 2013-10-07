@@ -15,6 +15,7 @@ public:
 };
 
 class VarCond: public NListDistCond{
+public:
 	VarCond(float v) : max_distsq(v) {}
 	__host__ __device__ bool operator()(const float rad1, const float rad2,
 			const float3, const float distsq) const {
@@ -56,9 +57,8 @@ public:
 	const float vert;
 };
 
-//extern "C" {
 
-//template <class O>
+template <class O>
 uint funcNList(	uint*& nlist,
 				uint* num_neigh, 
 				const float* dpos, 
@@ -68,9 +68,6 @@ uint funcNList(	uint*& nlist,
 				const uint* cellAdj, 
 				const uint numParticles, 
 				uint& max_neigh, 
-				VertCond op);
-
-
-//}
+				O op);
 
 #endif

@@ -466,7 +466,7 @@ void ParticleSystem::getGraphData(uint& graphs, uint& edges, uint& vert_edges)
 
 	VertCond test = VertCond(m_contact_dist*m_contact_dist, sqrtf(3.0/5.0));
 //	NListDistCond test; 
-	maxn = funcNList (m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
+	maxn = funcNList(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
 			m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, test);
 	vert_edges = numInteractions(m_dNumNeigh, newp.N)/2;
 	
