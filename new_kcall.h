@@ -12,14 +12,6 @@ void find_cellStart(uint* cellStart, uint* cellEnd, uint* phash, uint numParticl
 void reorder(uint* sortedIndex, float* sortedPos, float* sortedMom, float* oldPos, 
 		float* oldMom, uint numParticles);
 
-uint NListVar(uint*& nlist, uint* num_neigh, float* dpos, float* dmom,
-		uint* phash, uint* cellStart, uint* cellEnd, uint* cellAdj,
-	   	uint numParticles, uint& max_neigh, float max_dist);
-
-uint NListCut(uint*& nlist, uint* num_neigh, float* dpos, float* dmom,
-		uint* phash, uint* cellStart, uint* cellEnd, uint* cellAdj, 
-		uint numParticles, uint& max_neigh, float cut, float bigpct);
-
 uint vertEdge(uint* connections, const uint* nlist, const uint* num_neigh, const float* dPos, 
 		float maxth, float maxdist, uint numParticles);
 
