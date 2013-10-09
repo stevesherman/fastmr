@@ -157,7 +157,7 @@ shaders.o: shaders.cpp
 connectedgraphs.o: connectedgraphs.cpp
 	$(GCC) $(CCFLAGS) $(EXTRA_CCFLAGS) $(INCLUDES) -o $@ -c $<
 
-vedge.o: vedge.cu
+vedge.o: vedge.cu vedge.h
 	$(NVCC) $(NVCCFLAGS) $(EXTRA_NVCCFLAGS) $(GENCODE_FLAGS) $(INCLUDES) -o $@ -c $<
 
 total.o: vedge.o new_kcall.o utilities.o

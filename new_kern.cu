@@ -522,7 +522,7 @@ __global__ void NListCutK(uint* nlist,	//	o:neighbor list
 			
 			float sepdist;
 			if(Cp1 == 0.0f || Cp2 == 0.0f) {
-				sepdist = 1.05f*bigrad + 1.05f*lilrad;
+				sepdist = 1.05f*(bigrad + lilrad);
 			} else {
 				sepdist = bigd*bigrad + lild*lilrad;
 			}
@@ -533,7 +533,7 @@ __global__ void NListCutK(uint* nlist,	//	o:neighbor list
 			dr.z = dr.z - nparams.L.z*rintf(dr.z*nparams.Linv.z);
 			float lsq = dr.x*dr.x + dr.y*dr.y + dr.z*dr.z;
 			
-			if(lsq <= sepdist*sepdist){
+			if(lsq < sepdist*sepdist){
 				if(n_neigh < max_neigh)
 					nlist[nparams.N*n_neigh + idx] = idx2;
 				n_neigh++;

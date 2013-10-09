@@ -281,8 +281,10 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
 		rand_scale = rand_scale > .85f  && rand_scale < 1.0f ? rand_scale - 0.05f*rstep : rand_scale;
 		//printf("rand_scale: %f\n", rand_scale);
 		if(rebuildNList) {
-			NListVar(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dMoments, m_dGridParticleHash, 
-					m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, rand_scale*1.1f);
+			VarCond op(rand_scale*1.1f);
+			funcNList(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, m_dCellStart, 
+					m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, op);
+	
 			dx_since = 0.0f;
 		}
 		dx_since += 0.04f*m_params.pRadius[0];
@@ -299,8 +301,10 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
 	} else {
 
 		if (rebuildNList) {
-			NListCut(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dMoments, m_dGridParticleHash, 
-					m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh,  force_dist + rebuildDist, 0.5f);
+			MomCut asdf(force_dist + rebuildDist, 0.5f, 1.05f);
+			momNList(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dMoments, m_dGridParticleHash, 
+					m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, asdf);
+			
 			dx_since = 0.0f;
 		}
 
