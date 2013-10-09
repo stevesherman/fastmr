@@ -34,7 +34,7 @@ public:
 			const float3 er, const float distsq) const
 	{
 		float sepdist = rad1 + rad2;
-		return (distsq < max_distsq*sepdist*sepdist) && (fabs(er.y) > max_costh);
+		return (distsq < max_distsq*sepdist*sepdist) && (fabs(er.y) >= max_costh);
 	}
 	const float max_distsq;	
 	const float max_costh;
@@ -49,7 +49,7 @@ public:
 	{
 		float sepdist = rad1 + rad2;
 		return (distsq < max_distsq*sepdist*sepdist) 
-			&& fabs(er.y) < vert && fabs(er.z) > horiz;
+			&& fabs(er.y) < vert && fabs(er.z) >= horiz;
 	}
 
 	const float max_distsq;

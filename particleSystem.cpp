@@ -451,9 +451,11 @@ void ParticleSystem::getMagnetization()
 
 void ParticleSystem::getGraphData(uint& graphs, uint& edges, uint& vert_edges)
 {
+	
+	VarCond contact_op = VarCond(m_contact_dist*m_contact_dist);
 	//no reordering, assume m_contact_dist << m_interaction_dist, so it should always be fine
-	uint maxn = NListVar(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dMoments, m_dGridParticleHash, 
-			m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, m_contact_dist);
+	uint maxn = funcNList(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
+			m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, contact_op);
 	edges = numInteractions(m_dNumNeigh, newp.N)/2;
 	
 	m_hNeighList = new uint[newp.N*maxn];
@@ -462,24 +464,12 @@ void ParticleSystem::getGraphData(uint& graphs, uint& edges, uint& vert_edges)
 	graphs = adjConGraphs(m_hNeighList, m_hNumNeigh, newp.N);
 	delete [] m_hNeighList;
 
-	uint temp = vertEdge(m_dNumNeigh, m_dNeighList, m_dNumNeigh, m_dSortedPos,sqrtf(3.0/5.0), m_contact_dist, newp.N)/2;
 
 	VertCond test = VertCond(m_contact_dist*m_contact_dist, sqrtf(3.0/5.0));
-//	NListDistCond test; 
 	maxn = funcNList(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
 			m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, test);
 	vert_edges = numInteractions(m_dNumNeigh, newp.N)/2;
 	
-	if(temp != vert_edges)
-		printf("methods don't match! old: %d new %d, maxn %d\n", temp, vert_edges,maxn);
-
-	m_hNeighList = new uint[newp.N*maxn];
-	copyArrayFromDevice(m_hNeighList, m_dNeighList, 0, sizeof(uint)*newp.N*maxn);
-	copyArrayFromDevice(m_hNumNeigh,  m_dNumNeigh,  0, sizeof(uint)*newp.N);
-//	graphs = adjConGraphs(m_hNeighList, m_hNumNeigh, newp.N);
-	delete [] m_hNeighList;
-	
-		
 	dx_since = 1e6f;//set this to a really large number so that the nlist is regenerated
 
 
