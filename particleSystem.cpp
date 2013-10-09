@@ -4,7 +4,7 @@
 #include "connectedgraphs.h"
 #include "new_kern.h"
 #include "new_kcall.h"
-#include "vedge.h"
+#include "nlist.h"
 #include "sfc_pack.h"
 
 #include <cuda_runtime.h>

@@ -1,6 +1,6 @@
 #include <helper_math.h>
-#ifndef VEDGE_H
-#define VEDGE_H
+#ifndef NLIST_H
+#define NLIST_H
 
 
 class NListDistCond {

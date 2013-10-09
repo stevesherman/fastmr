@@ -7,7 +7,7 @@
 #include <cstdlib>
 
 #include "new_kern.h"
-#include "vedge.h"
+#include "nlist.h"
 
 #include "thrust/reduce.h"
 #include "thrust/device_ptr.h"
