@@ -53,8 +53,8 @@ public:
 	}
 
 	const float max_distsq;
-	const float horiz;
 	const float vert;
+	const float horiz;
 };
 
 class MomVar {
