@@ -453,30 +453,43 @@ void ParticleSystem::getMagnetization()
 }
 
 
-void ParticleSystem::getGraphData(uint& graphs, uint& edges, uint& vert_edges)
+void ParticleSystem::getGraphData(uint& graphs, uint& edges, uint& vert_edges, 
+		uint& vert_graph, uint& horz_edges, uint& horz_graph)
 {
 	
 	VarCond contact_op = VarCond(m_contact_dist*m_contact_dist);
 	//no reordering, assume m_contact_dist << m_interaction_dist, so it should always be fine
-	uint maxn = funcNList(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
+	uint maxn=funcNList(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
 			m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, contact_op);
 	edges = numInteractions(m_dNumNeigh, newp.N)/2;
-	
 	m_hNeighList = new uint[newp.N*maxn];
 	copyArrayFromDevice(m_hNeighList, m_dNeighList, 0, sizeof(uint)*newp.N*maxn);
 	copyArrayFromDevice(m_hNumNeigh,  m_dNumNeigh,  0, sizeof(uint)*newp.N);
 	graphs = adjConGraphs(m_hNeighList, m_hNumNeigh, newp.N);
 	delete [] m_hNeighList;
 
-
 	VertCond test = VertCond(m_contact_dist*m_contact_dist, sqrtf(3.0/5.0));
 	maxn = funcNList(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
 			m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, test);
 	vert_edges = numInteractions(m_dNumNeigh, newp.N)/2;
-	
-	dx_since = 1e6f;//set this to a really large number so that the nlist is regenerated
+	m_hNeighList = new uint[newp.N*maxn];
+	copyArrayFromDevice(m_hNeighList, m_dNeighList, 0, sizeof(uint)*newp.N*maxn);
+	copyArrayFromDevice(m_hNumNeigh,  m_dNumNeigh,  0, sizeof(uint)*newp.N);
+	vert_graph = adjConGraphs(m_hNeighList, m_hNumNeigh, newp.N);
+	delete [] m_hNeighList;
 
+	OutOfPlane horz_op = OutOfPlane(m_contact_dist*m_contact_dist, 
+			sqrtf(3.0/5.0), sqrtf(2.0)/2.0);
+	maxn = funcNList(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
+			m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, horz_op);
+	horz_edges = numInteractions(m_dNumNeigh, newp.N)/2;
+	m_hNeighList = new uint[newp.N*maxn];
+	copyArrayFromDevice(m_hNeighList, m_dNeighList, 0, sizeof(uint)*newp.N*maxn);
+	copyArrayFromDevice(m_hNumNeigh,  m_dNumNeigh,  0, sizeof(uint)*newp.N);
+	horz_graph = adjConGraphs(m_hNeighList, m_hNumNeigh, newp.N);
+	delete [] m_hNeighList;
 
+	dx_since = 1e6f;//trips nlist regeneration
 }
 
 uint ParticleSystem::getInteractions(){
@@ -517,8 +530,8 @@ void ParticleSystem::logStuff(FILE* file, float simtime)
 		return;
 	}
 	
-	uint edges=0, graphs=0, vedge=0;
-    getGraphData(graphs,edges,vedge);
+	uint edges=0, graphs=0, vedge=0, vgraphs=0, hedge=0,hgraphs;
+    getGraphData(graphs,edges,vedge,vgraphs,hedge,hgraphs);
 	float3 M = magnetization((float4*) m_dMoments, newp.N, newp.L.x*newp.L.y*newp.L.z);
 
 	//cuda calls for faster computation 

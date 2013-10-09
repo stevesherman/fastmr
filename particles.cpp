@@ -509,7 +509,7 @@ void motion(int x, int y)
 void key(unsigned char key, int /*x*/, int /*y*/)
 {
 
-	uint nedges = 0, ngraphs = 0, vcon = 0;
+	uint nedges=0, ngraphs=0, vedges=0, vgraphs=0, hedges=0, hgraphs=0;
 	switch (key) 
     {
     case ' ':
@@ -543,10 +543,13 @@ void key(unsigned char key, int /*x*/, int /*y*/)
 		psystem->printStress();
 		break;
 	case 'g':
-		psystem->getGraphData(ngraphs,nedges, vcon);
-		printf("numgraphs: %d, chainl: %f\n", ngraphs, (float)pdata.numBodies/(float) ngraphs);
-		printf("Edges = %d Mean edges = %f\n", nedges, (float)nedges/(float)pdata.numBodies);
-		printf("Vert edg %d Mean vedge = %f\n", vcon, (float)vcon/(float)pdata.numBodies);
+		psystem->getGraphData(ngraphs,nedges,vedges,vgraphs,hedges,hgraphs);
+		printf("numgraphs: %d, chainl: %f\t Edges = %d Mean edges = %f\n", ngraphs, 
+				(float)pdata.numBodies/(float) ngraphs, nedges, (float)nedges/(float)pdata.numBodies);
+		printf("numgraphs: %d, chainl: %f\t Edges = %d Mean edges = %f\n", vgraphs,	
+				(float)pdata.numBodies/(float) vgraphs, vedges, (float)vedges/(float)pdata.numBodies);
+		printf("numgraphs: %d, chainl: %f\t Edges = %d Mean edges = %f\n", hgraphs, 
+				(float)pdata.numBodies/(float) hgraphs, hedges, (float)hedges/(float)pdata.numBodies);
 		break;
     case 'u':
         psystem->dumpParticles(0, pdata.numBodies);

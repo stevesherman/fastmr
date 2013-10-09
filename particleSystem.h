@@ -65,7 +65,8 @@ public:
     float3 getWorldOrigin() { return m_params.worldOrigin; }
     float3 getCellSize() { return m_params.cellSize; }
 	
-	void getGraphData(uint& graphs, uint& edges, uint& vcon);
+	void getGraphData(uint& graphs, uint& edges, uint& vedge, uint& vgraph, 
+			uint& hedge, uint& horzgraph);
 	uint getInteractions();
 	int getInteractionRadius() { return m_params.interactionr;}
 
