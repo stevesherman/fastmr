@@ -49,7 +49,7 @@ public:
 	{
 		float sepdist = rad1 + rad2;
 		return (distsq < max_distsq*sepdist*sepdist) 
-			&& fabs(er.y) < vert && fabs(er.z) >= horiz;
+			&& fabs(er.y) < vert && fabs(er.z/er.x) >= horiz;
 	}
 
 	const float max_distsq;

@@ -478,8 +478,9 @@ void ParticleSystem::getGraphData(uint& graphs, uint& edges, uint& vert_edges,
 	vert_graph = adjConGraphs(m_hNeighList, m_hNumNeigh, newp.N);
 	delete [] m_hNeighList;
 
-	OutOfPlane horz_op = OutOfPlane(m_contact_dist*m_contact_dist, 
-			sqrtf(3.0/5.0), sqrtf(2.0)/2.0);
+	float outdist = 1.25f*(m_contact_dist - 1.0f) + 1.0f;
+	OutOfPlane horz_op = OutOfPlane(outdist*outdist,
+			sqrtf(3.0/5.0), 1.0); //ie less than 35.2 off the vertical, and w/in 45 deg of the outofplane direction
 	maxn = funcNList(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
 			m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, horz_op);
 	horz_edges = numInteractions(m_dNumNeigh, newp.N)/2;
@@ -543,9 +544,9 @@ void ParticleSystem::logStuff(FILE* file, float simtime)
 			-newp.origin.y, 0.0f)*newp.Linv.x*newp.Linv.y*newp.Linv.z;
 	float kinen = calcKinEn( (float4*) m_dForces1, (float4*) m_dPos1, newp);
 
-	fprintf(file, "%.7g\t%.6g\t%.6g\t%.6g\t%d\t%.6g\t%.6g\t%.6g\t%.6g\t%.6g\t%.6g\t%.6g\t%d\n", 
+	fprintf(file, "%.7g\t%.6g\t%.6g\t%.6g\t%d\t%.6g\t%.6g\t%.6g\t%.6g\t%.6g\t%.6g\t%.6g\t%d\t%d\t%d\t%d\n", 
 			simtime, newp.shear, newp.extH.y, (float)newp.N/graphs, edges, tf, bf, 
-			gs, kinen, M.x, M.y, M.z,vedge);
+			gs, kinen, M.x, M.y, M.z,vedge,vgraphs,hedge,hgraphs);
 }
 
 void ParticleSystem::printStress()

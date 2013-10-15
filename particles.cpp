@@ -544,11 +544,11 @@ void key(unsigned char key, int /*x*/, int /*y*/)
 		break;
 	case 'g':
 		psystem->getGraphData(ngraphs,nedges,vedges,vgraphs,hedges,hgraphs);
-		printf("numgraphs: %d, chainl: %f\t Edges = %d Mean edges = %f\n", ngraphs, 
+		printf("ngraphs: %d, nchainl: %f\t Edges = %d Mean edges = %f\n", ngraphs,
 				(float)pdata.numBodies/(float) ngraphs, nedges, (float)nedges/(float)pdata.numBodies);
-		printf("numgraphs: %d, chainl: %f\t Edges = %d Mean edges = %f\n", vgraphs,	
+		printf("vgraphs: %d, vchainl: %f\t VEdges = %d Mean vedges = %f\n", vgraphs,
 				(float)pdata.numBodies/(float) vgraphs, vedges, (float)vedges/(float)pdata.numBodies);
-		printf("numgraphs: %d, chainl: %f\t Edges = %d Mean edges = %f\n", hgraphs, 
+		printf("hgraphs: %d, hchainl: %f\t HEdges = %d Mean hedges = %f\n", hgraphs,
 				(float)pdata.numBodies/(float) hgraphs, hedges, (float)hedges/(float)pdata.numBodies);
 		break;
     case 'u':
@@ -960,7 +960,7 @@ main(int argc, char** argv)
 		}
 		if(!restart) {
 			psystem->logParams(datalog);	
-			fprintf(datalog, "time\tshear\textH\tchainl\tedges\ttopf\tbotf\tgstress\tkinen\tM.x \tM.y \tM.z \tvedge\n");
+			fprintf(datalog, "time\tshear\textH\tchainl\tedges\ttopf\tbotf\tgstress\tkinen \tM.x \tM.y \tM.z \tvedge\tvgraph\thedge\thgraph\n");
 		}
 	}
 	
