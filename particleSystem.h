@@ -59,6 +59,7 @@ public:
 	void setRebuildDist(float x) {rebuildDist = x;}
 	void setForceDist(float x) {force_dist = x;}
 	void dangerousResize(double  y);
+	void densDist();
 	float3 getWorldSize() { return newp.L;}
 	float getParticleRadius() { return m_params.pRadius[0]; }
     uint3 getGridSize() { return m_params.gridSize; }

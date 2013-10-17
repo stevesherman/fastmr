@@ -10,7 +10,7 @@
 #include <cuda_runtime.h>
 #include <helper_cuda.h>
 #include <helper_math.h>
-
+#include <new>
 #include <assert.h>
 #include <math.h>
 #include <memory.h>
@@ -19,8 +19,7 @@
 #include <algorithm>
 #include <GL/glew.h>
 
-#define PI_F   3.141592653589793f 
-#define MU_0 4e-7f*PI_F
+#define MU_0 4e-7f*M_PI
 #ifndef MU_C
 #define MU_C 1
 #endif
@@ -34,7 +33,7 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize):
 	m_numGridCells = m_params.gridSize.x*m_params.gridSize.y*m_params.gridSize.z;	
 	
 	m_params.uf = MU_C*MU_0;
-	m_params.Cpol = 4.0f*PI_F*pow(1.5*m_params.pRadius[0],3)*
+	m_params.Cpol = 4.0f*M_PI*pow(1.5*m_params.pRadius[0],3)*
 		(m_params.mu_p[0] - MU_C)/(m_params.mu_p[0]+2.0f*MU_C);	
 	m_params.globalDamping = 0.8f; 
     m_params.cdamping = 0.03f;
@@ -249,9 +248,9 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
     	dRendColor = (float *) mapGLBufferObject(&m_cuda_colorvbo_resource);
 		
 		//express colors as fraction of reference force, F0
-		float ref_moment = 4.0f*PI_F*pow(m_params.pRadius[0],3)*
+		float ref_moment = 4.0f*M_PI*pow(m_params.pRadius[0],3)*
 				(m_params.mu_p[0] - MU_C)/(m_params.mu_p[0]+2.0f*MU_C)*length(newp.extH);	
-		float F0 = 3*MU_0*ref_moment*ref_moment/ (4*PI_F*powf(2*m_params.pRadius[0],4));
+		float F0 = 3*MU_0*ref_moment*ref_moment/ (4*M_PI*powf(2*m_params.pRadius[0],4));
  		renderStuff(m_dPos1, m_dMoments, m_dForces1, dRendPos, dRendColor, m_colorFmax*F0, 
 				rand_scale, clipPlane,newp.N);
 		
@@ -507,8 +506,8 @@ ParticleSystem::dumpParticles(uint start, uint count)
 	copyArrayFromDevice(m_hMoments, m_dMoments, 0, sizeof(float)*4*count);
 	uint n_outside = 0;
 	for(uint i=start; i<start+count; i++) {
-		if(sqrt(m_hForces[i*4]*m_hForces[i*4] + m_hForces[i*4+1]*m_hForces[i*4+1] 
-					+ m_hForces[i*4+2]*m_hForces[i*4+2]) > 1e-7f) {
+	//	if(sqrt(m_hForces[i*4]*m_hForces[i*4] + m_hForces[i*4+1]*m_hForces[i*4+1]
+		//			+ m_hForces[i*4+2]*m_hForces[i*4+2]) > 1e-7f) {
     
 			printf("Position: (%.7g, %.7g, %.7g, %.7g)\n", m_hPos[i*4+0], 
 					m_hPos[i*4+1], m_hPos[i*4+2], m_hPos[i*4+3]);
@@ -516,13 +515,87 @@ ParticleSystem::dumpParticles(uint start, uint count)
 					m_hForces[i*4+1], m_hForces[i*4+2], m_hForces[i*4+3]);
 			printf("  Moments: (%.7g, %.7g, %.7g, %.7g)\n", m_hMoments[i*4+0], 
 					m_hMoments[i*4+1], m_hMoments[i*4+2], m_hMoments[i*4+3]);
-		}
+	//	}
 		if(fabs(m_hPos[i*4+1])+m_hPos[i*4+3] > newp.L.y/2.0f) n_outside++;
 	}
 	printf("Force cut = %g\n", sqrtf(newp.max_fdr_sq));
 	printf("n_outside = %d\n", n_outside);
 	getBadP();
 }
+
+void ParticleSystem::densDist()
+{
+	copyArrayFromDevice(m_hPos, m_dPos1, 0, sizeof(float)*4*newp.N);
+	double dx = 0.5f*m_params.pRadius[0];
+	int np = ceil(newp.L.z/dx);
+	dx = newp.L.z/np;
+
+	double* dens = new double[np];
+	if(dens == 0)
+		fprintf(stderr,"Couldnt allocate 20kb wtf");
+	for(int ii=0; ii<np; ii++){
+		dens[ii] = 0;
+	}
+
+	for(int ii=0; ii<newp.N; ii++) {
+		float zp = m_hPos[4*ii+2] - newp.origin.z;
+		float rad = m_hPos[4*ii+3];
+		int cell = floor(zp/dx);
+		float offset = zp - cell*dx;
+		assert(cell >= 0 && cell < np);
+		int numleft = ceil((rad - offset)/dx);
+
+		// do the left cap
+		float h = (cell - numleft + 1)*dx + rad - zp;
+		float cap_old = 1.0/3.0*M_PI*h*h*(3.0*rad - h);
+		float cap_curr = 0;
+		uint idx = (cell-numleft + np) % np;
+		dens[idx] += cap_old;
+
+		for(int rc=-numleft+1; rc < 0; rc++){
+			h = rad + (cell+rc+1)*dx - zp;
+			cap_curr = 1.0f/3.0f*M_PI*h*h*(3*rad - h);
+			idx = (cell + rc + np) % np;
+			dens[idx] += cap_curr - cap_old;
+			cap_old = cap_curr;
+		}
+
+		//do the middle
+		h = zp+rad-(cell+1)*dx;
+		float right_cap = 1.0/3.0*M_PI*h*h*(3.0*rad - h);
+		//use cap_old for left cap
+		dens[cell] += 4.0/3.0*M_PI*rad*rad*rad - right_cap - cap_old;
+		cap_old = right_cap;
+
+		int numright = ceil((rad - (dx-offset))/dx);
+		for(int rc=1; rc<numright;rc++) {
+			h = zp+rad - (cell+rc+1)*dx;
+			cap_curr = 1.0/3.0*M_PI*h*h*(3.0*rad - h);
+			idx = (cell+rc+np) % np;
+			dens[idx] += cap_old - cap_curr;
+			cap_old = cap_curr;
+		}
+		idx = (cell + numright + np) % np;
+		dens[idx] += cap_old;
+	}
+
+	double npstar = m_params.volfr[0]*newp.L.x*newp.L.y*dx/20.0;
+	for(uint ii=0; ii<np; ii++){
+		uint nstar = floor(dens[ii]/npstar);
+		printf("z=%4.3f:  ", (float)ii/np);
+		for(; nstar > 0; nstar--){
+			printf("*");
+		}
+		printf("\n");
+	}
+	delete [] dens;
+}
+
+
+
+	
+
+
 
 void ParticleSystem::logStuff(FILE* file, float simtime)
 {
@@ -756,7 +829,7 @@ ParticleSystem::initParticleGrid(uint3 size, float3 spacing, float3 jitter, uint
 						(frand()*2.0f-1.0f)*jitter.z;
 					m_hPos[i*4+3] = m_params.pRadius[0];
                 	float mu_p = m_params.mu_p[0];
-					float cpol = 4*PI_F*(mu_p - MU_C)/(mu_p+2.0f*MU_C)*m_params.pRadius[0]
+					float cpol = 4*M_PI*(mu_p - MU_C)/(mu_p+2.0f*MU_C)*m_params.pRadius[0]
 						*m_params.pRadius[0]*m_params.pRadius[0];
 
 
@@ -797,7 +870,7 @@ ParticleSystem::resetParticles(uint numiter, float scale_start)
 		for(i = 0; i < (int) m_params.nump[j]; i++){
 			if(m_params.rstd[j] > 0) {
 				u=frand(); v=frand();
-				norm = sqrt(-2.0*log(u))*cos(2.0*PI_F*v);
+				norm = sqrt(-2.0*log(u))*cos(2.0*M_PI*v);
 				float med_diam = m_params.pRadius[j];
 				radius = exp(norm*m_params.rstd[j])*med_diam;	
 			} else {
@@ -807,7 +880,7 @@ ParticleSystem::resetParticles(uint numiter, float scale_start)
 			minrad = radius < minrad ? radius : minrad;
 
 			mu_p = m_params.mu_p[j];
-			vol = 4.0f/3.0f*PI_F*radius*radius*radius;
+			vol = 4.0f/3.0f*M_PI*radius*radius*radius;
 			cpol = 3.0f*(mu_p - MU_C)/(mu_p+2.0f*MU_C)*vol;
 			vtot += vol;
 
