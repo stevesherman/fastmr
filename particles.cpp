@@ -147,7 +147,7 @@ void qupdate()
 		fflush(datalog);
 	}
 
-	if(frameCount % 1000 == 0 && frameCount != 0){
+	if(frameCount % 1000 == 0 && frameCount != 0 && logf != 0){
 		crashlog = fopen(crashname, "w");
 		fprintf(crashlog, "Time: %.12g ns\n", simtime);
 		psystem->logParams(crashlog);
@@ -208,14 +208,15 @@ void runBenchmark()
 	float fAvgSeconds = (float)1.0e-3 * (float)sdkGetTimerValue(&timer)/(float)frameCount;
 
     printf("particles, Throughput = %.4f KParticles/s, Time = %.5fs, Size = %u particles\n", 
-            (1.0e-3 * pdata.numBodies)/fAvgSeconds, fAvgSeconds*frameCount, pdata.numBodies);
+    		(1.0e-3 * pdata.numBodies)/fAvgSeconds, fAvgSeconds*frameCount, pdata.numBodies);
 
-	crashlog = fopen(crashname, "w");
-	fprintf(crashlog, "Time: %.12g ns\n", simtime);
-	psystem->logParams(crashlog);
-	psystem->logParticles(crashlog);
-	fclose(crashlog);//sets up the overwrite
-
+	if(logf != 0) {
+		crashlog = fopen(crashname, "w");
+		fprintf(crashlog, "Time: %.12g ns\n", simtime);
+		psystem->logParams(crashlog);
+		psystem->logParticles(crashlog);
+		fclose(crashlog); //sets up the overwrite
+	}
 }
 
 void computeFPS()
@@ -532,7 +533,7 @@ void key(unsigned char key, int /*x*/, int /*y*/)
 		psystem->NListStats();
 		break;
 	case 'd':
-        psystem->dumpGrid();
+        psystem->densDist();
         break;
 	case 's': 
 		psystem->printStress();
