@@ -62,8 +62,6 @@ int idleCounter = 0;
 int demoCounter = 0;
 const int idleDelay = 300;
 
-enum { M_VIEW = 0, M_MOVE };
-
 SimParams pdata;
 
 // simulation parameters
@@ -523,9 +521,6 @@ void key(unsigned char key, int /*x*/, int /*y*/)
     case '\033':
     case 'q':
        	exit(0);
-        break;
-    case 'v':
-        mode = M_VIEW;
         break;
     case 'm':
         psystem->getMagnetization();
