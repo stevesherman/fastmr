@@ -592,7 +592,7 @@ void ParticleSystem::densDist(FILE* output, double dx)
 	} else {
 		double vol = newp.L.x*newp.L.y*newp.L.z;
 		for(uint ii=0; ii<np; ii++){
-			fprintf(output,"%.6f\t", dens[ii]/vol);
+			fprintf(output,"%.6g\t", dens[ii]/vol);
 		}
 		fprintf(output,"\n");
 	}

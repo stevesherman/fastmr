@@ -72,7 +72,6 @@ public:
 	int getInteractionRadius() { return m_params.interactionr;}
 
 protected: // methods
-    ParticleSystem() {}
     uint createVBO(uint size);
 	void _initialize();
 	void initGrid();
