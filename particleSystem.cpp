@@ -506,8 +506,8 @@ ParticleSystem::dumpParticles(uint start, uint count)
 	copyArrayFromDevice(m_hMoments, m_dMoments, 0, sizeof(float)*4*count);
 	uint n_outside = 0;
 	for(uint i=start; i<start+count; i++) {
-	//	if(sqrt(m_hForces[i*4]*m_hForces[i*4] + m_hForces[i*4+1]*m_hForces[i*4+1]
-		//			+ m_hForces[i*4+2]*m_hForces[i*4+2]) > 1e-7f) {
+		if(sqrt(m_hForces[i*4]*m_hForces[i*4] + m_hForces[i*4+1]*m_hForces[i*4+1]
+					+ m_hForces[i*4+2]*m_hForces[i*4+2]) > 1e-7f) {
     
 			printf("Position: (%.7g, %.7g, %.7g, %.7g)\n", m_hPos[i*4+0], 
 					m_hPos[i*4+1], m_hPos[i*4+2], m_hPos[i*4+3]);
@@ -515,7 +515,7 @@ ParticleSystem::dumpParticles(uint start, uint count)
 					m_hForces[i*4+1], m_hForces[i*4+2], m_hForces[i*4+3]);
 			printf("  Moments: (%.7g, %.7g, %.7g, %.7g)\n", m_hMoments[i*4+0], 
 					m_hMoments[i*4+1], m_hMoments[i*4+2], m_hMoments[i*4+3]);
-	//	}
+		}
 		if(fabs(m_hPos[i*4+1])+m_hPos[i*4+3] > newp.L.y/2.0f) n_outside++;
 	}
 	printf("Force cut = %g\n", sqrtf(newp.max_fdr_sq));
