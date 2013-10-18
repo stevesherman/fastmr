@@ -523,10 +523,10 @@ ParticleSystem::dumpParticles(uint start, uint count)
 	getBadP();
 }
 
-void ParticleSystem::densDist()
+void ParticleSystem::densDist(FILE* output, double dx)
 {
 	copyArrayFromDevice(m_hPos, m_dPos1, 0, sizeof(float)*4*newp.N);
-	double dx = 0.5f*m_params.pRadius[0];
+
 	int np = ceil(newp.L.z/dx);
 	dx = newp.L.z/np;
 
@@ -579,14 +579,22 @@ void ParticleSystem::densDist()
 		dens[idx] += cap_old;
 	}
 
-	double npstar = m_params.volfr[0]*newp.L.x*newp.L.y*dx/20.0;
-	for(uint ii=0; ii<np; ii++){
-		uint nstar = floor(dens[ii]/npstar);
-		printf("z=%4.3f:  ", (float)ii/np);
-		for(; nstar > 0; nstar--){
-			printf("*");
+	if(output == stdout){
+		double npstar = m_params.volfr[0]*newp.L.x*newp.L.y*dx/20.0;
+		for(uint ii=0; ii<np; ii++){
+			uint nstar = floor(dens[ii]/npstar);
+			fprintf(output,"z=%4.3f:  ", (float)ii/np);
+			for(; nstar > 0; nstar--){
+				fprintf(output,"*");
+			}
+			fprintf(output,"\n");
 		}
-		printf("\n");
+	} else {
+		double vol = newp.L.x*newp.L.y*newp.L.z;
+		for(uint ii=0; ii<np; ii++){
+			fprintf(output,"%.6f\t", dens[ii]/vol);
+		}
+		fprintf(output,"\n");
 	}
 	delete [] dens;
 }

@@ -533,7 +533,7 @@ void key(unsigned char key, int /*x*/, int /*y*/)
 		psystem->NListStats();
 		break;
 	case 'd':
-        psystem->densDist();
+        psystem->densDist(stdout,0.25*pdata.pRadius[0]);
         break;
 	case 's': 
 		psystem->printStress();
