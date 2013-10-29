@@ -1,10 +1,8 @@
-#define PI_F 3.141592653589793f
-
 // Graphics includes
 #include <GL/glew.h>
 #include <GL/freeglut.h>
 
-//CUDA utilities and system inlcudes
+//CUDA utilities and system includes
 #include <cuda_runtime.h>
 #include <helper_functions.h>
 #include <helper_math.h>
@@ -44,6 +42,7 @@ const float inertia = 0.1;
 
 FILE* datalog;
 FILE* crashlog;
+FILE* densfile;
 const char* filename = "filenameunsetasd";
 char logfile [256];
 char crashname[231];
@@ -58,13 +57,14 @@ uint partlogInt = 0;
 bool bPause = false;
 bool displaySliders = false;
 bool demoMode = false;
+bool densLog = false;
 int idleCounter = 0;
 int demoCounter = 0;
 const int idleDelay = 300;
 
 SimParams pdata;
 
-// simulation parameters
+// simulation parameters - should be pulled into some default structure
 float timestep = 500; //in units of nanoseconds
 double simtime = 0.0f;
 float externalH = 100; //kA/m
@@ -134,7 +134,7 @@ void qupdate()
 	if(simtime < timestep)	psystem->setPinDist(0.8f);
 
 	if(strain != 0) {
-		float ws = worldSize.y*(1.0f + strain*sin(2.0f*PI_F/(period*1e6f)*simtime));
+		float ws = worldSize.y*(1.0f + strain*sin(2.0f*M_PI/(period*1e6f)*simtime));
 		psystem->dangerousResize(ws);
 	}
 
@@ -145,9 +145,14 @@ void qupdate()
 		printf("iter %d at %.2f/%.1f us\n", frameCount, simtime*1e-3f, maxtime);
 		psystem->logStuff(datalog, simtime*1e-3);	
 		fflush(datalog);
-	}
 
-	if(frameCount % 1000 == 0 && frameCount != 0 && logf != 0){
+		if(densLog){
+			fprintf(densfile,"%.7g\t", simtime*1e-3);
+			psystem->densDist(densfile, 0.25f*pdata.pRadius[0]);
+			fflush(densfile);
+		}
+	}
+	if( frameCount % 1000 == 0 && frameCount != 0 && logInterval != 0){
 		crashlog = fopen(crashname, "w");
 		fprintf(crashlog, "Time: %.12g ns\n", simtime);
 		psystem->logParams(crashlog);
@@ -165,6 +170,8 @@ void qupdate()
 		fclose(plog);	
 	}
 	
+
+
 
 	simtime += dtout;//so that it logs at the correct time
 	frameCount++;
@@ -210,7 +217,7 @@ void runBenchmark()
     printf("particles, Throughput = %.4f KParticles/s, Time = %.5fs, Size = %u particles\n", 
     		(1.0e-3 * pdata.numBodies)/fAvgSeconds, fAvgSeconds*frameCount, pdata.numBodies);
 
-	if(logf != 0) {
+	if(logInterval != 0) {
 		crashlog = fopen(crashname, "w");
 		fprintf(crashlog, "Time: %.12g ns\n", simtime);
 		psystem->logParams(crashlog);
@@ -389,7 +396,6 @@ inline float frand()
 {
     return rand() / (float) RAND_MAX;
 }
-
 
 void reshape(int w, int h)
 {
@@ -695,7 +701,9 @@ main(int argc, char** argv)
 	if(getCmdLineArgumentString( argc, (const char**)argv, "logt", &title)){
 		filename = title;
 	}
-	
+	if(checkCmdLineFlag(argc, (const char **)argv, "densLog"))
+			densLog = true;
+
    	sprintf(logfile, "/home/steve/Datasets/%s.dat", filename);
 	sprintf(crashname, "/home/steve/Datasets/%s.crash.dat", filename);
 
@@ -741,7 +749,7 @@ main(int argc, char** argv)
 
 		if(fgets(buff, 1024, crashlog) != NULL){
 			printf("%s", buff);
-			matches = sscanf(buff, "Build Date: %*s %*d %*d %*d:%*d:%*d\t svn version: %s", verno);
+			matches = sscanf(buff, "Build Date: %*s %*d %*d %*d:%*d:%*d\t %*s version: %s", verno);
 			printf("matches = %d\t verno: %s\n", matches, verno);
 			if(strncmp(VERSION_NUMBER, verno, 25))
 				fprintf(stderr, "Warning, running data from version: %s on %s\n", verno, VERSION_NUMBER);
@@ -825,11 +833,11 @@ main(int argc, char** argv)
 		clArgFloat("vfr0", pdata.volfr[0]);
 		pdata.mu_p[0] = 2000; //relative permeability
 		clArgFloat("xi0", pdata.mu_p[0]);
-		pdata.nump[0] = (pdata.volfr[0] * volume) / (4.0f/3.0f*PI_F*pow(pdata.pRadius[0],3)); 
+		pdata.nump[0] = (pdata.volfr[0] * volume) / (4.0f/3.0f*M_PI*pow(pdata.pRadius[0],3));
 		pdata.rstd[0] = 0; //sigma0 in log normal distribution
 		clArgFloat("std0", pdata.rstd[0]);	
 		if(pdata.rstd[0] > 0){//eq 3.24 crowe
-			pdata.nump[0] = (pdata.volfr[0]*volume) / (4.0f/3.0f*PI_F*pow(pdata.pRadius[0],3)
+			pdata.nump[0] = (pdata.volfr[0]*volume) / (4.0f/3.0f*M_PI*pow(pdata.pRadius[0],3)
 						*exp(4.5f*pdata.rstd[0]*pdata.rstd[0]));
 		}
 
@@ -840,11 +848,11 @@ main(int argc, char** argv)
 		clArgFloat("vfr1", pdata.volfr[1]);
 		pdata.mu_p[1] = 2000;
 		clArgFloat("xi1", pdata.mu_p[1]);
-		pdata.nump[1] = (pdata.volfr[1] * volume) / (4.0f/3.0f*PI_F*pow(pdata.pRadius[1],3)); 
+		pdata.nump[1] = (pdata.volfr[1] * volume) / (4.0f/3.0f*M_PI*pow(pdata.pRadius[1],3));
 		pdata.rstd[1] = 0;
 		clArgFloat("std1", pdata.rstd[1]);
 		if(pdata.rstd[1] > 0){//eq 3.24 crowe
-			pdata.nump[1] = (pdata.volfr[1]*volume) / (4.0f/3.0f*PI_F*pow(pdata.pRadius[1],3)
+			pdata.nump[1] = (pdata.volfr[1]*volume) / (4.0f/3.0f*M_PI*pow(pdata.pRadius[1],3)
 						*exp(4.5f*pdata.rstd[1]*pdata.rstd[1]));
 		}
 		
@@ -855,11 +863,11 @@ main(int argc, char** argv)
 		clArgFloat("vfr2", pdata.volfr[2]);
 		pdata.mu_p[2] = 1;
 		clArgFloat("xi2", pdata.mu_p[2]);
-		pdata.nump[2] = (pdata.volfr[2] * volume) / (4.0f/3.0f*PI_F*pow(pdata.pRadius[2],3)); 
+		pdata.nump[2] = (pdata.volfr[2] * volume) / (4.0f/3.0f*M_PI*pow(pdata.pRadius[2],3));
 		pdata.rstd[2] = 0;
 		clArgFloat("std2", pdata.rstd[2]);
 		if(pdata.rstd[2] > 0){//eq 3.24 crowe
-			pdata.nump[2] = (pdata.volfr[2]*volume) / (4.0f/3.0f*PI_F*pow(pdata.pRadius[2],3)
+			pdata.nump[2] = (pdata.volfr[2]*volume) / (4.0f/3.0f*M_PI*pow(pdata.pRadius[2],3)
 						*exp(4.5f*pdata.rstd[2]*pdata.rstd[2]));
 		}
 		
@@ -950,12 +958,17 @@ main(int argc, char** argv)
 	
 	if(logInterval != 0){
 		printf("saving: %s\n",logfile);
+		char densname [256];
+	   	sprintf(densname, "/home/steve/Datasets/%s.dens.dat", filename);
+		if(densLog)
+			densfile = fopen(densname, "a");
 		datalog = fopen(logfile, "a");
 		if(datalog == NULL) {
 			fprintf(stderr,"failed to open particle logfile, ferror %d\n", ferror(datalog));
 		}
 		if(!restart) {
 			psystem->logParams(datalog);	
+			psystem->logParams(densfile);
 			fprintf(datalog, "time\tshear\textH\tchainl\tedges\ttopf\tbotf\tgstress\tkinen \tM.x \tM.y \tM.z \tvedge\tvgraph\thedge\thgraph\n");
 		}
 	}
@@ -984,8 +997,11 @@ main(int argc, char** argv)
         glutMainLoop();
     }
 	printf("%d/%d iterations had to re-solved\n", resolved, frameCount);
-	if(logInterval != 0)
+	if(logInterval != 0){
 		fclose(datalog);
+		if(densLog)
+			fclose(densfile);
+	}
 
     if (psystem)
         delete psystem;

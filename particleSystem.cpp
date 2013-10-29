@@ -507,7 +507,7 @@ ParticleSystem::dumpParticles(uint start, uint count)
 	uint n_outside = 0;
 	for(uint i=start; i<start+count; i++) {
 		if(sqrt(m_hForces[i*4]*m_hForces[i*4] + m_hForces[i*4+1]*m_hForces[i*4+1]
-					+ m_hForces[i*4+2]*m_hForces[i*4+2]) > 1e-7f) {
+					+ m_hForces[i*4+2]*m_hForces[i*4+2]) > 1e-6f) {
     
 			printf("Position: (%.7g, %.7g, %.7g, %.7g)\n", m_hPos[i*4+0], 
 					m_hPos[i*4+1], m_hPos[i*4+2], m_hPos[i*4+3]);
@@ -532,7 +532,7 @@ void ParticleSystem::densDist(FILE* output, double dx)
 
 	double* dens = new double[np];
 	if(dens == 0)
-		fprintf(stderr,"Couldnt allocate 20kb wtf");
+		fprintf(stderr,"Couldn't allocate 20kb wtf");
 	for(int ii=0; ii<np; ii++){
 		dens[ii] = 0;
 	}
@@ -540,9 +540,9 @@ void ParticleSystem::densDist(FILE* output, double dx)
 	for(int ii=0; ii<newp.N; ii++) {
 		float zp = m_hPos[4*ii+2] - newp.origin.z;
 		float rad = m_hPos[4*ii+3];
-		int cell = floor(zp/dx);
+		//use mod to fix rounding errors making it neg or > np
+		int cell = ((int)floor(zp/dx) + np) % np;
 		float offset = zp - cell*dx;
-		assert(cell >= 0 && cell < np);
 		int numleft = ceil((rad - offset)/dx);
 
 		// do the left cap
