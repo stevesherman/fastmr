@@ -93,7 +93,6 @@ uint funcNList(uint*& nlist, //reference to the nlist pointer
 	funcNListK<<<numBlocks, numThreads>>>(nlist, num_neigh, (float4*) dpos, phash, 
 			cellStart, cellEnd, cellAdj, max_neigh, op);
 
-
 	thrust::maximum<uint> mx;
 	thrust::device_ptr<uint> numneigh_ptr(num_neigh);
 	uint maxn = thrust::reduce(numneigh_ptr, numneigh_ptr+numParticles, 0, mx);
@@ -103,9 +102,10 @@ uint funcNList(uint*& nlist, //reference to the nlist pointer
 		cudaFree(nlist);
 		assert(cudaMalloc((void**)&nlist, numParticles*maxn*sizeof(uint)) == cudaSuccess);
 		cudaMemset(nlist, 0, numParticles*maxn*sizeof(uint));
+		max_neigh = maxn;
+
 		funcNListK<<<numBlocks, numThreads>>>(nlist, num_neigh, (float4*) dpos, phash, 
 				cellStart, cellEnd, cellAdj, max_neigh, op);
-		max_neigh = maxn;
 	}
 
 	return maxn;
@@ -203,15 +203,16 @@ uint momNList(uint*& nlist, //reference to the nlist pointer
 	thrust::maximum<uint> mx;
 	thrust::device_ptr<uint> numneigh_ptr(num_neigh);
 	uint maxn = thrust::reduce(numneigh_ptr, numneigh_ptr+numParticles, 0, mx);
-	
+
 	if(maxn > max_neigh) {
 		printf("Extending NList from %u to %u\n", max_neigh, maxn);
 		cudaFree(nlist);
 		assert(cudaMalloc((void**)&nlist, numParticles*maxn*sizeof(uint)) == cudaSuccess);
 		cudaMemset(nlist, 0, numParticles*maxn*sizeof(uint));
+		max_neigh = maxn;
+
 		momNListK<<<numBlocks, numThreads>>>(nlist, num_neigh, (float4*) dpos, 
 				(float4*) dmom, phash, cellStart, cellEnd, cellAdj, max_neigh, op);
-		max_neigh = maxn;
 	}
 
 	return maxn;
