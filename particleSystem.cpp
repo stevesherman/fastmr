@@ -434,8 +434,9 @@ void ParticleSystem::getBadP()
 	int nans = 0, outbounds = 0;
 	copyArrayFromDevice(m_hPos, m_dPos1, 0, sizeof(float)*4*newp.N);
 	for(int i = 0; i < (int) newp.N; i++){
-		if( isnan(m_hPos[4*i]) || isnan(m_hPos[4*i+1]) || isnan(m_hPos[4*i+2]) )
+		if( isnanf(m_hPos[4*i]) || isnanf(m_hPos[4*i+1]) || isnanf(m_hPos[4*i+2]) ){
 			nans++;
+		}
 		if( pow(m_hPos[4*i],2) > pow(newp.origin.x,2) ||  pow(m_hPos[4*i+1],2) > pow(newp.origin.y,2) || 
 				pow(m_hPos[4*i+2],2) > pow(newp.origin.z,2) )
 		   outbounds++;
@@ -506,9 +507,10 @@ ParticleSystem::dumpParticles(uint start, uint count)
 	copyArrayFromDevice(m_hMoments, m_dMoments, 0, sizeof(float)*4*count);
 	uint n_outside = 0;
 	for(uint i=start; i<start+count; i++) {
-		if(sqrt(m_hForces[i*4]*m_hForces[i*4] + m_hForces[i*4+1]*m_hForces[i*4+1]
-					+ m_hForces[i*4+2]*m_hForces[i*4+2]) > 1e-6f) {
-    
+		bool islarge = sqrt(m_hForces[i*4]*m_hForces[i*4] + m_hForces[i*4+1]*m_hForces[i*4+1] 
+		        + m_hForces[i*4+2]*m_hForces[i*4+2]) > 1e-6f;
+		bool posnan = isnanf(m_hPos[i*4+0]) || isnanf(m_hPos[i*4+1]) || isnanf(m_hPos[i*4+2]);
+		if (islarge || posnan){
 			printf("Position: (%.7g, %.7g, %.7g, %.7g)\n", m_hPos[i*4+0], 
 					m_hPos[i*4+1], m_hPos[i*4+2], m_hPos[i*4+3]);
 			printf("  Forces: (%.7g, %.7g, %.7g, %.7g)\n", m_hForces[i*4+0], 
@@ -599,12 +601,6 @@ void ParticleSystem::densDist(FILE* output, double dx)
 	delete [] dens;
 }
 
-
-
-	
-
-
-
 void ParticleSystem::logStuff(FILE* file, float simtime)
 {
  	
@@ -689,27 +685,42 @@ void ParticleSystem::NListStats()
 			printf("\n");
 		}
 	}
-	printf("Max number of neighbors currently: %d, allocated %d\n", maxn, m_maxNeigh);
 
 	m_hNeighList = new uint[newp.N*m_maxNeigh];
 	copyArrayFromDevice(m_hNeighList, m_dNeighList, 0, sizeof(uint)*newp.N*m_maxNeigh);
+	int n_repeats = 0, n_rezeros = 0;
 	for(uint ii = 0; ii < newp.N; ii++) {
 		n_neigh = m_hNumNeigh[ii];
 		//if(ii < 50) printf("n_neigh: %d\n", n_neigh);
 		uint numzeros = 0;
+		uint repeats = 0;
 		for(uint jj = 0; jj <  n_neigh; jj++) {
 			uint neigh = m_hNeighList[ii + newp.N*jj];
 			numzeros = (neigh == 0) ? numzeros+1 : numzeros;
-			if(neigh == ii)
-				printf("Warning: self interaction on particle %d at %d entry\n", ii, jj);
+			if(neigh == ii){
+			//	printf("Warning: self interaction on particle %d at %d/%d entry\n", ii, jj,n_neigh-1);
+			}
+			for(uint kk=jj+1; kk < n_neigh; kk++) {
+				if(neigh == m_hNeighList[ii + newp.N*kk])
+					repeats++;
+			}
 		}
 		if(numzeros > 1){
-			printf("Excessive (%d) interactions with particle 0 by particle %d\n", numzeros,ii);
+			//printf("Excessive (%d/%d) interactions with particle 0 by particle %d\n", numzeros,n_neigh,ii);
+			n_rezeros++;
+		}
+		if(repeats > 0){
+			//printf("Particle %d has %d repeats\n", ii,repeats);
+			n_repeats++;
 		}
 	}
 	
+	if(n_repeats > 0 || n_rezeros > 0)
+		fprintf(stdout,"Nlist failure, %d p have repeats and %d have repeats w/ zero\n",n_repeats, n_rezeros);
+
 	//graphs = adjConGraphs(m_hNeighList, m_hNumNeigh, newp.N);
 	delete [] m_hNeighList;
+	printf("Max number of neighbors currently: %d, allocated %d\n\n", maxn, m_maxNeigh);
 
 }
 
@@ -720,9 +731,9 @@ void ParticleSystem::logParticles(FILE* file)
 	copyArrayFromDevice(m_hForces, m_dForces1,0, sizeof(float)*4*newp.N);
 	copyArrayFromDevice(m_hMoments, m_dMoments, 0, sizeof(float)*4*newp.N);
     for(uint i=0; i<newp.N; i++) {
-		fprintf(file, "%.9g\t%.9g\t%.9g\t%.9g\t", m_hPos[i*4+0], m_hPos[i*4+1], m_hPos[i*4+2], m_hPos[i*4+3]);
-		fprintf(file, "%.9g\t%.9g\t%.9g\t%.9g\t", m_hForces[i*4+0], m_hForces[i*4+1], m_hForces[i*4+2], m_hForces[i*4+3]);
-		fprintf(file, "%.9g\t%.9g\t%.9g\t%.9g\n", m_hMoments[i*4+0], m_hMoments[i*4+1], m_hMoments[i*4+2], m_hMoments[i*4+3]);
+		fprintf(file, "%.9e\t%.9e\t%.9e\t%.9e\t", m_hPos[i*4+0], m_hPos[i*4+1], m_hPos[i*4+2], m_hPos[i*4+3]);
+		fprintf(file, "%.9e\t%.9e\t%.9e\t%.9e\t", m_hForces[i*4+0], m_hForces[i*4+1], m_hForces[i*4+2], m_hForces[i*4+3]);
+		fprintf(file, "%.9e\t%.9e\t%.9e\t%.9e\n", m_hMoments[i*4+0], m_hMoments[i*4+1], m_hMoments[i*4+2], m_hMoments[i*4+3]);
 	}
 	fprintf(file, "-1\t-1\t-1\t-1\t-1\t-1\t-1\t-1\t\n");
 }
@@ -741,6 +752,8 @@ int ParticleSystem::loadParticles(FILE* file)
 			   fprintf(stderr, "Failed to read in particles, i=%d matches=%d\n", i, matches);
 			   return -1;
 		   }
+		   if(isnanf(m_hPos[i*4+0]) || isnanf(m_hPos[i*4+1]) || isnanf(m_hPos[i*4+2]) || isnanf(m_hPos[i*4+3]))
+			   printf("bad pos: %f %f %f %f\n", m_hPos[i*4], m_hPos[i*4+1], m_hPos[i*4+2], m_hPos[i*4+3]);
 		} else {
 			fprintf(stderr, "particle loader failed to read in a line, i=%d\n", i);
 			return -1;
