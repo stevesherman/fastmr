@@ -635,7 +635,7 @@ void initParamList()
 		paramlist->AddParam(new Param<float>("spring constant",pdata.spring, 0, 100, 1, &pdata.spring));
 		paramlist->AddParam(new Param<float>("H (kA/m)", externalH, 0, 1e3, 5, &externalH));
 		paramlist->AddParam(new Param<float>("shear rate", pdata.shear, 0, 2000, 50, &pdata.shear));
-		paramlist->AddParam(new Param<float>("colorFmax", colorFmax, 0, 1, 0.01f, &colorFmax));
+		paramlist->AddParam(new Param<float>("colorFmax", colorFmax, 0, 1.5, 0.01f, &colorFmax));
     	paramlist->AddParam(new Param<float>("visc", pdata.viscosity, 0.001f, .25f, 0.001f, &pdata.viscosity));
 		paramlist->AddParam(new Param<float>("max dx pct", iter_dxpct, 0, .1f, 0.001f, &iter_dxpct));
 		paramlist->AddParam(new Param<float>("pin dist", pin_dist, 0.995f, 1.5f, 0.005f, &pin_dist));
