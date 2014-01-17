@@ -968,7 +968,8 @@ main(int argc, char** argv)
 		}
 		if(!restart) {
 			psystem->logParams(datalog);	
-			psystem->logParams(densfile);
+			if (densLog)
+				psystem->logParams(densfile);
 			fprintf(datalog, "time\tshear\textH\tchainl\tedges\ttopf\tbotf\tgstress\tkinen \tM.x \tM.y \tM.z \tvedge\tvgraph\thedge\thgraph\n");
 		}
 	}
