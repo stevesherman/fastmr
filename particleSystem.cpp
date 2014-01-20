@@ -649,7 +649,6 @@ void ParticleSystem::NListStats()
 	printf("total interactions: %d\t mean interactions: %f\n", nInter, (float)nInter/newp.N);
 		dx_since = 1e6f;//set this to a really large number so that the nlist is regenerated
 	
-	//print a histogram of the number of neighbors
 	copyArrayFromDevice(m_hNumNeigh,  m_dNumNeigh,  0, sizeof(uint)*newp.N);
 	copyArrayFromDevice(m_hPos, m_dSortedPos, 0, sizeof(float)*4*newp.N);
 	uint overruns = 0;
@@ -662,29 +661,33 @@ void ParticleSystem::NListStats()
 	}
 	printf("Number of overruns: %d\n",overruns);
 	
+	//print histogram with mean radius in each bin
 	uint step = 20;
-	uint nump = 0;
 	uint np_star = 0.01*newp.N;
-	double meanrad;
-	for(uint bin = 0; bin < m_maxNeigh; bin += step) {
-		nump = 0;
-		meanrad = 0;
-		for(uint ii = 0; ii < newp.N; ii++){
-			uint n_neigh = m_hNumNeigh[ii];
-			if(n_neigh >= bin && m_hNumNeigh[ii] < bin+step){
-				meanrad += m_hPos[4*ii+3];
-				nump++;
-			}
-		}
-		meanrad = meanrad/nump;
+	uint nbins = ceil((double)m_maxNeigh/step);
+	uint* nump = new uint[nbins];
+	double* meanrad = new double[nbins];
+	memset(nump,0,nbins*sizeof(uint));
+	memset(meanrad,0,nbins*sizeof(double));
+
+	for(uint ii = 0; ii < newp.N; ii++){
+		uint n_neigh = m_hNumNeigh[ii];
+		meanrad[n_neigh/step] += m_hPos[4*ii+3];
+		nump[n_neigh/step]++;
+	}
+
+	for(uint ii = 0; ii < nbins; ii++){
+		uint bin = ii*step;
+		meanrad[ii] = (nump[ii] == 0) ? 0 : meanrad[ii]/nump[ii];
 		if(nump != 0) {
-			printf("bin %d-%d\t meanrad: %.4g\t nump: %d\t", bin, bin+step-1, meanrad,nump);
-			for(uint ii = 0; ii < round((float)nump/np_star); ii++)
+			printf("bin %d-%d\t meanrad: %.4g\t nump: %d\t", bin, bin+step-1, meanrad[ii],nump[ii]);
+			for(uint jj = 0; jj < round((float)nump[ii]/np_star); jj++)
 				printf("*");
 			printf("\n");
 		}
 	}
 
+	//
 	m_hNeighList = new uint[newp.N*m_maxNeigh];
 	copyArrayFromDevice(m_hNeighList, m_dNeighList, 0, sizeof(uint)*newp.N*m_maxNeigh);
 	int n_repeats = 0, n_rezeros = 0;
@@ -719,6 +722,8 @@ void ParticleSystem::NListStats()
 
 	//graphs = adjConGraphs(m_hNeighList, m_hNumNeigh, newp.N);
 	delete [] m_hNeighList;
+	delete [] nump;
+	delete [] meanrad;
 	printf("Max number of neighbors currently: %d, allocated %d\n\n", maxn, m_maxNeigh);
 
 }
