@@ -16,9 +16,6 @@
 #include <ctime>
 #include <algorithm>
 
-#include <iostream>
-#include <fstream>
-
 
 #include "particles.h"
 #include "particleSystem.h"

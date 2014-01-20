@@ -10,7 +10,6 @@
 #include <cuda_runtime.h>
 #include <helper_cuda.h>
 #include <helper_math.h>
-#include <new>
 #include <assert.h>
 #include <math.h>
 #include <memory.h>
