@@ -538,7 +538,7 @@ void ParticleSystem::densDist(FILE* output, double dx)
 	for(int ii=0; ii<np; ii++){
 		dens[ii] = 0;
 	}
-
+	//this will not work work if min(diam)/dx < 3
 	for(int ii=0; ii<newp.N; ii++) {
 		float zp = m_hPos[4*ii+2] - newp.origin.z;
 		float rad = m_hPos[4*ii+3];
