@@ -215,6 +215,7 @@ uint momNList(uint*& nlist, //reference to the nlist pointer
 				(float4*) dmom, phash, cellStart, cellEnd, cellAdj, max_neigh, op);
 	}
 
+	getLastCudaError("momNList");
 	return maxn;
 }
 

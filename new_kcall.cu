@@ -177,7 +177,7 @@ void collision_new(	const float* dSortedPos, const float* dOldVel, const uint* n
 	cudaUnbindTexture(pos_tex);
 	cudaUnbindTexture(vel_tex);
 
-	getLastCudaError("hi");
+	getLastCudaError("collision");
 }
 
 
