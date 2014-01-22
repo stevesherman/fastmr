@@ -74,7 +74,7 @@ float contact_dist = 1.05f;
 float pin_dist = 0.995f;
 float3 worldSize;
 float maxtime = 0;
-float force_dist = 8;
+float cellScale = 8;
 
 int resolved = 0;//number of times the integrator had to resolve a step
 
@@ -900,8 +900,8 @@ main(int argc, char** argv)
 
 	pdata.worldOrigin = worldSize*-0.5f;
 
-	clArgFloat("fdist", force_dist);	
-	float cellSize_des = force_dist*pdata.pRadius[0];
+	clArgFloat("cscale", cellScale);
+	float cellSize_des = cellScale*pdata.pRadius[0];
  
 	//gridSize.x = gridSize.y = gridSize.z = GRID_SIZE;
 	pdata.gridSize.x = floor(worldSize.x/cellSize_des);
