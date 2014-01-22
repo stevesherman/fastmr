@@ -145,7 +145,7 @@ utilities.o: utilities.cu particles_kernel.cu
 particles.o: particles.cpp
 	$(GCC) $(CCFLAGS) $(EXTRA_CCFLAGS) $(INCLUDES) -o $@ -c $<
 
-particleSystem.o: particleSystem.cpp
+particleSystem.o: particleSystem.cpp particleSystem.h
 	$(GCC) $(CCFLAGS) $(EXTRA_CCFLAGS) $(INCLUDES) -o $@ -c $<
 
 render_particles.o: render_particles.cpp
