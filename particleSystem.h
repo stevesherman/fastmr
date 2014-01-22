@@ -95,6 +95,7 @@ protected: // data
 	uint3 m_gridSize;
     float3 m_worldSize;
 	uint m_numGridCells;
+	int cdist;
 	float m_colorFmax;
 	float clipPlane;
 	float m_contact_dist;

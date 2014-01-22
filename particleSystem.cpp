@@ -50,8 +50,11 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize):
 	newp.origin = m_params.worldOrigin;
 	newp.Linv = 1/newp.L;
 	force_dist = 8.0f;
+	float slack = 2.0; // slack factor allows for interactions of larger particles
+	cdist = ceil(slack*force_dist*m_params.pRadius[0]/newp.cellSize.x);
+	newp.numAdjCells = pow(2*cdist + 1,3);
+
 	newp.max_fdr_sq = force_dist*m_params.pRadius[0]*force_dist*m_params.pRadius[0];
-	newp.numAdjCells = 125;
 	newp.spring = m_params.spring;
 	//newp.spring = 1.0f/(.02f*2.0f*m_params.pRadius[0]);
 	//newp.uf = m_params.uf;
@@ -957,7 +960,7 @@ void ParticleSystem::initGrid()
 				uint idc = i + j*newp.gridSize.x + k*newp.gridSize.y*newp.gridSize.x;
 				uint hash = m_hCellHash[idc];
 				uint cn = 0;
-				const int cdist = 2;
+				//const int cdist = 2;
 				for(int kk=-cdist; kk<=cdist; kk++){
 					for(int jj=-cdist; jj<=cdist; jj++){
 						for(int ii=-cdist; ii<=cdist;ii++){
