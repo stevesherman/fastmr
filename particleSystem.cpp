@@ -24,7 +24,6 @@
 #endif
 
 ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize):
-	m_bInitialized(false),
 	m_bUseOpenGL(false)
 {
 	newp.L = worldSize;
@@ -109,7 +108,6 @@ void colorRamp(float /*t*/, float *r)
 void
 ParticleSystem::_initialize()
 {
-    assert(!m_bInitialized);
 	m_randSet = 0;
     // allocate host storage
     m_hPos = new float[newp.N*4];
@@ -187,13 +185,11 @@ ParticleSystem::_initialize()
 	assert(cudaMalloc((void**)&m_dNeighList, newp.N*m_maxNeigh*sizeof(uint)) == cudaSuccess);
 		
     setParameters(&m_params);
-	m_bInitialized = true;
 }
 
 void
 ParticleSystem::_finalize()
 {
-    assert(m_bInitialized);
 	
 	delete [] m_hPos;
     delete [] m_hMoments;
@@ -242,7 +238,6 @@ ParticleSystem::_finalize()
 // step the simulation, limdxpct is that max distance before iteration is re-solved
 float ParticleSystem::update(float deltaTime, float limdxpct)
 {
-    assert(m_bInitialized);
     float *dRendPos, *dRendColor;
     if (m_bUseOpenGL) 
 	{

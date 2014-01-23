@@ -81,7 +81,7 @@ protected: // methods
 
 protected: // data
 	uint it_since_sort;
-	bool m_bInitialized, m_bUseOpenGL;
+	bool m_bUseOpenGL;
 	bool m_2d;
 	uint m_numParticles;
 	uint m_maxNeigh;
