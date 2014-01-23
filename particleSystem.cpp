@@ -50,7 +50,7 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize):
 	newp.origin = m_params.worldOrigin;
 	newp.Linv = 1/newp.L;
 	force_dist = 8.0f;
-	float slack = 2.0; // slack factor allows for interactions of larger particles
+	float slack = 1.0; // slack factor allows for interactions of larger particles
 	cdist = ceil(slack*force_dist*m_params.pRadius[0]/newp.cellSize.x);
 	newp.numAdjCells = pow(2*cdist + 1,3);
 
