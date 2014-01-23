@@ -23,7 +23,8 @@
 #define MU_C 1
 #endif
 
-ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize)
+ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize,
+		float fdist, float slk)
 {
 	newp.L = worldSize;
 	m_params = params;
@@ -47,8 +48,8 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize)
 	newp.cellSize = m_params.cellSize;
 	newp.origin = m_params.worldOrigin;
 	newp.Linv = 1/newp.L;
-	force_dist = 8.0f;
-	float slack = 1.0; // slack factor allows for interactions of larger particles
+	force_dist = fdist;
+	float slack = slk; // slack factor allows for interactions of larger particles
 	cdist = ceil(slack*force_dist*m_params.pRadius[0]/newp.cellSize.x);
 	newp.numAdjCells = pow(2*cdist + 1,3);
 
@@ -809,7 +810,7 @@ void ParticleSystem::logParams(FILE* file)
 			newp.L.y*1e3f, newp.L.z*1e3f);
 	fprintf(file, "spring: %.2f visc: %.2f ", m_params.spring, m_params.viscosity);
 	fprintf(file, "Pin_d: %.3f Contact_d: %.3f\n", newp.pin_d, m_contact_dist);
-	fprintf(file, "rebuildDist: %.4g\n", rebuildDist);
+	fprintf(file, "rebuildDist: %.4g fdist %.2f cdist %u\n", rebuildDist, force_dist, cdist);
 	fprintf(file, "H.x: %.3g\tH.y: %.3g\tH.z: %.3g\n", newp.extH.x, newp.extH.y, newp.extH.z);
 
 }

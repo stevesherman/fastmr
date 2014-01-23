@@ -17,7 +17,8 @@ class ParticleSystem
 public:
     ~ParticleSystem();
 	
-	ParticleSystem(SimParams params, bool useGL, float3 worldSize);
+	ParticleSystem(SimParams params, bool useGL, float3 worldSize,
+			float fdist, float slk);
 
     float update(float deltaTime, float limdxpct);
     void resetParticles(uint numiter, float scale_start);

@@ -902,6 +902,10 @@ main(int argc, char** argv)
 
 	clArgFloat("cscale", cellScale);
 	float cellSize_des = cellScale*pdata.pRadius[0];
+	float fdist = 8.0f;
+	clArgFloat("fdist", fdist);
+	float slack = 1.0;
+	clArgFloat("slack", slack);
  
 	//gridSize.x = gridSize.y = gridSize.z = GRID_SIZE;
 	pdata.gridSize.x = floor(worldSize.x/cellSize_des);
@@ -921,7 +925,7 @@ main(int argc, char** argv)
         cudaGLInit(argc, argv);
     }
 	
-	psystem = new ParticleSystem(pdata, g_useGL, worldSize);
+	psystem = new ParticleSystem(pdata, g_useGL, worldSize, fdist, slack);
 	
 	if (g_useGL) {
         renderer = new ParticleRenderer;
