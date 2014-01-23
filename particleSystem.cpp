@@ -23,8 +23,7 @@
 #define MU_C 1
 #endif
 
-ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize):
-	m_bUseOpenGL(false)
+ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize)
 {
 	newp.L = worldSize;
 	m_params = params;
