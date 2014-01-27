@@ -366,7 +366,8 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
 				assert(false);
 			}
 		}
-		dx_since += dx_moved + newp.shear*9.0f*m_params.pRadius[0]*deltaTime;	
+		//1.25 is a slack factor in the particle diffusivity
+		dx_since += dx_moved + newp.shear*(force_dist*1.25f)*m_params.pRadius[0]*deltaTime;
 	
 	}
 	it_since_sort++;
