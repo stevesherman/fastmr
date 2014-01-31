@@ -54,6 +54,7 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize,
 	newp.numAdjCells = pow(2*cdist + 1,3);
 
 	newp.max_fdr_sq = force_dist*m_params.pRadius[0]*force_dist*m_params.pRadius[0];
+	newp.forcedist_sq = force_dist*force_dist;
 	newp.spring = m_params.spring;
 	//newp.spring = 1.0f/(.02f*2.0f*m_params.pRadius[0]);
 	//newp.uf = m_params.uf;

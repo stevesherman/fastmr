@@ -18,6 +18,7 @@ struct NewParams {
 	float3 Linv;
 	
 	float max_fdr_sq;
+	float forcedist_sq;
 
 	float spring;
 //	float uf;

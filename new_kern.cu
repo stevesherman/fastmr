@@ -145,7 +145,7 @@ __global__ void magForcesK( const float4* dSortedPos,	//i: pos we use to calcula
 		float lsq = er.x*er.x + er.y*er.y + er.z*er.z;
 		er = er*rsqrtf(lsq);
 
-		if(lsq <= 4.0f*4.0f*sepdist*sepdist) { //nparams.max_fdr_sq){
+		if(lsq <= nparams.forcedist_sq*sepdist*sepdist) {
 			float dm1m2 = dot(m1,m2);
 			float dm1er = dot(m1,er);
 			float dm2er = dot(m2,er);
