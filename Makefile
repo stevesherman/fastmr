@@ -135,17 +135,16 @@ all: build
 
 build: fmr
 
-new_kcall.o: new_kcall.cu new_kern.cu
+new_kcall.o: new_kcall.cu new_kern.cu new_kern.h
 	$(NVCC) $(NVCCFLAGS) $(EXTRA_NVCCFLAGS) $(GENCODE_FLAGS) $(INCLUDES) -o $@ -c $<
 
-utilities.o: utilities.cu particles_kernel.cu
+utilities.o: utilities.cu particles_kernel.cu particles_kernel.h
 	$(NVCC) $(NVCCFLAGS) $(EXTRA_NVCCFLAGS) $(GENCODE_FLAGS) $(INCLUDES) -o $@ -c $<
 
-
-particles.o: particles.cpp
+particles.o: particles.cpp particleSystem.h
 	$(GCC) $(CCFLAGS) $(EXTRA_CCFLAGS) $(INCLUDES) -o $@ -c $<
 
-particleSystem.o: particleSystem.cpp particleSystem.h
+particleSystem.o: particleSystem.cpp particleSystem.h new_kern.h nlist.h 
 	$(GCC) $(CCFLAGS) $(EXTRA_CCFLAGS) $(INCLUDES) -o $@ -c $<
 
 render_particles.o: render_particles.cpp
@@ -157,13 +156,16 @@ shaders.o: shaders.cpp
 connectedgraphs.o: connectedgraphs.cpp
 	$(GCC) $(CCFLAGS) $(EXTRA_CCFLAGS) $(INCLUDES) -o $@ -c $<
 
+sfc_pack.o: sfc_pack.cpp sfc_pack.h
+	$(GCC) $(CCFLAGS) $(EXTRA_CCFLAGS) $(INCLUDES) -o $@ -c $<
+
 nlist.o: nlist.cu nlist.h
 	$(NVCC) $(NVCCFLAGS) $(EXTRA_NVCCFLAGS) $(GENCODE_FLAGS) $(INCLUDES) -o $@ -c $<
 
 total.o: nlist.o new_kcall.o utilities.o
 	$(NVCC) $(NVCCFLAGS) $(GENCODE_FLAGS) $(INCLUDES) -dlink $+ -o $@ 
 
-fmr: particles.o particleSystem.o connectedgraphs.o render_particles.o shaders.o total.o nlist.o utilities.o new_kcall.o
+fmr: particles.o particleSystem.o connectedgraphs.o sfc_pack.o render_particles.o shaders.o total.o nlist.o utilities.o new_kcall.o
 	$(GCC) $(CCFLAGS) -o $@ $+ $(LDFLAGS) $(EXTRA_LDFLAGS)
 
 run: build
