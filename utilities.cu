@@ -37,9 +37,10 @@
 #include "thrust/functional.h"
 #include "thrust/reduce.h"
 #include "thrust/inner_product.h"
-#include "particles_kernel.h"
-#include "new_kern.h"
+
 #include "utilities.h"
+
+#include "particles_kernel.h"
 #include "particles_kernel.cu"
 
 using namespace thrust;
@@ -387,4 +388,4 @@ void renderStuff(const float* pos,
 	getLastCudaError("Render Kernel execution failed");
 }
 
-}   // extern "C"
+}
