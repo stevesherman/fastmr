@@ -77,7 +77,7 @@ GCC             ?= g++
 VERSION=\"$(shell git describe --dirty --tags)\"
 EXTRA_NVCCFLAGS ?= -O3 -dc
 EXTRA_LDFLAGS   ?=
-EXTRA_CCFLAGS   ?= -std=c++0x -O3 -DVERSION_NUMBER=$(VERSION) -march=native
+EXTRA_CCFLAGS   ?= -std=c++0x -flto -O3 -DVERSION_NUMBER=$(VERSION) -march=native
 
 # CUDA code generation flags - only using 20 because i only have 20
 GENCODE_SM10    := -gencode arch=compute_10,code=sm_10
@@ -166,7 +166,7 @@ total.o: nlist.o new_kcall.o utilities.o
 	$(NVCC) $(NVCCFLAGS) $(GENCODE_FLAGS) $(INCLUDES) -dlink $+ -o $@ 
 
 fmr: particles.o particleSystem.o connectedgraphs.o sfc_pack.o render_particles.o shaders.o total.o nlist.o utilities.o new_kcall.o
-	$(GCC) $(CCFLAGS) -o $@ $+ $(LDFLAGS) $(EXTRA_LDFLAGS)
+	$(GCC) $(CCFLAGS) $(EXTRA_CCFLAGS) -o $@ $+ $(LDFLAGS) $(EXTRA_LDFLAGS)
 
 run: build
 	./fmr
