@@ -249,8 +249,16 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
 		float ref_moment = 4.0f*M_PI*pow(m_params.pRadius[0],3)*
 				(m_params.mu_p[0] - MU_C)/(m_params.mu_p[0]+2.0f*MU_C)*length(newp.extH);	
 		float F0 = 3*MU_0*ref_moment*ref_moment/ (4*M_PI*powf(2*m_params.pRadius[0],4));
- 		renderStuff(m_dPos1, m_dMoments, m_dForces1, dRendPos, dRendColor, m_colorFmax*F0, 
+ 		renderStuff(m_dPos1, m_dMoments, m_dForces1, dRendPos, dRendColor, m_colorFmax*F0,
 				rand_scale, clipPlane,newp.N);
+
+		//VertCond test = VertCond(m_contact_dist*m_contact_dist, sqrtf(3.0/5.0));
+		//VarCond test = VarCond(m_contact_dist*m_contact_dist);
+		//float outdist = 1.25f*(m_contact_dist - 1.0f) + 1.0f;
+		//OutOfPlane test = OutOfPlane(outdist*outdist,
+		//		sqrtf(3.0/5.0), 1.0); //ie less than 35.2 off the vertical, and w/in 45 deg of the outofplane direction
+
+		//graph_render(test, dRendPos, dRendColor);
 		
 		unmapGLBufferObject(m_cuda_posvbo_resource);
 		unmapGLBufferObject(m_cuda_colorvbo_resource);
@@ -261,7 +269,7 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
     }
 	setParameters(&m_params);
 	setNParameters(&newp);
-	bool rebuildNList = false;	
+	bool rebuildNList = true;
 	//printf("dx_since: %g\t cut: %g\n", dx_since, rebuildDist*m_params.pRadius[0]);
 	if(dx_since > rebuildDist*m_params.pRadius[0])
 	{
@@ -490,6 +498,23 @@ void ParticleSystem::getGraphData(uint& graphs, uint& edges, uint& vert_edges,
 	delete [] m_hNeighList;
 
 	dx_since = 1e6f;//trips nlist regeneration
+}
+
+template <class T>
+void ParticleSystem::graph_render(T cond, float* dRendPos, float* dRendColor)
+{
+	uint maxn = funcNList(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash,
+			m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, cond);
+	m_hNeighList = new uint[newp.N*maxn];
+	copyArrayFromDevice(m_hNeighList, m_dNeighList, 0, sizeof(uint)*newp.N*maxn);
+	copyArrayFromDevice(m_hNumNeigh,  m_dNumNeigh,  0, sizeof(uint)*newp.N);
+
+	//use m_hMoments as temp space because idgaf
+	graphColorLabel(m_hNeighList, m_hNumNeigh, newp.N, m_hMoments);
+
+	cudaMemcpy(dRendPos, m_dPos1, sizeof(float)*4*newp.N, cudaMemcpyDeviceToDevice);
+	cudaMemcpy(dRendColor, m_hMoments, sizeof(float)*4*newp.N, cudaMemcpyHostToDevice);
+	delete [] m_hNeighList;
 }
 
 uint ParticleSystem::getInteractions(){

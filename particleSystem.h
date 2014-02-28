@@ -11,6 +11,8 @@
 #include <cstdio>
 #include <cstdlib>
 
+
+#include "nlist.h"
 // Particle system class
 class ParticleSystem
 {
@@ -79,6 +81,8 @@ protected: // methods
 	void _finalize();
 	void sort_and_reorder();
 	void initParticleGrid(uint3 size, float3 spacing, float3 jitter, uint numParticles);
+
+	template<class T> void graph_render(T cond, float* dRendPos, float* dRendColor);
 
 protected: // data
 	uint it_since_sort;
