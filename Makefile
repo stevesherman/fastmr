@@ -162,9 +162,11 @@ sfc_pack.o: sfc_pack.cpp sfc_pack.h
 nlist.o: nlist.cu nlist.h
 	$(NVCC) $(NVCCFLAGS) $(EXTRA_NVCCFLAGS) $(GENCODE_FLAGS) $(INCLUDES) -o $@ -c $<
 
+#links all the device code together, allowing shared memory space
 total.o: nlist.o new_kcall.o utilities.o
 	$(NVCC) $(NVCCFLAGS) $(GENCODE_FLAGS) $(INCLUDES) -dlink $+ -o $@ 
 
+#link the host code
 fmr: particles.o particleSystem.o connectedgraphs.o sfc_pack.o render_particles.o shaders.o total.o nlist.o utilities.o new_kcall.o
 	$(GCC) $(CCFLAGS) $(EXTRA_CCFLAGS) -o $@ $+ $(LDFLAGS) $(EXTRA_LDFLAGS)
 
