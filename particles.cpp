@@ -576,7 +576,7 @@ void key(unsigned char key, int /*x*/, int /*y*/)
 		camera_trans[2] = -4.8*worldSize.z;		// zoom
 		break;
 	case '6':
-		camera_rot[0] = 5;
+		camera_rot[0] = 10;
 		camera_rot[1] = 87;
 		camera_trans[0] = 0;
 		camera_trans[1] = 0;
