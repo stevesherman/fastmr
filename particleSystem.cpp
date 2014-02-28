@@ -269,7 +269,7 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
     }
 	setParameters(&m_params);
 	setNParameters(&newp);
-	bool rebuildNList = true;
+	bool rebuildNList = false;
 	//printf("dx_since: %g\t cut: %g\n", dx_since, rebuildDist*m_params.pRadius[0]);
 	if(dx_since > rebuildDist*m_params.pRadius[0])
 	{
@@ -519,6 +519,7 @@ void ParticleSystem::graph_render(T cond, float* dRendPos, float* dRendColor)
 	float4 cut = make_float4(1,1,newp.origin.z*clipPlane,1);
 //	float4 cut = make_float4(newp.origin.x*clipPlane,1,1,1);
 	renderCutKern((float4*) dRendPos, cut,newp.N);
+	dx_since = 999; //if this is called, nlist is trashed, so rebuild the nlist
 }
 
 uint ParticleSystem::getInteractions(){
