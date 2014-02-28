@@ -153,7 +153,7 @@ render_particles.o: render_particles.cpp
 shaders.o: shaders.cpp
 	$(GCC) $(CCFLAGS) $(EXTRA_CCFLAGS) $(INCLUDES) -o $@ -c $<
 
-connectedgraphs.o: connectedgraphs.cpp
+connectedgraphs.o: connectedgraphs.cpp connectedgraphs.h
 	$(GCC) $(CCFLAGS) $(EXTRA_CCFLAGS) $(INCLUDES) -o $@ -c $<
 
 sfc_pack.o: sfc_pack.cpp sfc_pack.h
