@@ -523,7 +523,7 @@ void ParticleSystem::graph_render(T cond, float* dRendPos, float* dRendColor)
 }
 
 uint ParticleSystem::getInteractions(){
-	//assumes that a vanilla nlist was the last called, may fail wierdly
+	//assumes that a vanilla nlist was the last called, may fail weirdly
 	return numInteractions(m_dNumNeigh, newp.N);
 }
 
