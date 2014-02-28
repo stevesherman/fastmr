@@ -56,6 +56,7 @@ void pshift(float4* positions, float3 s, uint numParticles);
 
 
 void sortParticles(uint *dGridParticleHash, uint *dGridParticleIndex, uint numParticles);
+void renderCutKern(float4* pos, float4 minPos, uint numParticles);
 
 void renderStuff(const float* post, 
 				const float* moment,

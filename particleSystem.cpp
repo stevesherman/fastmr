@@ -515,6 +515,10 @@ void ParticleSystem::graph_render(T cond, float* dRendPos, float* dRendColor)
 	cudaMemcpy(dRendPos, m_dPos1, sizeof(float)*4*newp.N, cudaMemcpyDeviceToDevice);
 	cudaMemcpy(dRendColor, m_hMoments, sizeof(float)*4*newp.N, cudaMemcpyHostToDevice);
 	delete [] m_hNeighList;
+
+	float4 cut = make_float4(1,1,newp.origin.z*clipPlane,1);
+//	float4 cut = make_float4(newp.origin.x*clipPlane,1,1,1);
+	renderCutKern((float4*) dRendPos, cut,newp.N);
 }
 
 uint ParticleSystem::getInteractions(){

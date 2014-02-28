@@ -362,7 +362,23 @@ void resetMom(float4* moments, float3 extH, uint numParticles){
 			device_ptr<float4>(moments), mom_reset(extH));
 }
 
+struct renderCut
+{
+	renderCut(float4 r) : cut(r) {}
+	__host__ __device__ float4 operator()(const float4& p){
+		float4 returned = p;
+		if(p.x > cut.x || p.y > cut.y || p.z > cut.z || p.w > cut.w){
+			returned.w = 0;
+		}
+		return returned;
+	}
+	const float4 cut;
+};
 
+void renderCutKern(float4* pos, float4 minPos, uint numParticles) {
+	device_ptr<float4> dpos(pos);
+	transform(dpos, dpos+numParticles, dpos, renderCut(minPos));
+}
 
 void renderStuff(const float* pos, 
 				const float* moment, 
