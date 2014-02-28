@@ -144,7 +144,7 @@ utilities.o: utilities.cu particles_kernel.cu particles_kernel.h
 particles.o: particles.cpp particleSystem.h
 	$(GCC) $(CCFLAGS) $(EXTRA_CCFLAGS) $(INCLUDES) -o $@ -c $<
 
-particleSystem.o: particleSystem.cpp particleSystem.h new_kern.h nlist.h 
+particleSystem.o: particleSystem.cpp particleSystem.h new_kern.h nlist.h connectedgraphs.h
 	$(GCC) $(CCFLAGS) $(EXTRA_CCFLAGS) $(INCLUDES) -o $@ -c $<
 
 render_particles.o: render_particles.cpp
