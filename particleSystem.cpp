@@ -252,8 +252,8 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
  		renderStuff(m_dPos1, m_dMoments, m_dForces1, dRendPos, dRendColor, m_colorFmax*F0,
 				rand_scale, clipPlane,newp.N);
 
-		//VertCond test = VertCond(m_contact_dist*m_contact_dist, sqrtf(3.0/5.0));
 		//VarCond test = VarCond(m_contact_dist*m_contact_dist);
+		//VertCond test = VertCond(m_contact_dist*m_contact_dist, sqrtf(3.0/5.0));
 		//float outdist = 1.25f*(m_contact_dist - 1.0f) + 1.0f;
 		//OutOfPlane test = OutOfPlane(outdist*outdist,
 		//		sqrtf(3.0/5.0), 1.0); //ie less than 35.2 off the vertical, and w/in 45 deg of the outofplane direction
