@@ -568,19 +568,19 @@ void key(unsigned char key, int /*x*/, int /*y*/)
         psystem->resetParticles(20, 1.0f);
 		frameCount=0; simtime = 0; resolved = 0;
 		break;
-	case '5':  									// preset angle for pretty screenshots
-		camera_rot[0] = 15;						// elevation angle
-		camera_rot[1] = 23;					// azimuth angle
-		camera_trans[0] = -0.0*worldSize.x;	// horiz shift
-		camera_trans[1] = 0.05*worldSize.y;		// vert shift
+	case '5':  						// preset angle for pretty screenshots
+		camera_rot[0] = 12;			// elevation angle
+		camera_rot[1] = 23;			// azimuth angle
+		camera_trans[0] = 0;		// horiz shift - done after rotation
+		camera_trans[1] = 0;		// vert shift
 		camera_trans[2] = -4.8*worldSize.z;		// zoom
 		break;
-	case '6':
-		camera_rot[0] = 10;
-		camera_rot[1] = 87;
+	case '6':						//side view
+		camera_rot[0] = 12;
+		camera_rot[1] = 89;
 		camera_trans[0] = 0;
 		camera_trans[1] = 0;
-		camera_trans[2] = -4.5*worldSize.z;
+		camera_trans[2] = -4.8*worldSize.z;
 		break;
 	case '7':
 		rotatable = !rotatable;
