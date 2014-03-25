@@ -284,29 +284,29 @@ void display()
   	sdkStartTimer(&timer);  
 	setParams();
     // update the simulation
-    if (!bPause)
-    {
+	if (!bPause) {
 		qupdate();
-		if (renderer){ 
-            renderer->setVertexBuffer(psystem->getCurrentReadBuffer(), 
-					psystem->getNumParticles());
-		}
-    }
+	}
 
-    // render
-   	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);  
+	if (renderer){
+		psystem->render(FORCE);
+		renderer->setVertexBuffer(psystem->getCurrentReadBuffer(),
+				psystem->getNumParticles());
+	}
+	// render
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	for (int c = 0; c < 3; ++c) {
-        camera_trans_lag[c] += (camera_trans[c] - camera_trans_lag[c]) * inertia;
-        camera_rot_lag[c] += (camera_rot[c] - camera_rot_lag[c]) * inertia;
-    }
-	
-    // view transform
-    //glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-		
+		camera_trans_lag[c] += (camera_trans[c] - camera_trans_lag[c]) * inertia;
+		camera_rot_lag[c] += (camera_rot[c] - camera_rot_lag[c]) * inertia;
+	}
+
+	// view transform
+	//glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+
 	drawAxes();
-	
+
 	//draw cube and particles
 	glPushMatrix();	
     

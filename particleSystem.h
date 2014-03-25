@@ -13,6 +13,9 @@
 
 
 #include "nlist.h"
+
+enum RenderMode {FORCE, GLOBAL, VERTICAL, HORIZONTAL};
+
 // Particle system class
 class ParticleSystem
 {
@@ -23,6 +26,8 @@ public:
 			float fdist, float slk);
 
     float update(float deltaTime, float limdxpct);
+    void render(RenderMode mode);
+
     void resetParticles(uint numiter, float scale_start);
 
     int    getNumParticles() const { return m_numParticles; }

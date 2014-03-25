@@ -236,37 +236,48 @@ ParticleSystem::_finalize()
 
 }
 
+void ParticleSystem::render(RenderMode mode)
+{
+	float *dRendPos, *dRendColor;
+	if(!m_bUseOpenGL)
+		return;
+
+	dRendPos = (float *) mapGLBufferObject(&m_cuda_posvbo_resource);
+	dRendColor = (float *) mapGLBufferObject(&m_cuda_colorvbo_resource);
+
+	if(mode == FORCE){
+		//express colors as fraction of reference force, F0
+		float ref_moment = 4.0f*M_PI*pow(m_params.pRadius[0],3)*
+				(m_params.mu_p[0] - MU_C)/(m_params.mu_p[0]+2.0f*MU_C)*length(newp.extH);
+		float F0 = 3*MU_0*ref_moment*ref_moment/ (4*M_PI*powf(2*m_params.pRadius[0],4));
+		renderStuff(m_dPos1, m_dMoments, m_dForces1, dRendPos, dRendColor, m_colorFmax*F0,
+				rand_scale, clipPlane,newp.N);
+	}
+	if(mode == GLOBAL){
+		VarCond test = VarCond(m_contact_dist*m_contact_dist);
+		graph_render(test, dRendPos, dRendColor);
+	}
+	if(mode == VERTICAL){
+		VertCond test = VertCond(m_contact_dist*m_contact_dist, sqrtf(3.0/5.0));
+		graph_render(test, dRendPos, dRendColor);
+	}
+	if(mode == HORIZONTAL){
+		float outdist = 1.25f*(m_contact_dist - 1.0f) + 1.0f;
+		OutOfPlane test = OutOfPlane(outdist*outdist,
+				sqrtf(3.0/5.0), 1.0); //ie less than 35.2 off the vertical, and w/in 45 deg of the outofplane direction
+		graph_render(test, dRendPos, dRendColor);
+	}
+
+	unmapGLBufferObject(m_cuda_posvbo_resource);
+	unmapGLBufferObject(m_cuda_colorvbo_resource);
+
+
+}
+
 // step the simulation, limdxpct is that max distance before iteration is re-solved
 float ParticleSystem::update(float deltaTime, float limdxpct)
 {
-    float *dRendPos, *dRendColor;
-    if (m_bUseOpenGL) 
-	{
-        dRendPos = (float *) mapGLBufferObject(&m_cuda_posvbo_resource);
-    	dRendColor = (float *) mapGLBufferObject(&m_cuda_colorvbo_resource);
-		
-		//express colors as fraction of reference force, F0
-		float ref_moment = 4.0f*M_PI*pow(m_params.pRadius[0],3)*
-				(m_params.mu_p[0] - MU_C)/(m_params.mu_p[0]+2.0f*MU_C)*length(newp.extH);	
-		float F0 = 3*MU_0*ref_moment*ref_moment/ (4*M_PI*powf(2*m_params.pRadius[0],4));
- 		renderStuff(m_dPos1, m_dMoments, m_dForces1, dRendPos, dRendColor, m_colorFmax*F0,
-				rand_scale, clipPlane,newp.N);
 
-		//VarCond test = VarCond(m_contact_dist*m_contact_dist);
-		//VertCond test = VertCond(m_contact_dist*m_contact_dist, sqrtf(3.0/5.0));
-		//float outdist = 1.25f*(m_contact_dist - 1.0f) + 1.0f;
-		//OutOfPlane test = OutOfPlane(outdist*outdist,
-		//		sqrtf(3.0/5.0), 1.0); //ie less than 35.2 off the vertical, and w/in 45 deg of the outofplane direction
-
-		//graph_render(test, dRendPos, dRendColor);
-		
-		unmapGLBufferObject(m_cuda_posvbo_resource);
-		unmapGLBufferObject(m_cuda_colorvbo_resource);
-
-	} else {
-        dRendPos = (float *) m_cudaPosVBO;
-		dRendColor = (float*) m_cudaColorVBO; //shouldn't be a big deal, as color is only touched above
-    }
 	setParameters(&m_params);
 	setNParameters(&newp);
 	bool rebuildNList = false;
@@ -516,8 +527,8 @@ void ParticleSystem::graph_render(T cond, float* dRendPos, float* dRendColor)
 	cudaMemcpy(dRendColor, m_hMoments, sizeof(float)*4*newp.N, cudaMemcpyHostToDevice);
 	delete [] m_hNeighList;
 
-	float4 cut = make_float4(1,1,newp.origin.z*clipPlane,1);
-//	float4 cut = make_float4(newp.origin.x*clipPlane,1,1,1);
+//	float4 cut = make_float4(1,1,newp.origin.z*clipPlane,1);
+	float4 cut = make_float4(newp.origin.x*clipPlane,1,1,1);
 	renderCutKern((float4*) dRendPos, cut,newp.N);
 	dx_since = 999; //if this is called, nlist is trashed, so rebuild the nlist
 }
