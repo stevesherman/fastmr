@@ -64,6 +64,8 @@ public:
 	void setExternalH(float3 x) { m_params.externalH = x; newp.extH = x;}
 	void setPinDist(float x) { newp.pin_d = x;}
 	void setContactDist(float x) {m_contact_dist = x;}
+	void setCosVert(float x) {m_cos_vert = x;}
+	void setTanHorz(float x) {m_tan_horz = x;}
 	void setRebuildDist(float x) {rebuildDist = x;}
 	void setForceDist(float x) {force_dist = x;}
 	void dangerousResize(double  y);
@@ -109,6 +111,8 @@ protected: // data
 	float m_colorFmax;
 	float clipPlane;
 	float m_contact_dist;
+	float m_cos_vert;
+	float m_tan_horz;
 	float force_dist;
 
 	// CPU data

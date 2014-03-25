@@ -65,6 +65,8 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize,
 	newp.pin_d = 0.995f;  //ybot < radius*pin_d
 	newp.tanfric = 1e-5f;
 	m_contact_dist = 1.05f;	
+	m_cos_vert = sqrtf(3.0/5.0);
+	m_tan_horz = 1.0;
 	_initialize();
 	zeroDevice();
 	initGrid();
@@ -258,13 +260,13 @@ void ParticleSystem::render(RenderMode mode)
 		graph_render(test, dRendPos, dRendColor);
 	}
 	if(mode == VERTICAL){
-		VertCond test = VertCond(m_contact_dist*m_contact_dist, sqrtf(3.0/5.0));
+		VertCond test = VertCond(m_contact_dist*m_contact_dist, m_cos_vert);
 		graph_render(test, dRendPos, dRendColor);
 	}
 	if(mode == HORIZONTAL){
 		float outdist = 1.25f*(m_contact_dist - 1.0f) + 1.0f;
-		OutOfPlane test = OutOfPlane(outdist*outdist,
-				sqrtf(3.0/5.0), 1.0); //ie less than 35.2 off the vertical, and w/in 45 deg of the outofplane direction
+		//less than cos(39.2) off the vertical, and w/in tan(45 deg) of the outofplane direction
+		OutOfPlane test = OutOfPlane(outdist*outdist,m_cos_vert, m_tan_horz);
 		graph_render(test, dRendPos, dRendColor);
 	}
 
@@ -486,7 +488,7 @@ void ParticleSystem::getGraphData(uint& graphs, uint& edges, uint& vert_edges,
 	graphs = adjConGraphs(m_hNeighList, m_hNumNeigh, newp.N);
 	delete [] m_hNeighList;
 
-	VertCond test = VertCond(m_contact_dist*m_contact_dist, sqrtf(3.0/5.0));
+	VertCond test = VertCond(m_contact_dist*m_contact_dist, m_cos_vert);
 	maxn = funcNList(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
 			m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, test);
 	vert_edges = numInteractions(m_dNumNeigh, newp.N)/2;
@@ -497,8 +499,7 @@ void ParticleSystem::getGraphData(uint& graphs, uint& edges, uint& vert_edges,
 	delete [] m_hNeighList;
 
 	float outdist = 1.25f*(m_contact_dist - 1.0f) + 1.0f;
-	OutOfPlane horz_op = OutOfPlane(outdist*outdist,
-			sqrtf(3.0/5.0), 1.0); //ie less than 35.2 off the vertical, and w/in 45 deg of the outofplane direction
+	OutOfPlane horz_op = OutOfPlane(outdist*outdist, m_cos_vert, m_tan_horz);
 	maxn = funcNList(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
 			m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, horz_op);
 	horz_edges = numInteractions(m_dNumNeigh, newp.N)/2;
