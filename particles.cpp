@@ -72,6 +72,8 @@ float rebuild_pct = 0.1;
 float strain = 0, period = 24;//compression params, period in ms
 float contact_dist = 1.05f;
 float pin_dist = 0.995f;
+float con_ang_vert = acos(sqrt(3.0/5.0))*180.0/M_PI;
+float con_ang_horz = 45;
 float3 worldSize;
 float maxtime = 0;
 float cellScale = 8;
@@ -121,6 +123,8 @@ void setParams(){
 	psystem->setContactDist(contact_dist);
 	psystem->setRebuildDist(rebuild_pct);
 	psystem->setClipPlane(clipPlane);
+	psystem->setCosVert(cos(con_ang_vert/180.0f*M_PI));
+	psystem->setTanHorz(tan(con_ang_horz/180.0f*M_PI));
 }
 
 
@@ -637,6 +641,8 @@ void initParamList()
 		paramlist->AddParam(new Param<float>("max dx pct", iter_dxpct, 0, .1f, 0.001f, &iter_dxpct));
 		paramlist->AddParam(new Param<float>("pin dist", pin_dist, 0.995f, 1.5f, 0.005f, &pin_dist));
 		paramlist->AddParam(new Param<float>("contact_dist", contact_dist, .95f, 1.25f, 0.001f, &contact_dist));
+		paramlist->AddParam(new Param<float>("con_ang_vert", con_ang_vert, 0.0f, 90.0f, 0.5, &con_ang_vert));
+		paramlist->AddParam(new Param<float>("con_ang_horz", con_ang_horz, 0.0f, 90.0f, 0.5, &con_ang_horz));
 		paramlist->AddParam(new Param<float>("rebuild dist", rebuild_pct, 0.0f, 1.0f, 0.005f, &rebuild_pct));
 		paramlist->AddParam(new Param<float>("clip plane", clipPlane, -1.0, 1.0, 0.01, &clipPlane));
 	}
