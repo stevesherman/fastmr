@@ -42,19 +42,19 @@ public:
 
 class OutOfPlane: public NListDistCond{
 public:
-	OutOfPlane(float d, float v, float h) : max_distsq(d), vert(v), horiz(h) {}
+	OutOfPlane(float d, float v, float h) : max_distsq(d), cos_vert(v), tan_horiz(h) {}
 
 	__host__ __device__ bool operator()(const float rad1, const float rad2,
 			const float3 er, const float distsq) const 
 	{
 		float sepdist = rad1 + rad2;
 		return (distsq < max_distsq*sepdist*sepdist) 
-			&& fabs(er.y) < vert && fabs(er.z/er.x) >= horiz;
+			&& fabs(er.y) < cos_vert && fabs(er.z/er.x) >= tan_horiz;
 	}
 
 	const float max_distsq;
-	const float vert;
-	const float horiz;
+	const float cos_vert;
+	const float tan_horiz;
 };
 
 class MomVar {
