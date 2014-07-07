@@ -182,6 +182,86 @@ __global__ void magForcesK( const float4* dSortedPos,	//i: pos we use to calcula
 
 }
 
+// for uniform finite dipoles
+__global__ void finiteDipK( const float4* dSortedPos,	//i: pos we use to calculate forces
+							const float4* integrPos,	//i: pos we use as base to integrate from
+							const uint* nlist,		//i: the neighbor list
+							const uint* num_neigh,	//i: the number of inputs
+							float4* dForce,		//o: the magnetic force on a particle
+							float4* newPos,		//o: the integrated position
+							const float dipole_d, 	//i: finite dipole distance in units of diameters
+							const float F0,			//i: point dipole F_0
+							const float sigma_0, 	//i: reference diam
+							float deltaTime)	//o: the timestep
+{
+	uint idx = blockDim.x*blockIdx.x + threadIdx.x;
+	if(idx >= nparams.N)
+		return;
+	uint n_neigh = num_neigh[idx];
+	float4 pos1 = dSortedPos[idx];
+	//float4 pos1 = tex1Dfetch(pos_tex,idx);
+	float3 p1 = make_float3(pos1);
+	float radius1 = pos1.w;
+
+	float3 force = make_float3(0,0,0);
+
+	for(uint i = 0; i < n_neigh; i++)
+	{
+		uint neighbor = nlist[i*nparams.N + idx];
+
+		float4 pos2 = tex1Dfetch(pos_tex, neighbor);
+		float3 p2 = make_float3(pos2);
+		float radius2 = pos2.w;
+		float sepdist = radius1 + radius2;
+
+		float3 dr = p1 - p2;//start it out as dr, then modify to get er
+		dr.x = dr.x - nparams.L.x*rintf(dr.x*nparams.Linv.x);
+		dr.z = dr.z - nparams.L.x*rintf(dr.z*nparams.Linv.z);
+		float lsq = dr.x*dr.x + dr.y*dr.y + dr.z*dr.z;
+		float3 er = dr*rsqrtf(lsq);
+
+		if(lsq <= nparams.forcedist_sq*sepdist*sepdist) {
+
+			//er_0
+			force += (2/lsq)*er;
+
+			//er_+
+			dr.y += dipole_d*sigma_0;
+			lsq = dr.x*dr.x + dr.y*dr.y + dr.z*dr.z; //replace with 2d*dr.y + d^2?
+			er = dr*rsqrtf(lsq);
+			force -= (1/lsq)*er;
+
+			//er_-
+			dr.y -= 2.0f*dipole_d*sigma_0;
+			lsq = dr.x*dr.x + dr.y*dr.y + dr.z*dr.z;
+			er = dr*rsqrtf(lsq);
+			force -= (1/lsq)*er;
+
+			//convert back to real units
+			force *= F0/(3*dipole_d*dipole_d)*sigma_0*sigma_0;
+
+			force += 2*F0*expf(-nparams.spring*(sqrtf(lsq)/sepdist - 1))*er;
+
+		}
+
+	}
+	dForce[idx] = make_float4(force,0.0f);
+	float Cd = 6.0f*PI_F*radius1*nparams.visc;
+	float ybot = p1.y - nparams.origin.y;
+	force.x += nparams.shear*ybot*Cd;
+
+	//apply flow BCs
+	if(ybot <= nparams.pin_d*radius1)
+		force = make_float3(0,0,0);
+	if(ybot >= nparams.L.y - nparams.pin_d*radius1)
+		force = make_float3(nparams.shear*nparams.L.y*Cd,0,0);
+
+	float3 ipos = make_float3(integrPos[idx]);
+	newPos[idx] = make_float4(ipos + force/Cd*deltaTime, radius1);
+
+}
+
+
 __global__ void vertEdgeK(const uint* nlist, 
 						const uint* num_neigh,
 						const float4* dPos,
