@@ -19,6 +19,10 @@ void magForces(const float* dSortedPos, const float* dIntPos, float* newPos,
 		float* dForce, const float* dMom, const uint* nlist, const uint* num_neigh, 
 		uint numParticles, float deltaTime);
 
+void finiteDip(const float* dSortedPos, const float* dIntPos, float* newPos, float* dForce,
+		const uint* nlist, const uint* num_neigh, uint numParticles,
+		float dipole_d, float F0, float sigma_0, float deltaTime);
+
 void magFricForces(const float* dSortedPos, const float* dIntPos, float* newPos, 
 		float* dForceOut, const float* dMom, const float* dForceIn,
 		const uint* nlist, const uint* num_neigh, uint numParticles, float deltaTime);
