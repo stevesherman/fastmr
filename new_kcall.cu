@@ -1,20 +1,10 @@
-#include <cstdlib>
-#include <cstdio>
-#include <cstdlib>
-#include <assert.h>
-
-//#include "vector_types.h"
-#include <cuda_runtime.h>
-#include <cuda_gl_interop.h>
 #include <helper_cuda.h>
 #include <helper_cuda_gl.h>
 #include <helper_functions.h>
-//#include "helper_inline.h"
 
-#include "thrust/reduce.h"
-#include "thrust/extrema.h"
-#include "thrust/device_ptr.h"
-#include "thrust/functional.h"
+#include <thrust/reduce.h>
+#include <thrust/device_ptr.h>
+
 #include "new_kern.cu"
 
 extern "C" 

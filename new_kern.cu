@@ -8,9 +8,7 @@
 #define MU_C 1
 #endif
 
-#include <cuda_runtime.h>
 #include <helper_math.h>
-#include <cstdlib>
 
 #include "new_kern.h"
 
