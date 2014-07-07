@@ -203,6 +203,8 @@ __global__ void finiteDipK( const float4* dSortedPos,	//i: pos we use to calcula
 
 	float3 force = make_float3(0,0,0);
 
+	const float finite_pre = sigma_0*sigma_0/(3.0f*dipole_d*dipole_d);
+
 	for(uint i = 0; i < n_neigh; i++)
 	{
 		uint neighbor = nlist[i*nparams.N + idx];
@@ -221,19 +223,19 @@ __global__ void finiteDipK( const float4* dSortedPos,	//i: pos we use to calcula
 		if(lsq <= nparams.forcedist_sq*sepdist*sepdist) {
 
 			//er_0
-			force += (2/lsq)*er;
+			force += finite_pre*(2/lsq)*er;
 
 			//er_+
 			dr.y += dipole_d*sigma_0;
 			lsq = dr.x*dr.x + dr.y*dr.y + dr.z*dr.z; //replace with 2d*dr.y + d^2?
 			er = dr*rsqrtf(lsq);
-			force -= (1/lsq)*er;
+			force -= finite_pre*(1/lsq)*er;
 
 			//er_-
 			dr.y -= 2.0f*dipole_d*sigma_0;
 			lsq = dr.x*dr.x + dr.y*dr.y + dr.z*dr.z;
 			er = dr*rsqrtf(lsq);
-			force -= (1/lsq)*er;
+			force -= finite_pre*(1/lsq)*er;
 
 			force += 2*expf(-nparams.spring*(sqrtf(lsq)/sepdist - 1))*er;
 
@@ -242,7 +244,7 @@ __global__ void finiteDipK( const float4* dSortedPos,	//i: pos we use to calcula
 	}
 
 	//convert back to real units
-	force *= F0/(3*dipole_d*dipole_d)*sigma_0*sigma_0;
+	force *= F0;
 
 	dForce[idx] = make_float4(force,0.0f);
 	float Cd = 6.0f*PI_F*radius1*nparams.visc;
