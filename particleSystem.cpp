@@ -24,7 +24,7 @@
 #endif
 
 ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize,
-		float fdist, float slk)
+		float fdist, float slk,float dipd)
 {
 	newp.L = worldSize;
 	m_params = params;
@@ -75,6 +75,8 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize,
 	rebuildDist = 0.01;
 	it_since_sort = 0;
 	clipPlane = -1.0;
+	dipole_d = dipd;
+
 }
 
 void pswap(float*& a, float*& b) {
@@ -339,27 +341,55 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
 		while(solve) {
 		
 			
-			magForces(	m_dSortedPos,	//yin: yn 
+//			magForces(	m_dSortedPos,	//yin: yn
+//						m_dSortedPos,	//yn
+//						m_dPos1,   		//yn + 1/2*k1
+//						m_dForces1,   	//k1
+//						m_dMoments, m_dNeighList, m_dNumNeigh, newp.N, deltaTime/2);
+//			magForces(	m_dPos1, 		//yin: yn + 1/2*k1
+//						m_dSortedPos, 	//yn
+//						m_dPos2, 		//yn + 1/2*k2
+//						m_dForces2,		//k2
+//						m_dMoments, m_dNeighList, m_dNumNeigh, newp.N, deltaTime/2);
+//			magForces(	m_dPos2, 		//yin: yn + 1/2*k2
+//						m_dSortedPos, 	//yn
+//						m_dPos3, 		//yn + k3
+//						m_dForces3,		//k3
+//						m_dMoments, m_dNeighList, m_dNumNeigh, newp.N, deltaTime);
+//			magForces(	m_dPos3, 		//yin: yn + k3
+//						m_dSortedPos, 	//yn
+//						m_dPos4, 		// doesn't matter
+//						m_dForces4,		//k4
+//						m_dMoments, m_dNeighList, m_dNumNeigh, newp.N, deltaTime);
+
+			float ref_moment = 4.0f*M_PI*pow(m_params.pRadius[0],3)*
+					(m_params.mu_p[0] - MU_C)/(m_params.mu_p[0]+2.0f*MU_C)*length(newp.extH);
+			float F0 = 3*MU_0*ref_moment*ref_moment/ (4*M_PI*powf(2.0f*m_params.pRadius[0],4));
+			finiteDip(	m_dSortedPos,	//yin: yn
 						m_dSortedPos,	//yn
-						m_dPos1,   	//yn + 1/2*k1
+						m_dPos1,   		//yn + 1/2*k1
 						m_dForces1,   	//k1
-						m_dMoments, m_dNeighList, m_dNumNeigh, newp.N, deltaTime/2);
-			magForces(	m_dPos1, 		//yin: yn + 1/2*k1
+						m_dNeighList, m_dNumNeigh, newp.N, dipole_d, F0,
+						2.0f*m_params.pRadius[0],deltaTime/2);
+			finiteDip(	m_dPos1, 		//yin: yn + 1/2*k1
 						m_dSortedPos, 	//yn
 						m_dPos2, 		//yn + 1/2*k2
 						m_dForces2,		//k2
-						m_dMoments, m_dNeighList, m_dNumNeigh, newp.N, deltaTime/2);
-			magForces(	m_dPos2, 		//yin: yn + 1/2*k2
+						m_dNeighList, m_dNumNeigh, newp.N, dipole_d, F0,
+						2.0f*m_params.pRadius[0],deltaTime/2);
+			finiteDip(	m_dPos2, 		//yin: yn + 1/2*k2
 						m_dSortedPos, 	//yn
 						m_dPos3, 		//yn + k3
 						m_dForces3,		//k3
-						m_dMoments, m_dNeighList, m_dNumNeigh, newp.N, deltaTime);
-			magForces(	m_dPos3, 		//yin: yn + k3
+						m_dNeighList, m_dNumNeigh, newp.N, dipole_d, F0,
+						2.0f*m_params.pRadius[0],deltaTime);
+			finiteDip(	m_dPos3, 		//yin: yn + k3
 						m_dSortedPos, 	//yn
 						m_dPos4, 		// doesn't matter
 						m_dForces4,		//k4
-						m_dMoments, m_dNeighList, m_dNumNeigh, newp.N, deltaTime);
-		
+						m_dNeighList, m_dNumNeigh, newp.N, dipole_d, F0,
+						2.0f*m_params.pRadius[0],deltaTime);
+
 			integrateRK4(m_dSortedPos, m_dPos1, m_dPos2, m_dPos3, m_dPos4, m_dForces1, 
 					m_dForces2, m_dForces3, m_dForces4, deltaTime, newp.N);
 

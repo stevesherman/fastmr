@@ -880,7 +880,9 @@ main(int argc, char** argv)
 
 	//now we take comman flags, overwriting default/restart values
 
-
+	float dipole_d = 10; // a fatal value
+	clArgFloat("dipd", dipole_d);
+	assert(dipole_d > 0 && dipole_d < 1);
 	clArgFloat("shear", pdata.shear);
 	clArgFloat("k", pdata.spring);
 
@@ -931,7 +933,7 @@ main(int argc, char** argv)
         cudaGLInit(argc, argv);
     }
 	
-	psystem = new ParticleSystem(pdata, g_useGL, worldSize, fdist, slack);
+	psystem = new ParticleSystem(pdata, g_useGL, worldSize, fdist, slack,dipole_d);
 	
 	if (g_useGL) {
         renderer = new ParticleRenderer;

@@ -23,7 +23,7 @@ public:
     ~ParticleSystem();
 	
 	ParticleSystem(SimParams params, bool useGL, float3 worldSize,
-			float fdist, float slk);
+			float fdist, float slk,float dipole_d);
 
     float update(float deltaTime, float limdxpct);
     void render(RenderMode mode);
@@ -114,6 +114,7 @@ protected: // data
 	float m_cos_vert;
 	float m_tan_horz;
 	float force_dist;
+	float dipole_d;
 
 	// CPU data
     float* m_hPos;              // particle positions
