@@ -235,14 +235,15 @@ __global__ void finiteDipK( const float4* dSortedPos,	//i: pos we use to calcula
 			er = dr*rsqrtf(lsq);
 			force -= (1/lsq)*er;
 
-			//convert back to real units
-			force *= F0/(3*dipole_d*dipole_d)*sigma_0*sigma_0;
-
-			force += 2*F0*expf(-nparams.spring*(sqrtf(lsq)/sepdist - 1))*er;
+			force += 2*expf(-nparams.spring*(sqrtf(lsq)/sepdist - 1))*er;
 
 		}
 
 	}
+
+	//convert back to real units
+	force *= F0/(3*dipole_d*dipole_d)*sigma_0*sigma_0;
+
 	dForce[idx] = make_float4(force,0.0f);
 	float Cd = 6.0f*PI_F*radius1*nparams.visc;
 	float ybot = p1.y - nparams.origin.y;
