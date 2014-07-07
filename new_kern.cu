@@ -223,23 +223,23 @@ __global__ void finiteDipK( const float4* dSortedPos,	//i: pos we use to calcula
 		if(lsq <= nparams.forcedist_sq*sepdist*sepdist) {
 
 			//er_0
-			//create f_ij to fix numerical precision problems
-			float3 f_ij = 2*expf(-nparams.spring*(sqrtf(lsq)/sepdist - 1))*er;
-			f_ij += finite_pre*(2.0f/lsq)*er;
+			//create f_ij to attempt to fix numerical precision problems at small dipole_d
+			force += 2*expf(-nparams.spring*(sqrtf(lsq)/sepdist - 1))*er;
+			float3 f_ij = (2.0f/lsq)*er;
 
 			//er_+
 			dr.y += dipole_d*sigma_0;
 			lsq = dr.x*dr.x + dr.y*dr.y + dr.z*dr.z; //replace with 2d*dr.y + d^2?
 			er = dr*rsqrtf(lsq);
-			f_ij -= finite_pre*(1.0f/lsq)*er;
+			f_ij += (-1.0f/lsq)*er;
 
 			//er_-
 			dr.y -= 2.0f*dipole_d*sigma_0;
 			lsq = dr.x*dr.x + dr.y*dr.y + dr.z*dr.z;
 			er = dr*rsqrtf(lsq);
-			f_ij -= finite_pre*(1.0f/lsq)*er;
+			f_ij += (-1.0f/lsq)*er;
 
-			force += f_ij;
+			force += finite_pre*f_ij;
 
 		}
 
