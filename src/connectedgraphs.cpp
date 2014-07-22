@@ -86,7 +86,7 @@ void graphColorLabel(const uint* nlist, const uint* num_neigh,
 
 	graphLabeler(nlist, num_neigh, numParticles, length_list, visited);
 
-	//desaturated vals from maltab's distinguishable_colors.m
+	//random colors with fixed seed
 	int numGraphs = length_list.size();
 	float4* colorList = new float4[numGraphs];
 	srand(2); //so the colors flash less
