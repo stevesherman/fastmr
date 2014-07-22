@@ -232,4 +232,4 @@ run: build
 	./fmr
 
 clean:
-	rm -f fmr *.o
+	rm -f fmr *.o $(TESTS)
