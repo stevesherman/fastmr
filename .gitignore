@@ -3,3 +3,4 @@ fmr
 *.swp
 .cproject
 .project
+.settings/*
