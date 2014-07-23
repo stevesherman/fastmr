@@ -130,6 +130,9 @@ endif
 INCLUDES      := -I$(CUDA_INC_PATH) -Iinc -I. -Iinc/GL
 LDFLAGS       += $(LIBPATH_OPENGL)
 
+#first rule so it runs by default
+all: build test
+
 ###################################################
 #google test defines
 GTEST_DIR = ../gtest/
@@ -144,7 +147,7 @@ CXXFLAGS += -g -Wall -Wextra -pthread
 
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.
-TESTS = cgraphs_unittest
+TESTS = cgraphs_test nlist_test
 
 # All Google Test headers.  Usually you shouldn't change this
 # definition.
@@ -178,18 +181,23 @@ gtest_main.a : gtest-all.o gtest_main.o
 # Builds a sample test.  A test should link with either gtest.a or
 # gtest_main.a, depending on whether it defines its own main()
 # function.
+# when linking make sure to include source files before library files
 connectedgraphs_test.o: connectedgraphs_test.cpp connectedgraphs.h $(GTEST_HEADERS)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c connectedgraphs_test.cpp -o $@
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
-cgraphs_unittest: connectedgraphs.o connectedgraphs_test.o gtest_main.a
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@
+cgraphs_test: connectedgraphs.o connectedgraphs_test.o gtest_main.a
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $^ -o $@
+
+nlist_test.o: nlist_test.cpp nlist.o $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(INCLUDES) $(LD_FLAGS) -c $< -o $@
+
+#have to link all the cuda kernels at once? should fix this
+nlist_test: nlist_test.o nlist.o device.o new_kcall.o utilities.o gtest_main.a
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ $+ $(LDFLAGS) $(EXTRA_LDFLAGS)  
 
 
-# Target rules
-all: build test
-
+# Real rules
 test: $(TESTS)
-
 
 build: fmr
 
@@ -221,11 +229,11 @@ nlist.o: nlist.cu nlist.h
 	$(NVCC) $(NVCCFLAGS) $(EXTRA_NVCCFLAGS) $(GENCODE_FLAGS) $(INCLUDES) -o $@ -c $<
 
 #links all the device code together, allowing shared memory space
-total.o: nlist.o new_kcall.o utilities.o
+device.o: nlist.o new_kcall.o utilities.o
 	$(NVCC) $(NVCCFLAGS) $(GENCODE_FLAGS) $(INCLUDES) -dlink $+ -o $@ 
 
 #link the host code
-fmr: particles.o particleSystem.o connectedgraphs.o sfc_pack.o render_particles.o shaders.o total.o nlist.o utilities.o new_kcall.o
+fmr: particles.o particleSystem.o connectedgraphs.o sfc_pack.o render_particles.o shaders.o device.o nlist.o utilities.o new_kcall.o
 	$(GCC) $(CCFLAGS) $(EXTRA_CCFLAGS) -o $@ $+ $(LDFLAGS) $(EXTRA_LDFLAGS)
 
 run: build

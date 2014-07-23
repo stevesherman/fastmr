@@ -5,4 +5,5 @@ fmr
 .cproject
 .project
 .settings/*
-cgraphs_unittest
+cgraphs_test
+nlist_test
