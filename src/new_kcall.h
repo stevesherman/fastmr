@@ -1,3 +1,4 @@
+#include "new_kern.h"
 
 extern "C" {
 
