@@ -7,7 +7,7 @@ class NListDistCond {
 public:
 
 	__host__ __device__ virtual bool operator()(const float rad1, const float rad2, 
-			const float3 er, const float distsq) const {
+			const float3, const float distsq) const {
 		float sepdist = rad1 + rad2;
 		//return false;
 		return distsq < 4.0*4.0*sepdist*sepdist;
@@ -63,13 +63,13 @@ class MomVar {
 public:
 	MomVar(float d, float n) : max_distsq(d), nm_dist(n) {}
 	__host__ __device__ bool operator()(const float rad1, const float rad2,
-			const float3 er, const float distsq, const float Cp1, const float Cp2) const
+			const float3, const float distsq, const float Cp1, const float Cp2) const
 	{
 		float sepdist = rad1 + rad2;
 		float dcon = max_distsq;
 		if (Cp1 == 0 || Cp2 == 0) 
 			dcon = nm_dist;
-		return (sepdist < dcon*sepdist*sepdist);
+		return (distsq < dcon*sepdist*sepdist);
 	}
 	const float max_distsq;
 	const float nm_dist;
@@ -81,7 +81,7 @@ public:
 			lilrad(max_dist*(1.0f - big_pct)), nm_dist(n) {}
 	
 	__host__ __device__ bool operator()(const float rad1, const float rad2,
-			const float3 er, const float distsq, const float Cp1, const float Cp2) const
+			const float3, const float distsq, const float Cp1, const float Cp2) const
 	{
 		float sepdist;
 		if(rad1 > rad2){
