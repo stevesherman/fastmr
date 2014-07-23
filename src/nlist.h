@@ -16,7 +16,7 @@ public:
 
 class VarCond: public NListDistCond{
 public:
-	VarCond(float v) : max_distsq(v) {}
+	VarCond(float max_dist) : max_distsq(max_dist*max_dist) {}
 	__host__ __device__ bool operator()(const float rad1, const float rad2,
 			const float3, const float distsq) const {
 		float sepdist = rad1 + rad2;
@@ -28,7 +28,8 @@ public:
 
 class VertCond: public NListDistCond{
 public:
-	VertCond(float d, float c) : max_distsq(d), max_costh(c) {}
+	VertCond(float max_dist, float c) :
+		max_distsq(max_dist*max_dist), max_costh(c) {}
    
 	__host__ __device__ bool operator()(const float rad1, const float rad2, 
 			const float3 er, const float distsq) const
@@ -42,7 +43,8 @@ public:
 
 class OutOfPlane: public NListDistCond{
 public:
-	OutOfPlane(float d, float v, float h) : max_distsq(d), cos_vert(v), tan_horiz(h) {}
+	OutOfPlane(float max_dist, float v, float h) :
+		max_distsq(max_dist*max_dist), cos_vert(v), tan_horiz(h) {}
 
 	__host__ __device__ bool operator()(const float rad1, const float rad2,
 			const float3 er, const float distsq) const 

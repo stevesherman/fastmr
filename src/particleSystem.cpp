@@ -256,17 +256,17 @@ void ParticleSystem::render(RenderMode mode)
 				rand_scale, clipPlane,newp.N);
 	}
 	if(mode == GLOBAL){
-		VarCond test = VarCond(m_contact_dist*m_contact_dist);
+		VarCond test = VarCond(m_contact_dist);
 		graph_render(test, dRendPos, dRendColor);
 	}
 	if(mode == VERTICAL){
-		VertCond test = VertCond(m_contact_dist*m_contact_dist, m_cos_vert);
+		VertCond test = VertCond(m_contact_dist, m_cos_vert);
 		graph_render(test, dRendPos, dRendColor);
 	}
 	if(mode == HORIZONTAL){
 		float outdist = 1.25f*(m_contact_dist - 1.0f) + 1.0f;
 		//less than cos(39.2) off the vertical, and w/in tan(45 deg) of the outofplane direction
-		OutOfPlane test = OutOfPlane(outdist*outdist,m_cos_vert, m_tan_horz);
+		OutOfPlane test = OutOfPlane(outdist,m_cos_vert, m_tan_horz);
 		graph_render(test, dRendPos, dRendColor);
 	}
 
@@ -477,7 +477,7 @@ void ParticleSystem::getGraphData(uint& graphs, uint& edges, uint& vert_edges,
 		uint& vert_graph, uint& horz_edges, uint& horz_graph)
 {
 	
-	VarCond contact_op = VarCond(m_contact_dist*m_contact_dist);
+	VarCond contact_op = VarCond(m_contact_dist);
 	//no reordering, assume m_contact_dist << m_interaction_dist, so it should always be fine
 	uint maxn=funcNList(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
 			m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, contact_op);
@@ -488,7 +488,7 @@ void ParticleSystem::getGraphData(uint& graphs, uint& edges, uint& vert_edges,
 	graphs = adjConGraphs(m_hNeighList, m_hNumNeigh, newp.N);
 	delete [] m_hNeighList;
 
-	VertCond test = VertCond(m_contact_dist*m_contact_dist, m_cos_vert);
+	VertCond test = VertCond(m_contact_dist, m_cos_vert);
 	maxn = funcNList(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
 			m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, test);
 	vert_edges = numInteractions(m_dNumNeigh, newp.N)/2;
@@ -499,7 +499,7 @@ void ParticleSystem::getGraphData(uint& graphs, uint& edges, uint& vert_edges,
 	delete [] m_hNeighList;
 
 	float outdist = 1.25f*(m_contact_dist - 1.0f) + 1.0f;
-	OutOfPlane horz_op = OutOfPlane(outdist*outdist, m_cos_vert, m_tan_horz);
+	OutOfPlane horz_op = OutOfPlane(outdist, m_cos_vert, m_tan_horz);
 	maxn = funcNList(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash, 
 			m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, horz_op);
 	horz_edges = numInteractions(m_dNumNeigh, newp.N)/2;
