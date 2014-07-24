@@ -3,20 +3,10 @@
 #define NLIST_H
 
 
-class NListDistCond {
+class VarCond{
 public:
-
-	__host__ __device__ virtual bool operator()(const float rad1, const float rad2, 
-			const float3, const float distsq) const {
-		float sepdist = rad1 + rad2;
-		//return false;
-		return distsq < 4.0*4.0*sepdist*sepdist;
-	}
-};
-
-class VarCond: public NListDistCond{
-public:
-	VarCond(float max_dist) : max_distsq(max_dist*max_dist) {}
+	//set default distance to 1.0 for testing purposes
+	VarCond(float max_dist = 1.0f) : max_distsq(max_dist*max_dist) {}
 	__host__ __device__ bool operator()(const float rad1, const float rad2,
 			const float3, const float distsq) const {
 		float sepdist = rad1 + rad2;
@@ -26,9 +16,10 @@ public:
 	const float max_distsq;
 };
 
-class VertCond: public NListDistCond{
+class VertCond{
 public:
-	VertCond(float max_dist, float c) :
+	//the psystem defaults, cos(sqrt(3/5)) is 39.2 deg
+	VertCond(float max_dist = 1.0f, float c = sqrt(3.0/5.0)) :
 		max_distsq(max_dist*max_dist), max_costh(c) {}
    
 	__host__ __device__ bool operator()(const float rad1, const float rad2, 
@@ -41,9 +32,10 @@ public:
 	const float max_costh;
 };	
 
-class OutOfPlane: public NListDistCond{
+class OutOfPlane{
 public:
-	OutOfPlane(float max_dist, float v, float h) :
+	//psystem defaults, h=1.0 corresponds to 45 degrees
+	OutOfPlane(float max_dist=1.0f, float v=sqrt(3.0/5.0), float h=1.0) :
 		max_distsq(max_dist*max_dist), cos_vert(v), tan_horiz(h) {}
 
 	__host__ __device__ bool operator()(const float rad1, const float rad2,
