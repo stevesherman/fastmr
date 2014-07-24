@@ -32,6 +32,11 @@ public:
 	}
 
 	void setDevParams() { setNParameters(&hp); }
+	template <class Op>
+	uint callNList(Op o) {
+		return funcNList(dNList, dNumNeigh,(float*) dpos, phash,
+				cellStart,cellEnd,cellAdj, hp.N, nListSize, o);
+	}
 
 };
 
@@ -74,36 +79,16 @@ public:
 	}
 };
 
-
-TEST_F(TwoPTest, VarCondBasic) {
-	float4 fakepos[2] = {make_float4(0,0,0,1), make_float4(2,0,0,1)};
-	ASSERT_TRUE(setDPos(fakepos));
-
-	//sepdist is 2, distance is 2
-	uint maxn = funcNList(dNList, dNumNeigh,(float*) dpos, phash,
-			cellStart,cellEnd,cellAdj, hp.N, nListSize, VarCond(1.01));
-	ASSERT_EQ(maxn,1);
-
-	maxn = funcNList(dNList, dNumNeigh,(float*) dpos, phash,
-			cellStart,cellEnd,cellAdj, hp.N, nListSize, VarCond(0.99));
-	ASSERT_EQ(maxn,0);
-}
-
 TEST_F(TwoPTest, VarCondFar) {
 	float4 fakepos[2] = {make_float4(0,0,0,1), make_float4(4,0,0,1)};
 	ASSERT_TRUE(setDPos(fakepos));
 
 	//var cond identifies points with dist < param*(a1+a2);
 	//sepdist is 2, distance is 4
-	EXPECT_EQ(0, funcNList(dNList, dNumNeigh,(float*) dpos, phash,
-			cellStart,cellEnd,cellAdj, hp.N, nListSize, VarCond(1.01)));
-
+	EXPECT_EQ(0, callNList(VarCond(1.01)));
 	//exactly equal, so NOT neighbors
-	EXPECT_EQ(0, funcNList(dNList, dNumNeigh,(float*) dpos, phash,
-			cellStart,cellEnd,cellAdj, hp.N, nListSize, VarCond(2.0)));
-
-	EXPECT_EQ(1, funcNList(dNList, dNumNeigh,(float*) dpos, phash,
-			cellStart,cellEnd,cellAdj, hp.N, nListSize, VarCond(2.01)));
+	EXPECT_EQ(0, callNList( VarCond(2.0)));
+	EXPECT_EQ(1, callNList( VarCond(2.01)));
 }
 
 TEST_P(TwoPTest, VarCondRadius) {
@@ -111,33 +96,47 @@ TEST_P(TwoPTest, VarCondRadius) {
 			make_float4(1.0f+GetParam(),0,0,GetParam() )};
 	ASSERT_TRUE(setDPos(fakepos));
 
-	EXPECT_EQ(0,funcNList(dNList, dNumNeigh,(float*) dpos, phash,
-			cellStart,cellEnd,cellAdj, hp.N, nListSize, VarCond(0.99f)));
-
+	EXPECT_EQ(0,callNList( VarCond(1.0f - 1e-5f)));
 	//exactly equal, so NOT neighbors but to floating prec?
-	EXPECT_EQ(0, funcNList(dNList, dNumNeigh,(float*) dpos, phash,
-			cellStart,cellEnd,cellAdj, hp.N, nListSize, VarCond(1.0f)));
-
-	EXPECT_EQ(1, funcNList(dNList, dNumNeigh,(float*) dpos, phash,
-			cellStart,cellEnd,cellAdj, hp.N, nListSize, VarCond(1.1f)));
+	EXPECT_EQ(0, callNList( VarCond(1.0f)));
+	EXPECT_EQ(1, callNList( VarCond(1.0f + 1e-5f)));
 
 	float4 fp2[2] = {make_float4(1.0f+GetParam(),0,0,GetParam() ),
 			make_float4(0,0,0,1.0)};
 	ASSERT_TRUE(setDPos(fp2));
 
-	EXPECT_EQ(0,funcNList(dNList, dNumNeigh,(float*) dpos, phash,
-			cellStart,cellEnd,cellAdj, hp.N, nListSize, VarCond(0.99f)));
-
+	EXPECT_EQ(0,callNList( VarCond(1.0f - 1e-5f)));
 	//exactly equal, so NOT neighbors but to floating prec?
-	EXPECT_EQ(0, funcNList(dNList, dNumNeigh,(float*) dpos, phash,
-			cellStart,cellEnd,cellAdj, hp.N, nListSize, VarCond(1.0f)));
-
-	EXPECT_EQ(1, funcNList(dNList, dNumNeigh,(float*) dpos, phash,
-			cellStart,cellEnd,cellAdj, hp.N, nListSize, VarCond(1.1f)));
+	EXPECT_EQ(0, callNList( VarCond(1.0f)));
+	EXPECT_EQ(1, callNList( VarCond(1.0f + 1e-5f)));
 }
 
 INSTANTIATE_TEST_CASE_P(NearOne, TwoPTest, ::testing::Range(0.2f,5.0f,0.1f));
 
-TEST_F(TwoPTest, VarCondDiffRadius) {
+TEST_F(TwoPTest, PeriodicBC) {
+
+	//hp.L = make_float3(20.0f,20.0f,20.0f); hp.Linv = 1/hp.L;
+	//setDevParams();
+
+	float4 fp[2] = {make_float4(0,0,0,1.0),
+	make_float4(hp.L.x - 2.0,0,0, 1.0 )};
+	ASSERT_TRUE(setDPos(fp));
+
+	EXPECT_EQ(0, callNList( VarCond(1.0f)));
+	EXPECT_EQ(1, callNList( VarCond(1.0f+1e-5f)));
+
+	float4 fp2[2] = {make_float4(0,0,0,1.0),
+			make_float4(0,hp.L.y - 2.0,0, 1.0 )};
+	ASSERT_TRUE(setDPos(fp2));
+	//test that it is NOT vertically periodic
+	EXPECT_EQ(0, callNList( VarCond(1.0f)));
+	EXPECT_EQ(0, callNList( VarCond(1.0f+1e-5f)));
+
+	float4 fp3[2] = {make_float4(0,0,0,1.0),
+			make_float4(0,0,hp.L.z - 2.0,1.0 )};
+	ASSERT_TRUE(setDPos(fp3));
+	//test that it is horiz periodic
+	EXPECT_EQ(0, callNList( VarCond(1.0f)));
+	EXPECT_EQ(1, callNList( VarCond(1.0f+1e-5f)));
 
 }
