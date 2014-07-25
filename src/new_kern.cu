@@ -98,6 +98,23 @@ __global__ void reorderK(const uint* dSortedIndex, float4* sortedPos, float4* so
 	sortedMom[idx] = oldMom[sortedIdx];
 }
 
+__device__ inline void applyBC(uint idx, float deltaTime, float radius1,
+		float3 p1, float3 force, const float4* integrPos, float4* newPos)
+{
+	float Cd = 6.0f*PI_F*radius1*nparams.visc;
+	float ybot = p1.y - nparams.origin.y;
+	force.x += nparams.shear*ybot*Cd;
+
+	//apply flow BCs
+	if(ybot <= nparams.pin_d*radius1)
+		force = make_float3(0,0,0);
+	if(ybot >= nparams.L.y - nparams.pin_d*radius1)
+		force = make_float3(nparams.shear*nparams.L.y*Cd,0,0);
+
+	float3 ipos = make_float3(integrPos[idx]);
+	newPos[idx] = make_float4(ipos + force/Cd*deltaTime, radius1);
+}
+
 
 __global__ void magForcesK( const float4* dSortedPos,	//i: pos we use to calculate forces
 							const float4* dMom,		//i: the moment
@@ -165,18 +182,7 @@ __global__ void magForcesK( const float4* dSortedPos,	//i: pos we use to calcula
 			
 	}
 	dForce[idx] = make_float4(force,0.0f);
-	float Cd = 6.0f*PI_F*radius1*nparams.visc;
-	float ybot = p1.y - nparams.origin.y;
-	force.x += nparams.shear*ybot*Cd;
-	
-	//apply flow BCs
-	if(ybot <= nparams.pin_d*radius1)
-		force = make_float3(0,0,0);
-	if(ybot >= nparams.L.y - nparams.pin_d*radius1)
-		force = make_float3(nparams.shear*nparams.L.y*Cd,0,0);
-
-	float3 ipos = make_float3(integrPos[idx]);
-	newPos[idx] = make_float4(ipos + force/Cd*deltaTime, radius1);
+	applyBC(idx, deltaTime, radius1, p1, force, integrPos, newPos);
 
 }
 
@@ -247,21 +253,9 @@ __global__ void finiteDipK( const float4* dSortedPos,	//i: pos we use to calcula
 
 	//convert back to real units
 	force *= F0;
-
 	dForce[idx] = make_float4(force,0.0f);
-	float Cd = 6.0f*PI_F*radius1*nparams.visc;
-	float ybot = p1.y - nparams.origin.y;
-	force.x += nparams.shear*ybot*Cd;
 
-	//apply flow BCs
-	if(ybot <= nparams.pin_d*radius1)
-		force = make_float3(0,0,0);
-	if(ybot >= nparams.L.y - nparams.pin_d*radius1)
-		force = make_float3(nparams.shear*nparams.L.y*Cd,0,0);
-
-	float3 ipos = make_float3(integrPos[idx]);
-	newPos[idx] = make_float4(ipos + force/Cd*deltaTime, radius1);
-
+	applyBC(idx, deltaTime, radius1, p1, force, integrPos, newPos);
 }
 
 
