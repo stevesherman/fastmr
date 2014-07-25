@@ -116,6 +116,67 @@ __device__ inline void applyBC(uint idx, float deltaTime, float radius1,
 }
 
 
+//assume aligned point dipoles
+__global__ void pointDipK( const float4* dSortedPos,	//i: pos we use to calculate forces
+							const float4* integrPos,	//i: pos we use as base to integrate from
+							const uint* nlist,		//i: the neighbor list
+							const uint* num_neigh,	//i: the number of inputs
+							float4* dForce,		//o: the magnetic force on a particle
+							float4* newPos,		//o: the integrated position
+							const float Magn,
+							float deltaTime)	//o: the timestep
+{
+	uint idx = blockDim.x*blockIdx.x + threadIdx.x;
+	if(idx >= nparams.N)
+		return;
+	uint n_neigh = num_neigh[idx];
+	float4 pos1 = dSortedPos[idx];
+	//float4 pos1 = tex1Dfetch(pos_tex,idx);
+	float3 p1 = make_float3(pos1);
+	float radius1 = pos1.w;
+
+	float3 force = make_float3(0,0,0);
+
+	for(uint i = 0; i < n_neigh; i++)
+	{
+		uint neighbor = nlist[i*nparams.N + idx];
+
+		float4 pos2 = tex1Dfetch(pos_tex, neighbor);
+		float3 p2 = make_float3(pos2);
+		float radius2 = pos2.w;
+		float sepdist = radius1 + radius2;
+
+		float3 er = p1 - p2;//start it out as dr, then modify to get er
+		er.x = er.x - nparams.L.x*rintf(er.x*nparams.Linv.x);
+		er.z = er.z - nparams.L.x*rintf(er.z*nparams.Linv.z);
+		float lsq = er.x*er.x + er.y*er.y + er.z*er.z;
+		float inv_dist = rsqrtf(lsq);
+		er = er*inv_dist;
+
+		if(lsq <= nparams.forcedist_sq*sepdist*sepdist) {
+
+			float3 f_ij = er*(1 - 5*er.y*er.y);
+			f_ij.y += 2*er.y;
+			f_ij *= inv_dist*inv_dist*inv_dist*inv_dist;
+
+			float inv_sep = 1/sepdist;
+			f_ij += 2.0f*(inv_sep*inv_sep*inv_sep*inv_sep)*
+					expf(-nparams.spring*(sqrtf(lsq)*inv_sep - 1))*er;
+			//multiply by the "volume" of rad2
+			f_ij *= (radius2*radius2*radius2);
+
+			force += f_ij;
+		}
+	}
+
+	//convert force into physical units
+	force *= 4.0/3.0*PI_F*MU_0*(radius1*radius1*radius1)*(Magn*Magn);
+	dForce[idx] = make_float4(force,0.0f);
+	applyBC(idx, deltaTime, radius1, p1, force, integrPos, newPos);
+}
+
+
+
 __global__ void magForcesK( const float4* dSortedPos,	//i: pos we use to calculate forces
 							const float4* dMom,		//i: the moment
 							const float4* integrPos,	//i: pos we use as base to integrate from

@@ -93,7 +93,7 @@ void finiteDip(const float* dSortedPos, const float* dIntPos, float* newPos, flo
 	assert(newPos != dSortedPos);
 	uint numThreads = 128;
 	uint numBlocks = iDivUp(numParticles, numThreads);
-	cudaFuncSetCacheConfig(magForcesK, cudaFuncCachePreferL1);
+	cudaFuncSetCacheConfig(finiteDipK, cudaFuncCachePreferL1);
 
 	cudaBindTexture(0, pos_tex, dSortedPos, numParticles*sizeof(float4));
 
@@ -106,6 +106,26 @@ void finiteDip(const float* dSortedPos, const float* dIntPos, float* newPos, flo
 	getLastCudaError("Finite Magforces error");
 }
 
+void pointDip(const float* dSortedPos, const float* dIntPos, float* newPos, float* dForce,
+		const uint* nlist, const uint* num_neigh, uint numParticles,
+		float magn, float deltaTime)
+{
+	assert(newPos != dIntPos);
+	assert(newPos != dSortedPos);
+	uint numThreads = 128;
+	uint numBlocks = iDivUp(numParticles, numThreads);
+	cudaFuncSetCacheConfig(pointDipK, cudaFuncCachePreferL1);
+
+	cudaBindTexture(0, pos_tex, dSortedPos, numParticles*sizeof(float4));
+
+	pointDipK<<<numBlocks,numThreads>>>( (float4*)dSortedPos, (float4*) dIntPos,
+			nlist, num_neigh, (float4*) dForce, (float4*) newPos,
+			magn,deltaTime);
+
+	cudaUnbindTexture(pos_tex);
+
+	getLastCudaError("Finite Magforces error");
+}
 
 void magFricForces(const float* dSortedPos, const float* dIntPos, float* newPos, 
 		float* dForceOut, float* dMom, const float* dForceIn, const uint* nlist, 
