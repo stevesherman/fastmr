@@ -188,7 +188,7 @@ connectedgraphs_test.o: connectedgraphs_test.cpp connectedgraphs.h $(GTEST_HEADE
 cgraphs_test: connectedgraphs.o connectedgraphs_test.o gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $^ -o $@
 
-nlist_test.o: nlist_test.cpp nlist.o $(GTEST_HEADERS)
+nlist_test.o: nlist_test.cpp test_system.h nlist.o $(GTEST_HEADERS)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(INCLUDES) $(LD_FLAGS) -c $< -o $@
 
 #have to link all the cuda kernels at once? should fix this

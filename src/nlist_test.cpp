@@ -8,49 +8,8 @@
 #include "new_kern.h"
 #include "utilities.h"
 #include <cuda_runtime.h>
+#include "test_system.h"
 
-
-class BasicPsystem {
-
-public:
-	NewParams hp;
-
-	uint *dNList;
-	uint nListSize;
-	uint *dNumNeigh;
-	float4* dpos;
-	uint* phash;
-
-	uint* cellStart;
-	uint* cellEnd;
-	uint* cellAdj;
-
-	bool setDPos(float4* in_pos) {
-		return cudaMemcpy(dpos, in_pos, sizeof(float4)*hp.N, cudaMemcpyHostToDevice) == cudaSuccess;
-	}
-
-	bool allocNList(uint sz) {
-		nListSize = sz;
-		bool flag = cudaMalloc(&dNList, hp.N*nListSize*sizeof(uint)) == cudaSuccess;
-		cudaMemset(&dNList, 0, nListSize*hp.N*sizeof(uint));
-		return flag;
-	}
-
-	void setDevParams() { setNParameters(&hp); }
-
-	template <class Op>
-	uint callNList(Op o) {
-		return funcNList(dNList, dNumNeigh,(float*) dpos, phash,
-				cellStart,cellEnd,cellAdj, hp.N, nListSize, o);
-	}
-
-	bool validateNListLength(std::vector<uint> ref) {
-		std::vector<uint> hNumNeigh(hp.N);
-		cudaMemcpy(hNumNeigh.data(), dNumNeigh, sizeof(uint)*hp.N, cudaMemcpyDeviceToHost);
-		return ref == hNumNeigh;
-	}
-
-};
 
 class TwoPTest : public BasicPsystem, public ::testing::TestWithParam<float> {
 public:
