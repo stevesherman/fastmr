@@ -129,7 +129,7 @@ void pointDip(const float* dSortedPos, const float* dIntPos, float* newPos, floa
 
 void magFricForces(const float* dSortedPos, const float* dIntPos, float* newPos, 
 		float* dForceOut, float* dMom, const float* dForceIn, const uint* nlist, 
-		const uint* num_neigh, uint numParticles, float deltaTime)
+		const uint* num_neigh, uint numParticles, float static_fric,float deltaTime)
 {
 	assert(newPos != dIntPos);
 	assert(newPos != dSortedPos);
@@ -142,7 +142,7 @@ void magFricForces(const float* dSortedPos, const float* dIntPos, float* newPos,
 
 	magFricForcesK<<<numBlocks,numThreads>>>((float4*)dSortedPos, (float4*) dMom, 
 			(float4*) dForceIn, (float4*) dIntPos, nlist, num_neigh, 
-			(float4*) dForceOut, (float4*) newPos, deltaTime);
+			(float4*) dForceOut,(float4*) newPos,static_fric,deltaTime);
 	
 	cudaUnbindTexture(pos_tex);
 	cudaUnbindTexture(mom_tex);

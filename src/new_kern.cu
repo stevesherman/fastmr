@@ -367,7 +367,8 @@ __global__ void magFricForcesK( const float4* dSortedPos,	//i: pos we use to cal
 							const uint* num_neigh,	//i: the number of inputs
 							float4* dForceOut,		//o: the magnetic force on a particle
 							float4* newPos,		//o: the integrated position
-							float deltaTime)	//o: the timestep
+							float static_fric,	//maximum static friction
+							float deltaTime)	//i: the timestep
 {
 	uint idx = blockDim.x*blockIdx.x + threadIdx.x;
 	if(idx >= nparams.N)
@@ -425,8 +426,9 @@ __global__ void magFricForcesK( const float4* dSortedPos,	//i: pos we use to cal
 			dm1m2 = dot(m1,m2);
 			
 			float sepdist = radius1 + radius2;
-			force += 3.0f*MU_0*MU_C*dm1m2/(2.0f*PI_F*sepdist*sepdist*sepdist*sepdist)*
-					expf(-nparams.spring*(sqrtf(lsq)/sepdist - 1.0f))*er;
+			float normalforce = 3.0f*MU_0*MU_C*dm1m2/(2.0f*PI_F*sepdist*sepdist*sepdist*sepdist)*
+					expf(-nparams.spring*(sqrtf(lsq)/sepdist - 1.0f));
+			force += normalforce*er;
 			if(lsq <= sepdist*sepdist){
 				float3 v1 = f1/Cd1 + nparams.shear*p1.y;
 				v1 = (p1.y >= nparams.L.y - nparams.pin_d*radius1) ? 
@@ -435,14 +437,20 @@ __global__ void magFricForcesK( const float4* dSortedPos,	//i: pos we use to cal
 				v2 = (p2.y >= nparams.L.y - nparams.pin_d*radius2) ? 
 						make_float3(nparams.shear*nparams.L.y,0.0f,0.0f) : v2;
 				float3 relvel = v1 - v2;
-				//float3 tanvel = relvel - dot(er,relvel)*er;
-				force -= relvel*nparams.tanfric;
+				float3 tanvel = relvel - dot(er,relvel)*er;
+				float tanv_sq = tanvel.x*tanvel.x + tanvel.y*tanvel.y + tanvel.z*tanvel.z;
+				if(tanv_sq*nparams.tanfric*nparams.tanfric < normalforce*normalforce) {
+					force -= tanvel*nparams.tanfric;
+				} else {
+					tanvel = tanvel*rsqrtf(tanv_sq); //make it a unit vector;
+					force -= tanvel*static_fric*normalforce;
+				}
 			}
 		}
 			
 	}
 	dForceOut[idx] = make_float4(force,0.0f);
-		float ybot = p1.y - nparams.origin.y;
+	float ybot = p1.y - nparams.origin.y;
 	force.x += nparams.shear*ybot*Cd1;
 	
 	//apply flow BCs

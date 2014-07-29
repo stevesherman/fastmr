@@ -25,8 +25,8 @@ void finiteDip(const float* dSortedPos, const float* dIntPos, float* newPos, flo
 		float dipole_d, float F0, float sigma_0, float deltaTime);
 
 void magFricForces(const float* dSortedPos, const float* dIntPos, float* newPos, 
-		float* dForceOut, const float* dMom, const float* dForceIn,
-		const uint* nlist, const uint* num_neigh, uint numParticles, float deltaTime);
+		float* dForceOut, const float* dMom, const float* dForceIn,const uint* nlist,
+		const uint* num_neigh, uint numParticles, float static_fric, float deltaTime);
 
 void collision_new(	const float* dSortedPos, const float* dOldVel, 
 		const uint* nlist, const uint* num_neigh, float* dNewVel, 
