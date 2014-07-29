@@ -159,9 +159,9 @@ __global__ void pointDipK( const float4* dSortedPos,	//i: pos we use to calculat
 			f_ij.y += 2*er.y;
 			f_ij *= inv_dist*inv_dist*inv_dist*inv_dist;
 
-			float inv_sep = 1/sepdist;
+			float inv_sep = 1.0f/sepdist;
 			f_ij += 2.0f*(inv_sep*inv_sep*inv_sep*inv_sep)*
-					expf(-nparams.spring*(sqrtf(lsq)*inv_sep - 1))*er;
+					expf(-nparams.spring*((1.0f/inv_dist)*inv_sep - 1))*er;
 			//multiply by the "volume" of rad2
 			f_ij *= (radius2*radius2*radius2);
 
