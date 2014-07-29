@@ -5,7 +5,8 @@
 
 typedef unsigned int uint;
 
-struct NewParams {
+class NewParams {
+public:
 	uint N;
 	
 	uint3 gridSize;
