@@ -45,6 +45,8 @@ void graphLabeler(const uint* nlist,const uint* num_neigh, uint numParticles,
 				for(uint j=0; j < num_neigh[curr];j++){
 					S.push(nlist[numParticles*j + curr]);
 				}
+			} else {
+				assert(visited[curr] == numGraphs  && "Failure, directed graph");
 			}
 		}
 		if(chainl > 0){
