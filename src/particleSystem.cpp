@@ -63,7 +63,7 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize,
 	newp.extH = m_params.externalH;
 	newp.Cpol = m_params.Cpol;
 	newp.pin_d = 0.995f;  //ybot < radius*pin_d
-	newp.tanfric = 1e-5f;
+	newp.tanfric = .8;
 	m_contact_dist = 1.05f;	
 	m_cos_vert = sqrtf(3.0/5.0);
 	m_tan_horz = 1.0;
@@ -145,6 +145,7 @@ ParticleSystem::_initialize()
 	cudaMalloc((void**)&m_dForces4, memSize);
 
     cudaMalloc((void**)&m_dSortedPos, memSize);
+    cudaMalloc((void**)&m_dSortedForce, memSize);
 	cudaMalloc((void**)&m_dPos1, memSize);
 	cudaMalloc((void**)&m_dPos2, memSize);
 	cudaMalloc((void**)&m_dPos3, memSize);
@@ -217,6 +218,7 @@ ParticleSystem::_finalize()
 	cudaFree(m_dForces4);
 	
 	cudaFree(m_dSortedPos);
+	cudaFree(m_dSortedForce);
 	cudaFree(m_dPos1);
 	cudaFree(m_dPos2);
 	cudaFree(m_dPos3);
@@ -338,29 +340,29 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
 		float dx_moved = 0.0f;
 		while(solve) {
 		
-			
-			magForces(	m_dSortedPos,	//yin: yn 
+			float static_fric = 0.5;
+			magFricForces(	m_dSortedPos,	//yin: yn
 						m_dSortedPos,	//yn
 						m_dPos1,   	//yn + 1/2*k1
 						m_dForces1,   	//k1
-						m_dMoments, m_dNeighList, m_dNumNeigh, newp.N, deltaTime/2);
-			magForces(	m_dPos1, 		//yin: yn + 1/2*k1
+						m_dMoments, m_dSortedForce,  m_dNeighList, m_dNumNeigh, newp.N, static_fric, deltaTime/2);
+			magFricForces(	m_dPos1, 		//yin: yn + 1/2*k1
 						m_dSortedPos, 	//yn
 						m_dPos2, 		//yn + 1/2*k2
 						m_dForces2,		//k2
-						m_dMoments, m_dNeighList, m_dNumNeigh, newp.N, deltaTime/2);
-			magForces(	m_dPos2, 		//yin: yn + 1/2*k2
+						m_dMoments, m_dForces1,  m_dNeighList, m_dNumNeigh, newp.N, static_fric, deltaTime/2);
+			magFricForces(	m_dPos2, 		//yin: yn + 1/2*k2
 						m_dSortedPos, 	//yn
 						m_dPos3, 		//yn + k3
 						m_dForces3,		//k3
-						m_dMoments, m_dNeighList, m_dNumNeigh, newp.N, deltaTime);
-			magForces(	m_dPos3, 		//yin: yn + k3
+						m_dMoments, m_dForces2,  m_dNeighList, m_dNumNeigh, newp.N, static_fric, deltaTime);
+			magFricForces(	m_dPos3, 		//yin: yn + k3
 						m_dSortedPos, 	//yn
 						m_dPos4, 		// doesn't matter
 						m_dForces4,		//k4
-						m_dMoments, m_dNeighList, m_dNumNeigh, newp.N, deltaTime);
+						m_dMoments, m_dForces3,  m_dNeighList, m_dNumNeigh, newp.N, static_fric, deltaTime);
 		
-			integrateRK4(m_dSortedPos, m_dPos1, m_dPos2, m_dPos3, m_dPos4, m_dForces1, 
+			integrateRK4(m_dSortedPos, m_dPos1, m_dPos2, m_dPos3, m_dPos4, m_dSortedForce, m_dForces1,
 					m_dForces2, m_dForces3, m_dForces4, deltaTime, newp.N);
 
 			solve = false;	
@@ -425,8 +427,9 @@ void ParticleSystem::sort_and_reorder() {
 	// find start and end of each cell - also sets the fixed moment
 	find_cellStart(m_dCellStart, m_dCellEnd, m_dGridParticleHash, newp.N, m_numGridCells);
 	//reorder
-	reorder(m_dGridParticleIndex, m_dSortedPos, m_dTemp, m_dPos1, m_dMoments, newp.N);	
+	reorder(m_dGridParticleIndex, m_dSortedPos, m_dTemp, m_dForces1, m_dPos1, m_dMoments, m_dSortedForce, newp.N);
 	pswap(m_dMoments, m_dTemp);
+	pswap(m_dSortedForce, m_dForces1);
 	//printf("it since sort: %d\n", it_since_sort);	
 	it_since_sort = 0;
 }
@@ -864,7 +867,10 @@ void ParticleSystem::zeroDevice()
 {
 	cudaMemset(m_dForces1, 0, 4*newp.N*sizeof(float));
 	cudaMemset(m_dForces2, 0, 4*newp.N*sizeof(float));
+	cudaMemset(m_dForces3, 0, 4*newp.N*sizeof(float));
+	cudaMemset(m_dForces4, 0, 4*newp.N*sizeof(float));
 	cudaMemset(m_dSortedPos, 0, 4*newp.N*sizeof(float));
+	cudaMemset(m_dSortedForce, 0, 4*newp.N*sizeof(float));
 	cudaMemset(m_dPos4, 0, 4*newp.N*sizeof(float));
 	cudaMemset(m_dPos3, 0, 4*newp.N*sizeof(float));
 	cudaMemset(m_dPos2, 0, 4*newp.N*sizeof(float));

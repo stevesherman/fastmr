@@ -87,7 +87,7 @@ __global__ void findCellStartK(uint* cellStart,		//o: cell starts
 
 
 __global__ void reorderK(const uint* dSortedIndex, float4* sortedPos, float4* sortedMom, 
-		const float4* oldPos, const float4* oldMom)
+		float4* sortedForce, const float4* oldPos, const float4* oldMom, const float4* oldForce)
 {
 	uint idx = blockIdx.x*blockDim.x + threadIdx.x;
 	if(idx >= nparams.N)
@@ -96,6 +96,7 @@ __global__ void reorderK(const uint* dSortedIndex, float4* sortedPos, float4* so
 	uint sortedIdx = dSortedIndex[idx];
 	sortedPos[idx] = oldPos[sortedIdx];
 	sortedMom[idx] = oldMom[sortedIdx];
+	sortedForce[idx] = oldForce[idx];
 }
 
 __device__ inline void applyBC(uint idx, float deltaTime, float radius1,
@@ -426,26 +427,22 @@ __global__ void magFricForcesK( const float4* dSortedPos,	//i: pos we use to cal
 			dm1m2 = dot(m1,m2);
 			
 			float sepdist = radius1 + radius2;
-			float normalforce = 3.0f*MU_0*MU_C*dm1m2/(2.0f*PI_F*sepdist*sepdist*sepdist*sepdist)*
+			float normalforce = 3.0f*MU_0*MU_C*dm1m2/(4.0f*PI_F*sepdist*sepdist*sepdist*sepdist)*
 					expf(-nparams.spring*(sqrtf(lsq)/sepdist - 1.0f));
 			force += normalforce*er;
-			if(lsq <= sepdist*sepdist){
-				float3 v1 = f1/Cd1 + nparams.shear*p1.y;
-				v1 = (p1.y >= nparams.L.y - nparams.pin_d*radius1) ? 
-						make_float3(nparams.shear*nparams.L.y,0.0f,0.0f) : v1;
+		//	if(lsq <= sepdist*sepdist){
+				float3 v1 = f1/Cd1 + nparams.shear*p1.y;;
 				float3 v2 = f2/Cd2 + nparams.shear*p2.y;
-				v2 = (p2.y >= nparams.L.y - nparams.pin_d*radius2) ? 
-						make_float3(nparams.shear*nparams.L.y,0.0f,0.0f) : v2;
+
 				float3 relvel = v1 - v2;
 				float3 tanvel = relvel - dot(er,relvel)*er;
 				float tanv_sq = tanvel.x*tanvel.x + tanvel.y*tanvel.y + tanvel.z*tanvel.z;
-				if(tanv_sq*nparams.tanfric*nparams.tanfric < normalforce*normalforce) {
-					force -= tanvel*nparams.tanfric;
-				} else {
-					tanvel = tanvel*rsqrtf(tanv_sq); //make it a unit vector;
+
+				if(tanv_sq != 0){
+					tanvel = tanvel*rsqrtf(tanv_sq); //make it a unit vector
 					force -= tanvel*static_fric*normalforce;
 				}
-			}
+			//}
 		}
 			
 	}
@@ -516,7 +513,8 @@ __global__ void integrateRK4K(
 							const float4* PosB,
 							const float4* PosC,
 							const float4* PosD,
-							float4* forceA,
+							float4* forceOut,
+							const float4* forceA,
 							const float4* forceB,
 							const float4* forceC,
 							const float4* forceD,
@@ -554,7 +552,7 @@ __global__ void integrateRK4K(
 	float3 force4 = make_float3(forceD[index]);
 
 	float3 fcomp = (force1 + 2*force2 + 2*force3 + force4)/6.0f;//trapezoid rule	
-	forceA[index] = make_float4(fcomp, nothin);//averaged force
+	forceOut[index] = make_float4(fcomp, nothin);//averaged force
 
 
 }

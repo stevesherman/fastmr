@@ -10,8 +10,8 @@ void comp_phash(float* dpos, uint* d_pHash, uint* d_pIndex, uint* d_cell_hash,
 void find_cellStart(uint* cellStart, uint* cellEnd, uint* phash, uint numParticles,
 		uint numCells);
 
-void reorder(uint* sortedIndex, float* sortedPos, float* sortedMom, float* oldPos, 
-		float* oldMom, uint numParticles);
+void reorder(uint* d_pSortedIndex, float* dSortedPos, float* dSortedMom, float* sortedForce,
+		float* oldPos, float* oldMom, float* oldForce, uint numParticles);
 
 uint vertEdge(uint* connections, const uint* nlist, const uint* num_neigh, const float* dPos, 
 		float maxth, float maxdist, uint numParticles);
@@ -40,7 +40,8 @@ void integrateRK4(	const float* oldPos,
 					const float* PosB,
 					const float* PosC,
 					const float* PosD,
-					float* forceA,
+					float* forceOut,
+					const float* forceA,
 					const float* forceB,
 					const float* forceC,
 					const float* forceD,

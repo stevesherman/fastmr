@@ -37,14 +37,15 @@ void find_cellStart(uint* cellStart, uint* cellEnd, uint* phash, uint numParticl
 	findCellStartK<<< numBlocks, numThreads, sMemSize>>>(cellStart, cellEnd, phash);
 }
 
-void reorder(uint* d_pSortedIndex, float* dSortedPos, float* dSortedMom, float* oldPos, 
-		float* oldMom, uint numParticles)
+void reorder(uint* d_pSortedIndex, float* dSortedPos, float* dSortedMom, float4* sortedForce,
+		float* oldPos, float* oldMom, float* oldForce, uint numParticles)
 {
 	uint numThreads = 128;
 	uint numBlocks = iDivUp(numParticles, numThreads);
 
-	reorderK<<<numBlocks, numThreads>>>(d_pSortedIndex, (float4*)dSortedPos, (float4*)dSortedMom, 
-			(float4*)oldPos, (float4*)oldMom);
+	reorderK<<<numBlocks, numThreads>>>(d_pSortedIndex, (float4*)dSortedPos,
+			(float4*)dSortedMom, (float4*) sortedForce, (float4*)oldPos,
+			(float4*)oldMom, (float4*) oldForce);
 }
 
 
@@ -171,7 +172,7 @@ void mutualMagn(const float* pos, const float* oldMag, float* newMag,
 
 
 void integrateRK4(const float* oldPos, float* PosA, const float* PosB,
-		const float* PosC, const float* PosD, float* forceA, 
+		const float* PosC, const float* PosD, float* forceout, const float* forceA,
 		const float* forceB, const float* forceC, const float* forceD, 
 		float deltaTime, uint numParticles)
 {
@@ -183,6 +184,7 @@ void integrateRK4(const float* oldPos, float* PosA, const float* PosB,
 							 (float4*) PosB,
 							 (float4*) PosC,
 							 (float4*) PosD,
+							 (float4*) forceout,
 							(float4*) forceA,
 							 (float4*) forceB,
 							 (float4*) forceC,
