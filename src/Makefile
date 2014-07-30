@@ -204,13 +204,13 @@ build: fmr
 new_kcall.o: new_kcall.cu new_kern.cu new_kern.h new_kcall.h
 	$(NVCC) $(NVCCFLAGS) $(EXTRA_NVCCFLAGS) $(GENCODE_FLAGS) $(INCLUDES) -o $@ -c $<
 
-utilities.o: utilities.cu particles_kernel.cu particles_kernel.h
+utilities.o: utilities.cu utilities.h particles_kernel.cu particles_kernel.h
 	$(NVCC) $(NVCCFLAGS) $(EXTRA_NVCCFLAGS) $(GENCODE_FLAGS) $(INCLUDES) -o $@ -c $<
 
 particles.o: particles.cpp particleSystem.h
 	$(GCC) $(CCFLAGS) $(EXTRA_CCFLAGS) $(INCLUDES) -o $@ -c $<
 
-particleSystem.o: particleSystem.cpp particleSystem.h new_kern.h nlist.h connectedgraphs.h
+particleSystem.o: particleSystem.cpp particleSystem.h new_kern.h nlist.h new_kcall.h utilities.h connectedgraphs.h
 	$(GCC) $(CCFLAGS) $(EXTRA_CCFLAGS) $(INCLUDES) -o $@ -c $<
 
 render_particles.o: render_particles.cpp
