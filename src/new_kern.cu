@@ -431,7 +431,7 @@ __global__ void magFricForcesK( const float4* dSortedPos,	//i: pos we use to cal
 					expf(-nparams.spring*(sqrtf(lsq)/sepdist - 1.0f));
 			force += normalforce*er;
 		//	if(lsq <= sepdist*sepdist){
-				float3 v1 = f1/Cd1 + nparams.shear*p1.y;;
+				float3 v1 = f1/Cd1 + nparams.shear*p1.y;
 				float3 v2 = f2/Cd2 + nparams.shear*p2.y;
 
 				float3 relvel = v1 - v2;
