@@ -75,6 +75,7 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize,
 	rebuildDist = 0.01;
 	it_since_sort = 0;
 	clipPlane = -1.0;
+	static_fric = 0.5;
 }
 
 void pswap(float*& a, float*& b) {
@@ -340,7 +341,6 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
 		float dx_moved = 0.0f;
 		while(solve) {
 		
-			float static_fric = 0.5;
 			magFricForces(	m_dSortedPos,	//yin: yn
 						m_dSortedPos,	//yn
 						m_dPos1,   	//yn + 1/2*k1
@@ -856,7 +856,7 @@ void ParticleSystem::logParams(FILE* file)
 	fprintf(file, "worldsize: %.4gmm x %.4gmm x %.4gmm\n", newp.L.x*1e3f, 
 			newp.L.y*1e3f, newp.L.z*1e3f);
 	fprintf(file, "spring: %.2f visc: %.2f ", m_params.spring, m_params.viscosity);
-	fprintf(file, "Pin_d: %.3f Contact_d: %.3f\n", newp.pin_d, m_contact_dist);
+	fprintf(file, "Pin_d: %.3f Contact_d: %.3f static_fric: %.2f\n", newp.pin_d, m_contact_dist, static_fric);
 	fprintf(file, "rebuildDist: %.4g fdist %.2f cdist %u\n", rebuildDist, force_dist, cdist);
 	fprintf(file, "H.x: %.3g\tH.y: %.3g\tH.z: %.3g\n", newp.extH.x, newp.extH.y, newp.extH.z);
 

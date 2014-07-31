@@ -114,6 +114,7 @@ protected: // data
 	float m_cos_vert;
 	float m_tan_horz;
 	float force_dist;
+	float static_fric;
 
 	// CPU data
     float* m_hPos;              // particle positions
