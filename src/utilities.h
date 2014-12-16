@@ -53,7 +53,7 @@ float maxvel(float4* forces, float4* positions, NewParams& params);
 void resetMom(float4* moments, float3 extH, uint numParticles);
 void pshift(float4* positions, float3 s, uint numParticles);
 
-
+float bogacki_error(float4* k1, float4* k2, float4* k3, float4* k4, uint N, float Cd, float deltaTime);
 
 void sortParticles(uint *dGridParticleHash, uint *dGridParticleIndex, uint numParticles);
 void renderCutKern(float4* pos, float4 minPos, uint numParticles);

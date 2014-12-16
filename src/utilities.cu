@@ -380,6 +380,42 @@ void renderCutKern(float4* pos, float4 minPos, uint numParticles) {
 	transform(dpos, dpos+numParticles, dpos, renderCut(minPos));
 }
 
+
+struct bogacki
+{
+	bogacki(float dt, float c) : deltaTime(dt), Cd(c) {}
+	__host__ __device__ float operator() (const tuple<float4, float4, float4, float4>& p) {
+		float3 k1 = make_float3(get<0>(p));
+		float3 k2 = make_float3(get<1>(p));
+		float3 k3 = make_float3(get<2>(p));
+		float3 k4 = make_float3(get<3>(p));
+
+		float3 error = (float)(2.0/9.0 - 7.0/24.0)*k1 + (float)(3.0/9.0 - 6.0/24.0)*k2 +
+				(float)(4.0/9.0 - 8.0/24.0)*k3 + (float)(0.0 - 3.0/24.0)*k4;
+
+		return deltaTime*length(error)/Cd;
+	}
+	const float deltaTime;
+	const float Cd;
+};
+
+float bogacki_error(float4* k1, float4* k2, float4* k3, float4* k4, uint N, float Cd, float deltaTime) {
+
+	device_ptr<float4> dk1 = device_ptr<float4>(k1);
+	device_ptr<float4> dk2 = device_ptr<float4>(k2);
+	device_ptr<float4> dk3 = device_ptr<float4>(k3);
+	device_ptr<float4> dk4 = device_ptr<float4>(k4);
+
+	//transform reduce, unary func computes error, reducing to find max
+	return transform_reduce(
+			thrust::make_zip_iterator(make_tuple(dk1, dk2, dk3,dk4)),
+			thrust::make_zip_iterator(make_tuple(dk1+N, dk2+N, dk3+N,dk4+N)),
+			bogacki(deltaTime,Cd),
+			0.0f,
+			maximum<float>() );
+}
+
+
 void renderStuff(const float* pos, 
 				const float* moment, 
 				const float* force, 
