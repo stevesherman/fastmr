@@ -77,7 +77,7 @@ GCC             ?= g++
 VERSION=\"$(shell git describe --dirty --tags)\"
 EXTRA_NVCCFLAGS ?= -O3 -dc
 EXTRA_LDFLAGS   ?=
-EXTRA_CCFLAGS   ?= -std=c++0x -flto -O3 -DVERSION_NUMBER=$(VERSION) -march=native
+EXTRA_CCFLAGS   ?= -std=c++11 -flto -O3 -DVERSION_NUMBER=$(VERSION) -march=native
 
 # CUDA code generation flags - only using 20 because i only have 20
 GENCODE_SM10    := -gencode arch=compute_10,code=sm_10
@@ -118,8 +118,8 @@ endif
 
 # Debug build flags
 ifeq ($(dbg),1)
-      CCFLAGS   += -g
-      NVCCFLAGS += -g -G
+      CCFLAGS   +=  #-lineinfo
+      NVCCFLAGS +=  #-G -lineinfo
       TARGET    := debug
 else
       TARGET    := release
@@ -204,19 +204,19 @@ build: fmr
 new_kcall.o: new_kcall.cu new_kern.cu new_kern.h new_kcall.h
 	$(NVCC) $(NVCCFLAGS) $(EXTRA_NVCCFLAGS) $(GENCODE_FLAGS) $(INCLUDES) -o $@ -c $<
 
-utilities.o: utilities.cu particles_kernel.cu particles_kernel.h
+utilities.o: utilities.cu utilities.h particles_kernel.cu particles_kernel.h
 	$(NVCC) $(NVCCFLAGS) $(EXTRA_NVCCFLAGS) $(GENCODE_FLAGS) $(INCLUDES) -o $@ -c $<
 
 particles.o: particles.cpp particleSystem.h
 	$(GCC) $(CCFLAGS) $(EXTRA_CCFLAGS) $(INCLUDES) -o $@ -c $<
 
-particleSystem.o: particleSystem.cpp particleSystem.h new_kern.h nlist.h connectedgraphs.h
+particleSystem.o: particleSystem.cpp particleSystem.h new_kcall.h new_kern.h nlist.h connectedgraphs.h utilities.h
 	$(GCC) $(CCFLAGS) $(EXTRA_CCFLAGS) $(INCLUDES) -o $@ -c $<
 
 render_particles.o: render_particles.cpp
 	$(GCC) $(CCFLAGS) $(EXTRA_CCFLAGS) $(INCLUDES) -o $@ -c $<
 
-shaders.o: shaders.cpp
+shaders.o: shaders.cpp shaders.h
 	$(GCC) $(CCFLAGS) $(EXTRA_CCFLAGS) $(INCLUDES) -o $@ -c $<
 
 connectedgraphs.o: connectedgraphs.cpp connectedgraphs.h
