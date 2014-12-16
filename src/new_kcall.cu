@@ -37,14 +37,14 @@ void find_cellStart(uint* cellStart, uint* cellEnd, uint* phash, uint numParticl
 	findCellStartK<<< numBlocks, numThreads, sMemSize>>>(cellStart, cellEnd, phash);
 }
 
-void reorder(uint* d_pSortedIndex, float* dSortedPos, float* dSortedMom, float* oldPos, 
-		float* oldMom, uint numParticles)
+void reorder(uint* d_pSortedIndex, float* dSortedA, float* dSortedB,
+		float* oldA, float* oldB, uint numParticles)
 {
 	uint numThreads = 128;
 	uint numBlocks = iDivUp(numParticles, numThreads);
 
-	reorderK<<<numBlocks, numThreads>>>(d_pSortedIndex, (float4*)dSortedPos, (float4*)dSortedMom, 
-			(float4*)oldPos, (float4*)oldMom);
+	reorderK<<<numBlocks, numThreads>>>(d_pSortedIndex, (float4*)dSortedA,
+			(float4*)dSortedB, (float4*)oldA, (float4*)oldB);
 }
 
 
@@ -189,6 +189,23 @@ void integrateRK4(const float* oldPos, float* PosA, const float* PosB,
 							 (float4*) forceD,
 							 deltaTime,
 							 numParticles);
+}
+
+void bogacki_ynp1(	const float* d_yn, const float* d_k1, const float* d_k2,
+					const float* d_k3, float* d_ynp1, float deltaTime, uint numParticles) {
+	uint numThreads = 256;
+	uint numBlocks = iDivUp(numParticles, numThreads);
+	bogacki_ynp1k<<<numBlocks, numThreads>>>(
+								(float4*) d_yn,
+								(float4*) d_k1,
+								(float4*) d_k2,
+								(float4*) d_k3,
+								(float4*) d_ynp1,
+								deltaTime,
+								numParticles);
+
+	getLastCudaError("bogacki_ynp1");
+
 }
 
 

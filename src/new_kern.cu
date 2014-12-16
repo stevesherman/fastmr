@@ -86,20 +86,21 @@ __global__ void findCellStartK(uint* cellStart,		//o: cell starts
 }
 
 
-__global__ void reorderK(const uint* dSortedIndex, float4* sortedPos, float4* sortedMom, 
-		const float4* oldPos, const float4* oldMom)
+__global__ void reorderK(const uint* dSortedIndex, float4* sortedA,
+		float4* sortedB, const float4* oldA,
+		const float4* oldB)
 {
 	uint idx = blockIdx.x*blockDim.x + threadIdx.x;
 	if(idx >= nparams.N)
 		return;
 
 	uint sortedIdx = dSortedIndex[idx];
-	sortedPos[idx] = oldPos[sortedIdx];
-	sortedMom[idx] = oldMom[sortedIdx];
+	sortedA[idx] = oldA[sortedIdx];
+	sortedB[idx] = oldB[sortedIdx];
 }
 
 __device__ inline void applyBC(uint idx, float deltaTime, float radius1,
-		float3 p1, float3 force, const float4* integrPos, float4* newPos)
+		const float3 p1, float3 force, const float4* integrPos, float4* newPos)
 {
 	float Cd = 6.0f*PI_F*radius1*nparams.visc;
 	float ybot = p1.y - nparams.origin.y;
@@ -112,7 +113,16 @@ __device__ inline void applyBC(uint idx, float deltaTime, float radius1,
 		force = make_float3(nparams.shear*nparams.L.y*Cd,0,0);
 
 	float3 ipos = make_float3(integrPos[idx]);
-	newPos[idx] = make_float4(ipos + force/Cd*deltaTime, radius1);
+	float3 npos = ipos + force/Cd*deltaTime;
+
+	if(npos.y > 0.5*nparams.L.y - radius1) {
+		npos.y = 0.5*nparams.L.y - radius1;
+	}
+	if(npos.y <-0.5*nparams.L.y + radius1) {
+		npos.y = -0.5*nparams.L.y + radius1;
+	}
+
+	newPos[idx] = make_float4(npos, radius1);
 }
 
 
@@ -454,9 +464,9 @@ __global__ void magFricForcesK( const float4* dSortedPos,	//i: pos we use to cal
 	force.x += nparams.shear*ybot*Cd1;
 	
 	//apply flow BCs
-	if(ybot <= nparams.pin_d*radius1)
+	if(ybot < nparams.pin_d*radius1)
 		force = make_float3(0,0,0);
-	if(ybot >= nparams.L.y - nparams.pin_d*radius1)
+	if(ybot > nparams.L.y - nparams.pin_d*radius1)
 		force = make_float3(nparams.shear*nparams.L.y*Cd1,0,0);
 
 	float3 ipos = make_float3(integrPos[idx]);
@@ -558,6 +568,42 @@ __global__ void integrateRK4K(
 
 
 }
+
+__global__ void bogacki_ynp1k(
+							const float4* d_yn,
+							const float4* d_ynpk1,
+							const float4* d_ynpk2,
+							const float4* d_ynpk3,
+							float4* d_ynp1,
+							const float deltaTime,
+							const uint numParticles)
+{
+
+
+	uint index = blockIdx.x*blockDim.x + threadIdx.x;
+    if (index >= numParticles) return;          // handle case when no. of particles not multiple of block size
+
+	float4 old = d_yn[index];
+	float3 yn = make_float3(old);
+	float radius = old.w;
+
+	float3 k1 = 2.0f*(make_float3(d_ynpk1[index]) - yn);
+	float3 k2 = 4.0/3.0f*(make_float3(d_ynpk2[index]) - yn);
+	float3 k3 = make_float3(d_ynpk3[index]) - yn;
+
+	//float Cd = 6*PI_F*nparams.visc*radius;
+
+	float3 ynp1 = yn + (1.0f/9.0f)*(2.0f*k1 + 3.0f*k2 + 4.0f*k3);
+
+	ynp1.x -= nparams.L.x*rintf(ynp1.x*nparams.Linv.x);//this runs the risk of floating point errors pushing things outside the box
+	ynp1.z -= nparams.L.z*rintf(ynp1.z*nparams.Linv.z);
+	if (ynp1.y > -1.0f*nparams.origin.y - radius ) { ynp1.y = -1.0f*nparams.origin.y - radius;}
+	if (ynp1.y < nparams.origin.y + radius ) { ynp1.y = nparams.origin.y + radius; }
+
+	d_ynp1[index] = make_float4(ynp1, radius);
+
+}
+
 
 __global__ void collisionK( const float4* sortedPos,	//i: pos we use to calculate forces
 							const float4* oldVel,
