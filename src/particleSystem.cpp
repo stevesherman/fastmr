@@ -75,6 +75,7 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize,
 	rebuildDist = 0.01;
 	it_since_sort = 0;
 	clipPlane = -1.0;
+	last_dt = 0;
 }
 
 void pswap(float*& a, float*& b) {
@@ -277,9 +278,9 @@ void ParticleSystem::render(RenderMode mode)
 }
 
 // step the simulation, limdxpct is that max distance before iteration is re-solved
-float ParticleSystem::update(float deltaTime, float limdxpct)
+float ParticleSystem::update(float dt_ref, float limdxpct)
 {
-
+	float deltaTime = dt_ref;
 	setParameters(&m_params);
 	setNParameters(&newp);
 	bool rebuildNList = false;
@@ -289,7 +290,9 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
 		rebuildNList = true;
 		sort_and_reorder();
 	}else{
-		pswap(m_dSortedPos, m_dPos1);//make sortespos have output from previous iter
+		pswap(m_dSortedPos, m_dPos1);//make sortespos have yn
+		pswap(m_dPos1, m_dPos4); //inside pos1 has yn+1/2k1
+
 	}
 
 	if(m_randSet > 0)
@@ -333,6 +336,7 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
 			pswap(m_dMoments, m_dTemp);	
 		}
 	
+		/*// old shitty classic RK4
 		//if the particles are moving too much, half the timestep and resolve
 		bool solve = true;
 		float dx_moved = 0.0f;
@@ -387,13 +391,77 @@ float ParticleSystem::update(float deltaTime, float limdxpct)
 				dumpParticles(0, newp.N);
 				assert(false);
 			}
-		}
+		}*/
+		//shiny new bogacki 23
+		bool solve = false;
+		float dx_moved = 0.0f;
+		do {
+			if(deltaTime != last_dt || it_since_sort == 0){
+				magForces(	m_dSortedPos,	//yin: yn
+						m_dSortedPos,	//yn
+						m_dPos1,   	//yn + 1/2*k1
+						m_dForces1,   	//k1
+						m_dMoments, m_dNeighList, m_dNumNeigh, newp.N, 0.5f*deltaTime);
+			}
+			magForces(	m_dPos1, 		//yin: yn + 1/2*k1
+					m_dSortedPos, 	//yn
+					m_dPos2, 		//yn + 3/4*k2
+					m_dForces2,		//k2
+					m_dMoments, m_dNeighList, m_dNumNeigh, newp.N, 0.75*deltaTime);
+
+			magForces(	m_dPos2, 		//yin: yn + 1/2*k2
+					m_dSortedPos, 	//yn
+					m_dPos3, 		//yn + k3
+					m_dForces3,		//k3
+					m_dMoments, m_dNeighList, m_dNumNeigh, newp.N, deltaTime);
+
+			// compute y_np1, applies periodic BCs
+			bogacki_ynp1(	m_dSortedPos, m_dPos1, m_dPos2, m_dPos3, m_dPos1,
+					deltaTime, newp.N);
+			//compute f(y_np1) is k4/k1 at next step
+			//use dt=dt_ref under assumption that this is terminating iteration
+			magForces(	m_dPos1, 		//yin: ynp1
+					m_dPos1, 	//yn
+					m_dPos4, 		//yn + 1/2*k1
+					m_dForces4,		//k1
+					m_dMoments, m_dNeighList, m_dNumNeigh, newp.N, 0.5*dt_ref);
+			//	printf("even more after\n");
+			// compute error in magnetic forces?
+			float err = bogacki_error((float4*)m_dForces1, (float4*)m_dForces2, (float4*)m_dForces3,
+					(float4*) m_dForces4, newp.N, 6*M_PI*newp.visc*m_params.pRadius[0],deltaTime);
+			pswap(m_dForces4, m_dForces1);
+			//	printf("error=%.3g\n", err/m_params.pRadius[0]);
+
+			if(err > 0.001*m_params.pRadius[0]) {
+				solve = true;
+			} else {
+				solve = isOutofBounds((float4*)m_dPos1, newp.L/2.0, newp.N);
+			}
+
+			if(solve){
+				deltaTime *=.5f;
+				printf("error est %.3g\treducing timestep %.3g ", err/m_params.pRadius[0], deltaTime);
+				getBadP();
+			}
+			if(deltaTime <= 1e-30f && deltaTime != 0) {
+				printf("timestep fail!, ws=%fmm\n", newp.L.y*1e3);
+				getBadP();
+				getMagnetization();
+				NListStats();
+				dumpParticles(0, newp.N);
+				assert(false);
+			}
+
+		} while(solve);
+		dx_moved = maxvel((float4*)m_dForces1,(float4*)m_dPos1,newp)*deltaTime;
+
 		//1.25 is a slack factor in the particle diffusivity
 		dx_since += dx_moved + newp.shear*(force_dist*1.25f)*m_params.pRadius[0]*deltaTime;
-	
+		last_dt = dt_ref;
 	}
 	it_since_sort++;
-		
+	//printf("dx_since= %.3g, it_since_sort=%d\n", dx_since, it_since_sort);
+//	printf("dt=%.4g\n", deltaTime);
 	return deltaTime;
 }
 
@@ -415,7 +483,7 @@ void ParticleSystem::dangerousResize(double  y) {
 }
 
 
-// takes contents of Pos1 and sorts it into m_dSortedPos
+// takes contents of Pos1 and sorts it into m_dSortedPos, and m_dMoments into m_dTempt
 void ParticleSystem::sort_and_reorder() {
 		
 	// sort particles based on hash
@@ -425,8 +493,11 @@ void ParticleSystem::sort_and_reorder() {
 	// find start and end of each cell - also sets the fixed moment
 	find_cellStart(m_dCellStart, m_dCellEnd, m_dGridParticleHash, newp.N, m_numGridCells);
 	//reorder
-	reorder(m_dGridParticleIndex, m_dSortedPos, m_dTemp, m_dPos1, m_dMoments, newp.N);	
+	reorder(m_dGridParticleIndex, m_dSortedPos, m_dTemp, m_dPos1, m_dMoments, newp.N);
 	pswap(m_dMoments, m_dTemp);
+	//reorder and swap k4 data - for Bogacki only
+	reorder(m_dGridParticleIndex, m_dPos1, m_dTemp, m_dPos4, m_dForces1, newp.N);
+	pswap(m_dForces1, m_dTemp);
 	//printf("it since sort: %d\n", it_since_sort);	
 	it_since_sort = 0;
 }

@@ -101,6 +101,7 @@ protected: // data
 	float rand_scale;
     float dx_since;
 	float rebuildDist;	//the distance in units of rad[0] traveled before we resolve
+	float last_dt;
 	// params
     SimParams m_params;
     NewParams newp;
