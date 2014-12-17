@@ -115,11 +115,11 @@ __device__ inline void applyBC(uint idx, float deltaTime, float radius1,
 	float3 ipos = make_float3(integrPos[idx]);
 	float3 npos = ipos + force/Cd*deltaTime;
 
-	if(npos.y > 0.5*nparams.L.y - radius1) {
-		npos.y = 0.5*nparams.L.y - radius1;
+	if(npos.y > 0.5f*nparams.L.y - radius1) {
+		npos.y = 0.5f*nparams.L.y - radius1;
 	}
-	if(npos.y <-0.5*nparams.L.y + radius1) {
-		npos.y = -0.5*nparams.L.y + radius1;
+	if(npos.y <-0.5f*nparams.L.y + radius1) {
+		npos.y = -0.5f*nparams.L.y + radius1;
 	}
 
 	newPos[idx] = make_float4(npos, radius1);
@@ -160,10 +160,11 @@ __global__ void pointDipK( const float4* dSortedPos,	//i: pos we use to calculat
 		er.x = er.x - nparams.L.x*rintf(er.x*nparams.Linv.x);
 		er.z = er.z - nparams.L.x*rintf(er.z*nparams.Linv.z);
 		float lsq = er.x*er.x + er.y*er.y + er.z*er.z;
-		float inv_dist = rsqrtf(lsq);
-		er = er*inv_dist;
 
 		if(lsq <= nparams.forcedist_sq*sepdist*sepdist) {
+
+			float inv_dist = rsqrtf(lsq);
+			er = er*inv_dist;
 
 			float3 f_ij = er*(1 - 5*er.y*er.y);
 			f_ij.y += 2*er.y;
