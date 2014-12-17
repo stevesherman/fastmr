@@ -112,7 +112,7 @@ void pointDip(const float* dSortedPos, const float* dIntPos, float* newPos, floa
 {
 	assert(newPos != dIntPos);
 	assert(newPos != dSortedPos);
-	uint numThreads = 128;
+	uint numThreads = 192;
 	uint numBlocks = iDivUp(numParticles, numThreads);
 	cudaFuncSetCacheConfig(pointDipK, cudaFuncCachePreferL1);
 
