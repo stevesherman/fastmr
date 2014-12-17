@@ -5,7 +5,7 @@
 
 class VarCond{
 public:
-	//set default distance to 1.0 for testing purposes
+	//set default distance in diams to 1.0 for testing purposes
 	VarCond(float max_dist = 1.0f) : max_distsq(max_dist*max_dist) {}
 	__host__ __device__ bool operator()(const float rad1, const float rad2,
 			const float3, const float distsq) const {
@@ -53,7 +53,7 @@ public:
 
 class MomVar {
 public:
-	MomVar(float d, float n) : max_distsq(d), nm_dist(n) {}
+	MomVar(float d, float n) : max_distsq(d*d), nm_dist(n*n) {}
 	__host__ __device__ bool operator()(const float rad1, const float rad2,
 			const float3, const float distsq, const float Cp1, const float Cp2) const
 	{
@@ -69,8 +69,8 @@ public:
 
 class MomCut {
 public:
-	MomCut(float max_dist, float big_pct, float n) : bigrad(max_dist*big_pct), 
-			lilrad(max_dist*(1.0f - big_pct)), nm_dist(n) {}
+	MomCut(float max_dist, float big_pct, float n) : bigrad(2.0f*max_dist*big_pct),
+			lilrad(2.0f*max_dist*(1.0f - big_pct)), nm_dist(n*n) {}
 	
 	__host__ __device__ bool operator()(const float rad1, const float rad2,
 			const float3, const float distsq, const float Cp1, const float Cp2) const
