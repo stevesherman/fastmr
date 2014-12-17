@@ -48,7 +48,7 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize,
 	newp.cellSize = m_params.cellSize;
 	newp.origin = m_params.worldOrigin;
 	newp.Linv = 1/newp.L;
-	force_dist = fdist;
+	force_dist = fdist; //in units of radiuses(!)
 	float slack = slk; // slack factor allows for interactions of larger particles
 	cdist = ceil(slack*force_dist*m_params.pRadius[0]/newp.cellSize.x);
 	newp.numAdjCells = pow(2*cdist + 1,3);
@@ -322,117 +322,54 @@ float ParticleSystem::update(float dt_ref, float limdxpct)
 	} else {
 
 		if (rebuildNList) {
-			MomCut asdf(force_dist + rebuildDist, 0.5f, 1.05f);
-			momNList(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dMoments, m_dGridParticleHash, 
+			//force_dist is in radii, the cond operators are in diams
+			VarCond asdf(0.5f*(force_dist + rebuildDist));
+			funcNList(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash,
 					m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, asdf);
-			
 			dx_since = 0.0f;
 		}
 
-		if(m_params.mutDipIter != 0) resetMom((float4*) m_dMoments, newp.extH, newp.N);	
-		//note that odd numbers of iterations prevent sheet formation
-		for(int i = 0; i < m_params.mutDipIter; i++) {
-			mutualMagn(m_dSortedPos,m_dMoments, m_dTemp, m_dNeighList, m_dNumNeigh, newp.N);
-			pswap(m_dMoments, m_dTemp);	
-		}
-	
-		/*// old shitty classic RK4
-		//if the particles are moving too much, half the timestep and resolve
-		bool solve = true;
-		float dx_moved = 0.0f;
-		while(solve) {
-		
-			
-			magForces(	m_dSortedPos,	//yin: yn 
-						m_dSortedPos,	//yn
-						m_dPos1,   	//yn + 1/2*k1
-						m_dForces1,   	//k1
-						m_dMoments, m_dNeighList, m_dNumNeigh, newp.N, deltaTime/2);
-			magForces(	m_dPos1, 		//yin: yn + 1/2*k1
-						m_dSortedPos, 	//yn
-						m_dPos2, 		//yn + 1/2*k2
-						m_dForces2,		//k2
-						m_dMoments, m_dNeighList, m_dNumNeigh, newp.N, deltaTime/2);
-			magForces(	m_dPos2, 		//yin: yn + 1/2*k2
-						m_dSortedPos, 	//yn
-						m_dPos3, 		//yn + k3
-						m_dForces3,		//k3
-						m_dMoments, m_dNeighList, m_dNumNeigh, newp.N, deltaTime);
-			magForces(	m_dPos3, 		//yin: yn + k3
-						m_dSortedPos, 	//yn
-						m_dPos4, 		// doesn't matter
-						m_dForces4,		//k4
-						m_dMoments, m_dNeighList, m_dNumNeigh, newp.N, deltaTime);
-		
-			integrateRK4(m_dSortedPos, m_dPos1, m_dPos2, m_dPos3, m_dPos4, m_dForces1, 
-					m_dForces2, m_dForces3, m_dForces4, deltaTime, newp.N);
-
-			solve = false;	
-		
-			//find max force
-			dx_moved = maxvel((float4*)m_dForces1,(float4*)m_dPos1,newp)*deltaTime;
-			//limdx is limit allowed per iteration
-			float limDx = limdxpct*m_params.pRadius[0];
-			if(dx_moved > limDx){
-				solve = true;
-			} else { //if not excess force, check for out of bounds
-				solve = isOutofBounds((float4*)m_dPos1, newp.L/2.0, newp.N);
-			}
-			if(solve){
-				deltaTime *=.5f;
-				printf("force excess ratio %.3g\treducing timestep %.3g\n", dx_moved/limDx, deltaTime);
-				//getBadP();	
-			}
-			if(deltaTime <= 1e-30f && deltaTime != 0) {
-				printf("timestep fail!, ws=%fmm\n", newp.L.y*1e3);
-				getBadP();
-				getMagnetization();
-				NListStats();
-				dumpParticles(0, newp.N);
-				assert(false);
-			}
-		}*/
 		//shiny new bogacki 23
 		bool solve = false;
 		float dx_moved = 0.0f;
 		do {
 			if(deltaTime != last_dt || it_since_sort == 0){
-				magForces(	m_dSortedPos,	//yin: yn
+				pointDip(	m_dSortedPos,	//yin: yn
 						m_dSortedPos,	//yn
 						m_dPos1,   	//yn + 1/2*k1
 						m_dForces1,   	//k1
-						m_dMoments, m_dNeighList, m_dNumNeigh, newp.N, 0.5f*deltaTime);
+						m_dNeighList, m_dNumNeigh, newp.N, 300e3f,0.5f*deltaTime);
 			}
-			magForces(	m_dPos1, 		//yin: yn + 1/2*k1
+			pointDip(	m_dPos1, 		//yin: yn + 1/2*k1
 					m_dSortedPos, 	//yn
 					m_dPos2, 		//yn + 3/4*k2
 					m_dForces2,		//k2
-					m_dMoments, m_dNeighList, m_dNumNeigh, newp.N, 0.75*deltaTime);
+					m_dNeighList, m_dNumNeigh, newp.N, 300e3f,0.75*deltaTime);
 
-			magForces(	m_dPos2, 		//yin: yn + 1/2*k2
+			pointDip(	m_dPos2, 		//yin: yn + 1/2*k2
 					m_dSortedPos, 	//yn
 					m_dPos3, 		//yn + k3
 					m_dForces3,		//k3
-					m_dMoments, m_dNeighList, m_dNumNeigh, newp.N, deltaTime);
+					m_dNeighList, m_dNumNeigh, newp.N, 300e3f,deltaTime);
 
 			// compute y_np1, applies periodic BCs
 			bogacki_ynp1(	m_dSortedPos, m_dPos1, m_dPos2, m_dPos3, m_dPos1,
 					deltaTime, newp.N);
 			//compute f(y_np1) is k4/k1 at next step
 			//use dt=dt_ref under assumption that this is terminating iteration
-			magForces(	m_dPos1, 		//yin: ynp1
+			pointDip(	m_dPos1, 		//yin: ynp1
 					m_dPos1, 	//yn
 					m_dPos4, 		//yn + 1/2*k1
 					m_dForces4,		//k1
-					m_dMoments, m_dNeighList, m_dNumNeigh, newp.N, 0.5*dt_ref);
-			//	printf("even more after\n");
+					m_dNeighList, m_dNumNeigh, newp.N, 300e3f,0.5*dt_ref);
+
 			// compute error in magnetic forces?
 			float err = bogacki_error((float4*)m_dForces1, (float4*)m_dForces2, (float4*)m_dForces3,
 					(float4*) m_dForces4, newp.N, 6*M_PI*newp.visc*m_params.pRadius[0],deltaTime);
 			pswap(m_dForces4, m_dForces1);
 			//	printf("error=%.3g\n", err/m_params.pRadius[0]);
 
-			if(err > 0.001*m_params.pRadius[0]) {
+			if(err > 0.002*m_params.pRadius[0]) {
 				solve = true;
 			} else {
 				solve = isOutofBounds((float4*)m_dPos1, newp.L/2.0, newp.N);
