@@ -75,7 +75,7 @@ GCC             ?= g++
 
 # Extra user flags
 VERSION=\"$(shell git describe --dirty --tags)\"
-EXTRA_NVCCFLAGS ?= -O3 -dc
+EXTRA_NVCCFLAGS ?= -O3 -dc -lineinfo
 EXTRA_LDFLAGS   ?=
 EXTRA_CCFLAGS   ?= -std=c++11 -flto -O3 -DVERSION_NUMBER=$(VERSION) -march=native
 
@@ -118,8 +118,8 @@ endif
 
 # Debug build flags
 ifeq ($(dbg),1)
-      CCFLAGS   +=  #-lineinfo
-      NVCCFLAGS +=  #-G -lineinfo
+      CCFLAGS   +=  -g 
+      NVCCFLAGS +=  -g -G 
       TARGET    := debug
 else
       TARGET    := release
@@ -228,12 +228,15 @@ sfc_pack.o: sfc_pack.cpp sfc_pack.h
 nlist.o: nlist.cu nlist.h
 	$(NVCC) $(NVCCFLAGS) $(EXTRA_NVCCFLAGS) $(GENCODE_FLAGS) $(INCLUDES) -o $@ -c $<
 
+sobol.o: sobol.cpp sobol.hpp
+	$(GCC) $(CCFLAGS) $(EXTRA_CCFLAGS) $(INCLUDES) -o $@ -c $<
+
 #links all the device code together, allowing shared memory space
 device.o: nlist.o new_kcall.o utilities.o
 	$(NVCC) $(NVCCFLAGS) $(GENCODE_FLAGS) $(INCLUDES) -dlink $+ -o $@ 
 
 #link the host code
-fmr: particles.o particleSystem.o connectedgraphs.o sfc_pack.o render_particles.o shaders.o device.o nlist.o utilities.o new_kcall.o
+fmr: particles.o particleSystem.o sobol.o connectedgraphs.o sfc_pack.o render_particles.o shaders.o device.o nlist.o utilities.o new_kcall.o
 	$(GCC) $(CCFLAGS) $(EXTRA_CCFLAGS) -o $@ $+ $(LDFLAGS) $(EXTRA_LDFLAGS)
 
 run: build
