@@ -408,8 +408,8 @@ float bogacki_error(float4* k1, float4* k2, float4* k3, float4* k4, uint N, floa
 
 	//transform reduce, unary func computes error, reducing to find max
 	return transform_reduce(
-			thrust::make_zip_iterator(make_tuple(dk1, dk2, dk3,dk4)),
-			thrust::make_zip_iterator(make_tuple(dk1+N, dk2+N, dk3+N,dk4+N)),
+			make_zip_iterator(make_tuple(dk1, dk2, dk3,dk4)),
+			make_zip_iterator(make_tuple(dk1+N, dk2+N, dk3+N,dk4+N)),
 			bogacki(deltaTime,Cd),
 			0.0f,
 			maximum<float>() );
