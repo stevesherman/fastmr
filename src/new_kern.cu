@@ -99,7 +99,7 @@ __global__ void reorderK(const uint* dSortedIndex, float4* sortedA,
 	sortedB[idx] = oldB[sortedIdx];
 }
 
-__device__ inline void applyBC(uint idx, float deltaTime, float radius1,
+__device__ inline void applyBC(uint idx, float deltaTime, const float radius1,
 		const float3 p1, float3 force, const float4* integrPos, float4* newPos)
 {
 	float Cd = 6.0f*PI_F*radius1*nparams.visc;
@@ -115,12 +115,9 @@ __device__ inline void applyBC(uint idx, float deltaTime, float radius1,
 	float3 ipos = make_float3(integrPos[idx]);
 	float3 npos = ipos + force/Cd*deltaTime;
 
-	if(npos.y > 0.5f*nparams.L.y - radius1) {
-		npos.y = 0.5f*nparams.L.y - radius1;
-	}
-	if(npos.y <-0.5f*nparams.L.y + radius1) {
-		npos.y = -0.5f*nparams.L.y + radius1;
-	}
+	float edge = 0.5f*nparams.L.y - radius1;
+	npos.y = npos.y > edge ? edge : npos.y;
+	npos.y = npos.y < -edge ? -edge : npos.y;
 
 	newPos[idx] = make_float4(npos, radius1);
 }
@@ -133,8 +130,8 @@ __global__ void pointDipK( const float4* dSortedPos,	//i: pos we use to calculat
 							const uint* num_neigh,	//i: the number of inputs
 							float4* dForce,		//o: the magnetic force on a particle
 							float4* newPos,		//o: the integrated position
-							const float Magn,
-							float deltaTime)	//o: the timestep
+							const float mu0M2,	//i: mu0*M^2
+							float deltaTime)	//i: the timestep
 {
 	uint idx = blockDim.x*blockIdx.x + threadIdx.x;
 	if(idx >= nparams.N)
@@ -172,7 +169,7 @@ __global__ void pointDipK( const float4* dSortedPos,	//i: pos we use to calculat
 
 			float inv_sep = 1.0f/sepdist;
 			f_ij += 2.0f*(inv_sep*inv_sep*inv_sep*inv_sep)*
-					expf(-nparams.spring*((1.0f/inv_dist)*inv_sep - 1))*er;
+					expf(-nparams.spring*((1.0f/inv_dist)*inv_sep - 1.0f))*er;
 			//multiply by the "volume" of rad2
 			f_ij *= (radius2*radius2*radius2);
 
@@ -181,7 +178,7 @@ __global__ void pointDipK( const float4* dSortedPos,	//i: pos we use to calculat
 	}
 
 	//convert force into physical units
-	force *= 4.0/3.0*PI_F*MU_0*(radius1*radius1*radius1)*(Magn*Magn);
+	force *= 4.0f/3.0f*PI_F*(radius1*radius1*radius1)*mu0M2;
 	dForce[idx] = make_float4(force,0.0f);
 	applyBC(idx, deltaTime, radius1, p1, force, integrPos, newPos);
 }
@@ -370,6 +367,7 @@ __global__ void vertEdgeK(const uint* nlist,
 	conn[idx] = connections; //for this to work, nlist must be regenned immediately after calling this
 }
 
+//note: gives non-physical results
 __global__ void magFricForcesK( const float4* dSortedPos,	//i: pos we use to calculate forces
 							const float4* dMom,		//i: the moment
 							const float4* dForceIn,  //i: the old force, used to find velocity		
