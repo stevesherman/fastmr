@@ -31,9 +31,13 @@ uint width = 600, height = 600;
 // view params
 int ox, oy;
 int buttonState = 0;
-float camera_trans[] = {0, 0, -2.2e-3};
+
+const float length_scale = 1.0f;
+
+
+float camera_trans[] = {0, 0, -300*length_scale};
 float camera_rot[]   = {0, 0, 0};
-float camera_trans_lag[] = {0, 0, -3e-3};
+float camera_trans_lag[] = {0, 0, -350*length_scale};
 float camera_rot_lag[] = {0, 0, 0};
 const float inertia = 0.1;
 
@@ -61,10 +65,11 @@ const int idleDelay = 300;
 
 SimParams pdata;
 
+
 // simulation parameters - should be pulled into some default structure
-float timestep = 500; //in units of nanoseconds
+float timestep = 0.2; //in units of nanoseconds
 double simtime = 0.0f;
-float externalH = 100; //kA/m
+float externalH = 1/3*sqrt(48/M_PI/(4e-7*M_PI))*1e-3;
 float colorFmax = 0.75;
 float clipPlane = -1.0;
 float iter_dxpct = 0.035;
@@ -76,7 +81,7 @@ float con_ang_vert = acos(sqrt(3.0/5.0))*180.0/M_PI;
 float con_ang_horz = 45;
 float3 worldSize;
 float maxtime = 0;
-float cellScale = 8;
+float cellScale = 4;
 
 int resolved = 0;//number of times the integrator had to resolve a step
 
@@ -131,15 +136,22 @@ void setParams(){
 void qupdate()
 {
  	setParams();
+
+	float magn = 3*externalH*1e3;
+	float F0 = M_PI/48.0*(4e-7*M_PI)*magn*magn*(length_scale*length_scale);
+	float Cd = 3*M_PI*length_scale*pdata.viscosity;
+	float tscale = Cd*(length_scale)/F0; //global sim units
+	float step_scale = tscale/pdata.spring;
+
 	//this crude hack makes pinned particles at start unpinned so they can space and unfuck each other
-	if(simtime < timestep)	psystem->setPinDist(0.8f);
+	if(simtime < timestep*step_scale)	psystem->setPinDist(0.8f);
 
 	if(strain != 0) {
 		float ws = worldSize.y*(1.0f + strain*sin(2.0f*M_PI/(period*1e6f)*simtime));
 		psystem->dangerousResize(ws);
 	}
 
-	float dtout = 1e9*psystem->update(timestep*1e-9f, iter_dxpct);
+	float dtout = 1e9*psystem->update(timestep*step_scale, iter_dxpct);
 	if(fabs(dtout - timestep) > .01f*dtout)
 		resolved++;
 	if(logInterval != 0 && frameCount % logInterval == 0){
@@ -149,7 +161,7 @@ void qupdate()
 
 		if(densLog){
 			fprintf(densfile,"%.7g\t", simtime*1e-3);
-			psystem->densDist(densfile, 0.25f*pdata.pRadius[0]);
+			psystem->densDist(densfile, 0.125f*length_scale);
 			fflush(densfile);
 		}
 	}
@@ -241,7 +253,6 @@ void computeFPS()
         sdkResetTimer(&timer);  
     }
 }
-
 
 void drawAxes() 
 {
@@ -403,7 +414,7 @@ void reshape(int w, int h)
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     float aspRatio = (float) w / (float) h;
-	gluPerspective(20.0, aspRatio, 0.1e-6, 10);
+	gluPerspective(20.0, aspRatio, length_scale*1e-2f, length_scale*500);
 	
 	width = w;
 	height = h;
@@ -494,8 +505,8 @@ void motion(int x, int y)
 	} 
 	else if (buttonState & 2) {
 		// middle = translate
-		camera_trans[0] += dx / 6e4f;
-		camera_trans[1] -= dy / 6e4f;
+		camera_trans[0] += dx *2*length_scale;
+		camera_trans[1] -= dy *2*length_scale;
 	}
 	else if (buttonState & 1) {
 		// left = rotate
@@ -540,7 +551,7 @@ void key(unsigned char key, int /*x*/, int /*y*/)
 		psystem->NListStats();
 		break;
 	case 'd':
-        psystem->densDist(stdout,0.25*pdata.pRadius[0]);
+        psystem->densDist(stdout,0.125*length_scale);
         break;
 	case 's': 
 		psystem->printStress();
@@ -632,7 +643,7 @@ void initParamList()
     if (g_useGL) {
         // create a new parameter list
 		paramlist = new ParamListGL("misc");
-        paramlist->AddParam(new Param<float>("time step (ns)", timestep, 0.0, 1200, 5, &timestep));
+        paramlist->AddParam(new Param<float>("time step (ns)", timestep, 0.0, 0.5, 0.01, &timestep));
 		paramlist->AddParam(new Param<float>("spring constant",pdata.spring, 0, 100, 1, &pdata.spring));
 		paramlist->AddParam(new Param<float>("H (kA/m)", externalH, 0, 1e3, 5, &externalH));
 		paramlist->AddParam(new Param<float>("shear rate", pdata.shear, 0, 2000, 50, &pdata.shear));
@@ -823,15 +834,15 @@ main(int argc, char** argv)
 		}	   
 		//keep the crashlog open to read the particles
 	} else {
-		float worldsize1d = .35;//units of mm
+		float worldsize1d = 40;//units of mm
 		clArgFloat("wsize", worldsize1d);
-		worldSize = make_float3(worldsize1d*1e-3f, worldsize1d*1e-3f, worldsize1d*1e-3f);
+		worldSize = make_float3(worldsize1d, worldsize1d, worldsize1d)*length_scale;
 		float volume = worldSize.x*worldSize.y*worldSize.z; 
 
-		float radius = 4.0f;
+		float radius = 0.5f;
 		//haven't figured out a good way to do this in a loop
 		clArgFloat("rad0", radius);
-		pdata.pRadius[0] = radius*1e-6f; //median diameter
+		pdata.pRadius[0] = radius*length_scale; //median diameter
 		pdata.volfr[0] = 0.30f;
 		clArgFloat("vfr0", pdata.volfr[0]);
 		pdata.mu_p[0] = 2000; //relative permeability
@@ -844,9 +855,9 @@ main(int argc, char** argv)
 						*exp(4.5f*pdata.rstd[0]*pdata.rstd[0]));
 		}
 
-		radius = 6.0f;
+		radius = 1.5f;
 		clArgFloat("rad1", radius);
-		pdata.pRadius[1] = radius*1e-6f;
+		pdata.pRadius[1] = radius*length_scale;
 		pdata.volfr[1] = 0.0f;
 		clArgFloat("vfr1", pdata.volfr[1]);
 		pdata.mu_p[1] = 2000;
@@ -859,9 +870,9 @@ main(int argc, char** argv)
 						*exp(4.5f*pdata.rstd[1]*pdata.rstd[1]));
 		}
 		
-		radius = 25.0f;
+		radius = 6.0f;
 		clArgFloat("rad2", radius);
-		pdata.pRadius[2] = radius*1e-6f;
+		pdata.pRadius[2] = radius*length_scale;
 		pdata.volfr[2] = 0.0f;
 		clArgFloat("vfr2", pdata.volfr[2]);
 		pdata.mu_p[2] = 1;
@@ -890,7 +901,7 @@ main(int argc, char** argv)
 	clArgFloat("H", externalH);
 	pdata.externalH = make_float3(0,externalH*1e3f,0);
 
-	clArgFloat("dt", timestep);//units of ns
+	clArgFloat("dt", timestep);//in ndim units
 	clArgFloat("maxtime", maxtime);//units of ns as well
 	clArgFloat("visc", pdata.viscosity);
 
@@ -907,7 +918,7 @@ main(int argc, char** argv)
 	pdata.worldOrigin = worldSize*-0.5f;
 
 	clArgFloat("cscale", cellScale);
-	float cellSize_des = cellScale*pdata.pRadius[0];
+	float cellSize_des = cellScale*length_scale;
 	float fdist = 8.0f;
 	clArgFloat("fdist", fdist);
 	float slack = 1.0;
@@ -986,7 +997,7 @@ main(int argc, char** argv)
     if (benchmark || !g_useGL) 
     {
        	if(maxtime <= 0)
-			maxtime = timestep*500*1e-3;
+			maxtime = 1e3;
 
         runBenchmark();
     }
