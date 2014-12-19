@@ -414,7 +414,7 @@ void reshape(int w, int h)
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     float aspRatio = (float) w / (float) h;
-	gluPerspective(20.0, aspRatio, length_scale*1e-2f, length_scale*500);
+	gluPerspective(20.0, aspRatio, length_scale*1e-2f, length_scale*1e4);
 	
 	width = w;
 	height = h;
