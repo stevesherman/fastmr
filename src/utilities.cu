@@ -74,11 +74,6 @@ void cudaGLInit(int argc, char **argv)
 	findCudaGLDevice(argc, (const char **)argv);
 }
 
-void threadSync()
-{
-    cudaThreadSynchronize();
-}
-
 void copyArrayToDevice(void* device, const void* host, int offset, int size)
 {
     cudaMemcpy((char *) device + offset, host, size, cudaMemcpyHostToDevice);
