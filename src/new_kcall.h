@@ -26,7 +26,7 @@ void finiteDip(const float* dSortedPos, const float* dIntPos, float* newPos, flo
 
 void pointDip(const float* dSortedPos, const float* dIntPos, float* newPos, float* dForce,
 		const uint* nlist, const uint* num_neigh, uint numParticles,
-		float magn, float deltaTime);
+		float forceFactor, float deltaTime);
 
 void magFricForces(const float* dSortedPos, const float* dIntPos, float* newPos, 
 		float* dForceOut, const float* dMom, const float* dForceIn,const uint* nlist,

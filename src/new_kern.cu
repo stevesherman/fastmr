@@ -130,8 +130,8 @@ __global__ void pointDipK( const float4* dSortedPos,	//i: pos we use to calculat
 							const uint* num_neigh,	//i: the number of inputs
 							float4* dForce,		//o: the magnetic force on a particle
 							float4* newPos,		//o: the integrated position
-							const float mu0M2,	//i: mu0*M^2
-							float deltaTime)	//i: the timestep
+							const float forceFactor,	//i: 4/3*pi*mu0*M^2
+							const float deltaTime)	//i: the timestep
 {
 	uint idx = blockDim.x*blockIdx.x + threadIdx.x;
 	if(idx >= nparams.N)
@@ -178,7 +178,7 @@ __global__ void pointDipK( const float4* dSortedPos,	//i: pos we use to calculat
 	}
 
 	//convert force into physical units
-	force *= 4.0f/3.0f*PI_F*(radius1*radius1*radius1)*mu0M2;
+	force *= forceFactor*(radius1*radius1*radius1);
 	dForce[idx] = make_float4(force,0.0f);
 	applyBC(idx, deltaTime, radius1, p1, force, integrPos, newPos);
 }

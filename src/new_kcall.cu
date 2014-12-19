@@ -108,7 +108,7 @@ void finiteDip(const float* dSortedPos, const float* dIntPos, float* newPos, flo
 
 void pointDip(const float* dSortedPos, const float* dIntPos, float* newPos, float* dForce,
 		const uint* nlist, const uint* num_neigh, uint numParticles,
-		float magn, float deltaTime)
+		float forceFactor, float deltaTime)
 {
 	assert(newPos != dIntPos);
 	assert(newPos != dSortedPos);
@@ -120,11 +120,11 @@ void pointDip(const float* dSortedPos, const float* dIntPos, float* newPos, floa
 
 	pointDipK<<<numBlocks,numThreads>>>( (float4*)dSortedPos, (float4*) dIntPos,
 			nlist, num_neigh, (float4*) dForce, (float4*) newPos,
-			magn,deltaTime);
+			forceFactor,deltaTime);
 
 	cudaUnbindTexture(pos_tex);
 
-	getLastCudaError("Finite Magforces error");
+	getLastCudaError("Point forces error");
 }
 
 void magFricForces(const float* dSortedPos, const float* dIntPos, float* newPos, 
