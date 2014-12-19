@@ -225,7 +225,7 @@ connectedgraphs.o: connectedgraphs.cpp connectedgraphs.h
 sfc_pack.o: sfc_pack.cpp sfc_pack.h
 	$(GCC) $(CCFLAGS) $(EXTRA_CCFLAGS) $(INCLUDES) -o $@ -c $<
 
-nlist.o: nlist.cu nlist.h
+nlist.o: nlist.cu nlist.h new_kern.h
 	$(NVCC) $(NVCCFLAGS) $(EXTRA_NVCCFLAGS) $(GENCODE_FLAGS) $(INCLUDES) -o $@ -c $<
 
 sobol.o: sobol.cpp sobol.hpp
