@@ -919,7 +919,7 @@ main(int argc, char** argv)
 
 	clArgFloat("cscale", cellScale);
 	float cellSize_des = cellScale*length_scale;
-	float fdist = 8.0f;
+	float fdist = 4.0f;
 	clArgFloat("fdist", fdist);
 	float slack = 1.0;
 	clArgFloat("slack", slack);

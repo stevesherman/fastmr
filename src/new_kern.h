@@ -15,6 +15,8 @@ public:
 	float3 origin;
 	uint numAdjCells;
 
+	float length_scale;
+
 	float3 L;
 	float3 Linv;
 	
@@ -22,7 +24,6 @@ public:
 	float forcedist_sq;
 
 	float spring;
-//	float uf;
 	float visc;
 	float shear;
 

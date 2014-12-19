@@ -41,6 +41,8 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize,
 
 	m_bUseOpenGL = useGL;
 
+	newp.length_scale = 2.0f*m_params.pRadius[0];
+
 	newp.N = m_numParticles;
 	newp.gridSize = m_params.gridSize;
 	newp.numCells = m_numGridCells;
@@ -48,12 +50,12 @@ ParticleSystem::ParticleSystem(SimParams params, bool useGL, float3 worldSize,
 	newp.origin = m_params.worldOrigin;
 	newp.L = worldSize;
 	newp.Linv = 1/newp.L;
-	force_dist = fdist; //in units of radiuses(!)
+	force_dist = fdist; //in units of length_scale
 	float slack = slk; // slack factor allows for interactions of larger particles
-	cdist = ceil(slack*force_dist*m_params.pRadius[0]/newp.cellSize.x);
+	cdist = ceil(slack*force_dist*newp.length_scale/newp.cellSize.x);
 	newp.numAdjCells = pow(2*cdist + 1,3);
 
-	newp.max_fdr_sq = force_dist*m_params.pRadius[0]*force_dist*m_params.pRadius[0];
+	newp.max_fdr_sq = force_dist*newp.length_scale*force_dist*newp.length_scale;
 	newp.forcedist_sq = force_dist*force_dist;
 	newp.spring = m_params.spring;
 	//newp.spring = 1.0f/(.02f*2.0f*m_params.pRadius[0]);
@@ -250,9 +252,9 @@ void ParticleSystem::render(RenderMode mode)
 
 	if(mode == FORCE){
 		//express colors as fraction of reference force, F0
-		float ref_moment = 4.0f*M_PI*pow(m_params.pRadius[0],3)*
-				(m_params.mu_p[0] - MU_C)/(m_params.mu_p[0]+2.0f*MU_C)*length(newp.extH);
-		float F0 = 3*MU_0*ref_moment*ref_moment/ (4*M_PI*powf(2*m_params.pRadius[0],4));
+		float ref_moment = M_PI/6.0f*pow(newp.length_scale,3)*
+				3.0f*(m_params.mu_p[0] - MU_C)/(m_params.mu_p[0]+2.0f*MU_C)*length(newp.extH);
+		float F0 = 3*MU_0*ref_moment*ref_moment/ (4*M_PI*powf(newp.length_scale,4));
 		renderStuff(m_dPos1, m_dMoments, m_dForces1, dRendPos, dRendColor, m_colorFmax*F0,
 				rand_scale, clipPlane,newp.N);
 	}
@@ -284,8 +286,8 @@ float ParticleSystem::update(float dt_ref, float limdxpct)
 	setParameters(&m_params);
 	setNParameters(&newp);
 	bool rebuildNList = false;
-	//printf("dx_since: %g\t cut: %g\n", dx_since, rebuildDist*m_params.pRadius[0]);
-	if(dx_since > rebuildDist*m_params.pRadius[0])
+	//printf("dx_since: %g\t cut: %g\n", dx_since, rebuildDist*0.5f*newp.length_scale);
+	if(dx_since > rebuildDist*0.5f*newp.length_scale)
 	{
 		rebuildNList = true;
 		sort_and_reorder();
@@ -308,7 +310,7 @@ float ParticleSystem::update(float dt_ref, float limdxpct)
 	
 			dx_since = 0.0f;
 		}
-		dx_since += 0.04f*m_params.pRadius[0];
+		dx_since += 0.04f*0.5f*newp.length_scale;
 		//sorted pos and forces 1 are the old positions
 		collision_new(m_dSortedPos, m_dForces1, m_dNeighList, m_dNumNeigh, m_dForces2, 
 				m_dPos2, newp.N, rand_scale*1.01f, 1e-3f);
@@ -323,7 +325,7 @@ float ParticleSystem::update(float dt_ref, float limdxpct)
 
 		if (rebuildNList) {
 			//force_dist is in radii, the cond operators are in diams
-			VarCond asdf(0.5f*(force_dist + rebuildDist));
+			VarCond asdf(force_dist + rebuildDist);
 			funcNList(m_dNeighList, m_dNumNeigh, m_dSortedPos, m_dGridParticleHash,
 					m_dCellStart, m_dCellEnd, m_dCellAdj, newp.N, m_maxNeigh, asdf);
 			dx_since = 0.0f;
@@ -367,11 +369,11 @@ float ParticleSystem::update(float dt_ref, float limdxpct)
 
 			// compute error in magnetic forces?
 			float err = bogacki_error((float4*)m_dForces1, (float4*)m_dForces2, (float4*)m_dForces3,
-					(float4*) m_dForces4, newp.N, 6*M_PI*newp.visc*m_params.pRadius[0],deltaTime);
+					(float4*) m_dForces4, newp.N, 3*M_PI*newp.visc*newp.length_scale,deltaTime);
 			pswap(m_dForces4, m_dForces1);
 			//	printf("error=%.3g\n", err/m_params.pRadius[0]);
 
-			if(err > 0.002*m_params.pRadius[0]) {
+			if(err > 0.001f*newp.length_scale) {
 				solve = true;
 			} else {
 				solve = isOutofBounds((float4*)m_dPos1, newp.L/2.0, newp.N);
@@ -379,7 +381,7 @@ float ParticleSystem::update(float dt_ref, float limdxpct)
 
 			if(solve){
 				deltaTime *=.5f;
-				printf("error est %.3g\treducing timestep %.3g ", err/m_params.pRadius[0], deltaTime);
+				printf("error est %.3g\treducing timestep %.3g ", err/newp.length_scale, deltaTime);
 				getBadP();
 			}
 			if(deltaTime <= 1e-30f && deltaTime != 0) {
@@ -395,7 +397,7 @@ float ParticleSystem::update(float dt_ref, float limdxpct)
 		dx_moved = maxvel((float4*)m_dForces1,(float4*)m_dPos1,newp)*deltaTime;
 
 		//1.25 is a slack factor in the particle diffusivity
-		dx_since += dx_moved + newp.shear*(force_dist*1.25f)*m_params.pRadius[0]*deltaTime;
+		dx_since += dx_moved + newp.shear*(force_dist*1.25f)*newp.length_scale*deltaTime;
 		last_dt = dt_ref;
 	}
 	it_since_sort++;
@@ -414,8 +416,8 @@ void ParticleSystem::dangerousResize(double  y) {
 	newp.Linv.y = 1.0/y;
 	newp.origin.y = -newp.L.y/2.0;
 	newp.cellSize.y = newp.L.y/newp.gridSize.y;
-	if( newp.cellSize.y < force_dist*m_params.pRadius[0]) {
-		newp.cellSize.y = force_dist*m_params.pRadius[0];
+	if( newp.cellSize.y < force_dist*newp.length_scale) {
+		newp.cellSize.y = force_dist*newp.length_scale;
 		printf("Cells shrunk excessively\n");
 	}
 
