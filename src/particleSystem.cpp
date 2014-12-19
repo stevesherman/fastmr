@@ -332,26 +332,27 @@ float ParticleSystem::update(float dt_ref, float limdxpct)
 		//shiny new bogacki 23
 		bool solve = false;
 		float dx_moved = 0.0f;
-		float mu0M2 = MU_0*(3.0*newp.extH.y)*(3.0*newp.extH.y);
+		// for radius based
+		float fcoeff = 4.0/3.0*M_PI*MU_0*(3.0*newp.extH.y)*(3.0*newp.extH.y);
 		do {
 			if(deltaTime != last_dt || it_since_sort == 0){
 				pointDip(	m_dSortedPos,	//yin: yn
 						m_dSortedPos,	//yn
 						m_dPos1,   	//yn + 1/2*k1
 						m_dForces1,   	//k1
-						m_dNeighList, m_dNumNeigh, newp.N, mu0M2,0.5f*deltaTime);
+						m_dNeighList, m_dNumNeigh, newp.N, fcoeff,0.5f*deltaTime);
 			}
 			pointDip(	m_dPos1, 		//yin: yn + 1/2*k1
 					m_dSortedPos, 	//yn
 					m_dPos2, 		//yn + 3/4*k2
 					m_dForces2,		//k2
-					m_dNeighList, m_dNumNeigh, newp.N, mu0M2,0.75*deltaTime);
+					m_dNeighList, m_dNumNeigh, newp.N, fcoeff,0.75*deltaTime);
 
 			pointDip(	m_dPos2, 		//yin: yn + 1/2*k2
 					m_dSortedPos, 	//yn
 					m_dPos3, 		//yn + k3
 					m_dForces3,		//k3
-					m_dNeighList, m_dNumNeigh, newp.N, mu0M2,deltaTime);
+					m_dNeighList, m_dNumNeigh, newp.N, fcoeff,deltaTime);
 
 			// compute y_np1, applies periodic BCs
 			bogacki_ynp1(	m_dSortedPos, m_dPos1, m_dPos2, m_dPos3, m_dPos1,
@@ -362,7 +363,7 @@ float ParticleSystem::update(float dt_ref, float limdxpct)
 					m_dPos1, 	//yn
 					m_dPos4, 		//yn + 1/2*k1
 					m_dForces4,		//k1
-					m_dNeighList, m_dNumNeigh, newp.N, mu0M2,0.5*dt_ref);
+					m_dNeighList, m_dNumNeigh, newp.N, fcoeff,0.5*dt_ref);
 
 			// compute error in magnetic forces?
 			float err = bogacki_error((float4*)m_dForces1, (float4*)m_dForces2, (float4*)m_dForces3,
