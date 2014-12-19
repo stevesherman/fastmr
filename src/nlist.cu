@@ -86,7 +86,7 @@ uint funcNList(uint*& nlist, //reference to the nlist pointer
 		uint& max_neigh, 
 		O op)
 {
-	uint numThreads = 128;
+	uint numThreads = 192;
 	uint numBlocks = iDivUp(numParticles, numThreads);
 	cudaFuncSetCacheConfig(funcNListK<O>, cudaFuncCachePreferL1);	
 
@@ -108,6 +108,7 @@ uint funcNList(uint*& nlist, //reference to the nlist pointer
 				cellStart, cellEnd, cellAdj, max_neigh, op);
 	}
 
+	getLastCudaError("funcNList");
 	return maxn;
 }
 
