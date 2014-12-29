@@ -15,7 +15,7 @@
 #include <cstdio>
 #include <ctime>
 #include <algorithm>
-
+#include <unistd.h>
 
 #include "particles.h"
 #include "particleSystem.h"
@@ -150,12 +150,12 @@ void qupdate()
 		psystem->dangerousResize(ws);
 	}
 
-	float dtout = 1e9*psystem->update(timestep*step_scale, iter_dxpct);
-	if(fabs(dtout - timestep) > .01f*dtout)
+	float dtout = psystem->update(timestep*step_scale, iter_dxpct);
+	if(fabs(dtout - timestep*step_scale) > .01f*dtout)
 		resolved++;
 	if(logInterval != 0 && frameCount % logInterval == 0){
 		printf("iter %d at %.2f/%.1f us\n", frameCount, simtime*1e-3f, maxtime);
-		psystem->logStuff(datalog, simtime*1e-3);	
+		psystem->logStuff(datalog, simtime);
 		fflush(datalog);
 
 		if(densLog){
@@ -215,12 +215,12 @@ void runBenchmark()
     printf("Run %u particles simulation for %f us...\n\n", pdata.numBodies, maxtime);
     cudaDeviceSynchronize();
     sdkStartTimer(&timer);
-	while(simtime < maxtime*1e3f){
+	while(simtime < maxtime){
 		qupdate();	    
 	}
 	//do a final write to the logfile
 	if(logInterval > 0)
-		psystem->logStuff(datalog, simtime*1e-3f);
+		psystem->logStuff(datalog, simtime);
 
     cudaDeviceSynchronize();
     sdkStopTimer(&timer);
@@ -231,7 +231,7 @@ void runBenchmark()
 
 	if(logInterval != 0) {
 		crashlog = fopen(crashname, "w");
-		fprintf(crashlog, "Time: %.12g ns\n", simtime);
+		fprintf(crashlog, "Time: %.12g s\n", simtime);
 		psystem->logParams(crashlog);
 		psystem->logParticles(crashlog);
 		fclose(crashlog); //sets up the overwrite
@@ -244,7 +244,7 @@ void computeFPS()
     if (fpsCount == fpsLimit) {
         char fps[256];
         float ifps = 1.f / (sdkGetAverageTimerValue(&timer) / 1000.f);
-        sprintf(fps, "CUDA MR Fluid Sim (%d particles): %3.1f fps Time: %.2f us",pdata.numBodies, ifps, simtime*1e-3);  
+        sprintf(fps, "CUDA MR Fluid Sim (%d particles): %3.1f fps Time: %g s",pdata.numBodies, ifps, simtime);
 
         glutSetWindowTitle(fps);
         fpsCount = 0; 
@@ -300,6 +300,8 @@ void display()
     // update the simulation
 	if (!bPause) {
 		qupdate();
+	} else {
+		usleep(1e4);
 	}
 
 	if (renderer){
@@ -397,7 +399,7 @@ void display()
     glutReportErrors();
 
     computeFPS();
-	if((maxtime > 0) && (simtime >= maxtime*1e3)){
+	if((maxtime > 0) && (simtime >= maxtime)){
 		exit(0);	
 	}
 
