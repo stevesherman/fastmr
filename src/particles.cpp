@@ -34,7 +34,6 @@ int buttonState = 0;
 
 const float length_scale = 1.0f;
 
-
 float camera_trans[] = {0, 0, -300*length_scale};
 float camera_rot[]   = {0, 0, 0};
 float camera_trans_lag[] = {0, 0, -350*length_scale};
@@ -68,7 +67,7 @@ SimParams pdata;
 
 // simulation parameters - should be pulled into some default structure
 float timestep = 0.2; //in nd units
-double simtime = 0.0f;//in ns
+double simtime = 0.0f;//in s
 float externalH = 1/3*sqrt(48/M_PI/(4e-7*M_PI))*1e-3;
 float colorFmax = 0.75;
 float clipPlane = -1.0;
@@ -83,7 +82,7 @@ float3 worldSize;
 float maxtime = 0;
 float cellScale = 4;
 
-int resolved = 0;//number of times the integrator had to resolve a step
+int resolved = -1100;//number of times the integrator had to resolve a step
 
 ParticleSystem *psystem = 0;
 
@@ -98,8 +97,8 @@ float modelView[16];
 
 ParamListGL *paramlist;
 
-// Auto-Verification Code
-int frameCount = 0;
+//counts number of iterations
+int frameCount = -1100;
 bool g_useGL = true;
 
 
@@ -154,7 +153,7 @@ void qupdate()
 	if(fabs(dtout - timestep*step_scale) > .01f*dtout)
 		resolved++;
 	if(logInterval != 0 && frameCount % logInterval == 0){
-		printf("iter %d at %.2f/%.1f us\n", frameCount, simtime*1e-3f, maxtime);
+		printf("iter %d at %.2f/%.1f s\n", frameCount, simtime, maxtime);
 		psystem->logStuff(datalog, simtime);
 		fflush(datalog);
 
@@ -166,7 +165,7 @@ void qupdate()
 	}
 	if( frameCount % 1000 == 0 && frameCount != 0 && logInterval != 0){
 		crashlog = fopen(crashname, "w");
-		fprintf(crashlog, "Time: %.12g ns\n", simtime);
+		fprintf(crashlog, "Time: %.12g s\n", simtime);
 		psystem->logParams(crashlog);
 		psystem->logParticles(crashlog);
 		fclose(crashlog);//sets up the overwrite
@@ -176,7 +175,7 @@ void qupdate()
 		char pname [256];
 		sprintf(pname, "/home/steve/Datasets/%s_plog%.5d.dat", filename, frameCount/partlogInt);
 		FILE* plog = fopen(pname, "w");
-		fprintf(plog, "Time: %g ns\n", simtime);
+		fprintf(plog, "Time: %g s\n", simtime);
 		psystem->logParams(plog);
 		psystem->logParticles(plog);
 		fclose(plog);	
@@ -212,7 +211,7 @@ void initGL(int argc, char **argv)
 
 void runBenchmark()
 {
-    printf("Run %u particles simulation for %f us...\n\n", pdata.numBodies, maxtime);
+    printf("Run %u particles simulation for %f s...\n\n", pdata.numBodies, maxtime);
     cudaDeviceSynchronize();
     sdkStartTimer(&timer);
 	while(simtime < maxtime){
@@ -574,15 +573,15 @@ void key(unsigned char key, int /*x*/, int /*y*/)
         break;
 	case '1':
         psystem->resetParticles(1100, 0.3f);
-		frameCount=0; simtime = 0; resolved = 0;
+		frameCount=-1100; simtime = 0; resolved = -1100;
 		break;
     case '2':
         psystem->resetParticles(300, 1.0f);
-		frameCount=0; simtime = 0; resolved = 0;
+		frameCount=-300; simtime = 0; resolved = -300;
 		break;
     case '3':
         psystem->resetParticles(20, 1.0f);
-		frameCount=0; simtime = 0; resolved = 0;
+		frameCount=-20; simtime = 0; resolved = -20;
 		break;
 	case '5':  						// preset angle for pretty screenshots
 		camera_rot[0] = 12;			// elevation angle
@@ -900,7 +899,7 @@ main(int argc, char** argv)
 	pdata.externalH = make_float3(0,externalH*1e3f,0);
 
 	clArgFloat("dt", timestep);//in ndim units
-	clArgFloat("maxtime", maxtime);//units of ns as well
+	clArgFloat("maxtime", maxtime);//units of s as well
 	clArgFloat("visc", pdata.viscosity);
 
 	float mason = 0.1;
@@ -999,7 +998,7 @@ main(int argc, char** argv)
     if (benchmark || !g_useGL) 
     {
        	if(maxtime <= 0)
-			maxtime = 1e3;
+			maxtime = 10;
 
         runBenchmark();
     }
