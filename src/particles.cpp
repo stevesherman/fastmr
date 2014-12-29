@@ -67,8 +67,8 @@ SimParams pdata;
 
 
 // simulation parameters - should be pulled into some default structure
-float timestep = 0.2; //in units of nanoseconds
-double simtime = 0.0f;
+float timestep = 0.2; //in nd units
+double simtime = 0.0f;//in ns
 float externalH = 1/3*sqrt(48/M_PI/(4e-7*M_PI))*1e-3;
 float colorFmax = 0.75;
 float clipPlane = -1.0;
@@ -142,7 +142,6 @@ void qupdate()
 	float Cd = 3*M_PI*length_scale*pdata.viscosity;
 	float tscale = Cd*(length_scale)/F0; //global sim units
 	float step_scale = tscale/pdata.spring;
-
 	//this crude hack makes pinned particles at start unpinned so they can space and unfuck each other
 	if(simtime < timestep*step_scale)	psystem->setPinDist(0.8f);
 
@@ -733,8 +732,8 @@ main(int argc, char** argv)
 	//set defaults
 	pdata.shear = 500;
 	pdata.spring = 50;
-	externalH = 100;
-	pdata.viscosity = 0.1;
+	externalH = 1e-3*sqrt(48.0/(M_PI*4e-7*M_PI))/3;
+	pdata.viscosity = 1/(3*M_PI);
 	pdata.colorFmax = colorFmax;
 	pdata.globalDamping = 0.8f; 
 	pdata.cdamping = 0.03f;
@@ -890,9 +889,6 @@ main(int argc, char** argv)
 
 
 	//now we take comman flags, overwriting default/restart values
-
-
-	clArgFloat("shear", pdata.shear);
 	clArgFloat("k", pdata.spring);
 
 	clArgFloat("strain", strain);
@@ -904,6 +900,10 @@ main(int argc, char** argv)
 	clArgFloat("dt", timestep);//in ndim units
 	clArgFloat("maxtime", maxtime);//units of ns as well
 	clArgFloat("visc", pdata.viscosity);
+
+	float mason = 0.1;
+	clArgFloat("mason", mason);
+	pdata.shear = mason/144.0*(4e-7*M_PI)*(9*externalH*externalH*1e6)/pdata.viscosity;
 
 	clArgFloat("cspring", pdata.cspring);
 	
