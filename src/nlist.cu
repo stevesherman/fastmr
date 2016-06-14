@@ -108,7 +108,7 @@ uint funcNList(uint*& nlist, //reference to the nlist pointer
 				cellStart, cellEnd, cellAdj, max_neigh, op);
 	}
 
-	getLastCudaError("funcNList");
+//	getLastCudaError("funcNList");
 	return maxn;
 }
 
