@@ -153,19 +153,19 @@ void qupdate()
 	if(fabs(dtout - timestep*step_scale) > .01f*dtout)
 		resolved++;
 	if(logInterval != 0 && frameCount % logInterval == 0){
-		printf("iter %d at %.2f/%.1f s\n", frameCount, simtime, maxtime);
+		printf("iter %d at %.2f/%.1f \n", frameCount, simtime, maxtime);
 		psystem->logStuff(datalog, simtime);
 		fflush(datalog);
 
 		if(densLog){
-			fprintf(densfile,"%.7g\t", simtime*1e-3);
+			fprintf(densfile,"%.4g\t", simtime);
 			psystem->densDist(densfile, 0.125f*length_scale);
 			fflush(densfile);
 		}
 	}
 	if( frameCount % 1000 == 0 && frameCount != 0 && logInterval != 0){
 		crashlog = fopen(crashname, "w");
-		fprintf(crashlog, "Time: %.12g s\n", simtime);
+		fprintf(crashlog, "Time: %.12g \n", simtime);
 		psystem->logParams(crashlog);
 		psystem->logParticles(crashlog);
 		fclose(crashlog);//sets up the overwrite
@@ -175,7 +175,7 @@ void qupdate()
 		char pname [256];
 		sprintf(pname, "/home/steve/Datasets/%s_plog%.5d.dat", filename, frameCount/partlogInt);
 		FILE* plog = fopen(pname, "w");
-		fprintf(plog, "Time: %g s\n", simtime);
+		fprintf(plog, "Time: %g \n", simtime);
 		psystem->logParams(plog);
 		psystem->logParticles(plog);
 		fclose(plog);	
@@ -184,7 +184,7 @@ void qupdate()
 
 
 
-	simtime += dtout;//so that it logs at the correct time
+	simtime += dtout/tscale;//so that it logs at the correct time
 	frameCount++;
 }
 
@@ -230,7 +230,7 @@ void runBenchmark()
 
 	if(logInterval != 0) {
 		crashlog = fopen(crashname, "w");
-		fprintf(crashlog, "Time: %.12g s\n", simtime);
+		fprintf(crashlog, "Time: %.7g \n", simtime);
 		psystem->logParams(crashlog);
 		psystem->logParticles(crashlog);
 		fclose(crashlog); //sets up the overwrite
@@ -243,7 +243,7 @@ void computeFPS()
     if (fpsCount == fpsLimit) {
         char fps[256];
         float ifps = 1.f / (sdkGetAverageTimerValue(&timer) / 1000.f);
-        sprintf(fps, "CUDA MR Fluid Sim (%d particles): %3.1f fps Time: %g s",pdata.numBodies, ifps, simtime);
+        sprintf(fps, "CUDA MR Fluid Sim (%d particles): %3.1f fps Time: %g ",pdata.numBodies, ifps, simtime);
 
         glutSetWindowTitle(fps);
         fpsCount = 0; 
@@ -757,8 +757,8 @@ main(int argc, char** argv)
 		char verno[30];
 
 		if(fgets(buff, 1024, crashlog) != NULL) {
-			matches = sscanf(buff, "Time: %lg ns", &simtime);
-			printf("matches = %d\t time: %g ns\n", matches, simtime);
+			matches = sscanf(buff, "Time: %lg ", &simtime);
+			printf("matches = %d\t time: %g \n", matches, simtime);
 		}
 
 		if(fgets(buff, 1024, crashlog) != NULL){
