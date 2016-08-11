@@ -867,7 +867,7 @@ void ParticleSystem::logParams(FILE* file)
 	fprintf(file, "spring: %.2f visc: %.5f ", m_params.spring, m_params.viscosity);
 	fprintf(file, "Pin_d: %.3f Contact_d: %.3f\n", newp.pin_d, m_contact_dist);
 	fprintf(file, "rebuildDist: %.4g fdist %.2f cdist %u\n", rebuildDist, force_dist, cdist);
-	fprintf(file, "H.x: %.3g\tH.y: %.3g\tH.z: %.3g\n", newp.extH.x, newp.extH.y, newp.extH.z);
+	fprintf(file, "H.x: %.3g\tH.y: %.6g\tH.z: %.3g\n", newp.extH.x, newp.extH.y, newp.extH.z);
 
 }
 
